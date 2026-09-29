@@ -37,7 +37,8 @@ NM_FOR_TARGET=$NM
 MAKEINFO=/usr/local/bin/makeinfo
 FLEX=/usr/local/bin/flex
 BISON=/usr/local/bin/bison
-BUILD_CFLAGS='-O0 -D_POSIX_SOURCE'
+BUILD_CFLAGS='-O2 -D_POSIX_SOURCE'
+SEED_CFLAGS='-O0 -D_POSIX_SOURCE'
 CFLAGS=$BUILD_CFLAGS
 CXXFLAGS=$BUILD_CFLAGS
 CPPFLAGS='-D_POSIX_SOURCE'
@@ -97,8 +98,9 @@ cd "$BUILDDIR"
     --disable-visibility
 
 # Three native compiler stages, followed by GCC's stage-2/stage-3 comparison.
-# Keep the port's conservative compiler build flags identical in every stage.
-"$MAKE" SHELL="$CONFIG_SHELL" STAGE1_CFLAGS="$BUILD_CFLAGS" \
+# Stock cc cannot optimize insn-attrtab.c within this host's resources.
+# Optimize the two self-built stages and runtimes; compare stages 2 and 3.
+"$MAKE" SHELL="$CONFIG_SHELL" STAGE1_CFLAGS="$SEED_CFLAGS" \
     BOOT_CFLAGS="$BUILD_CFLAGS" bootstrap
 
 # Force a fresh comparison rather than accepting the existing comparison stamp.

@@ -401,7 +401,7 @@ index 0000000..0aa3846
 +#define DEFAULT_PCC_STRUCT_RETURN 0
 diff --git a/gcc/config/i386/next.h b/gcc/config/i386/next.h
 new file mode 100644
-index 0000000..0dd151a
+index 0000000..e1d321e
 --- /dev/null
 +++ b/gcc/config/i386/next.h
 @@ -0,0 +1,183 @@
@@ -425,10 +425,10 @@ index 0000000..0dd151a
 +the Free Software Foundation, 59 Temple Place - Suite 330,
 +Boston, MA 02111-1307, USA.  */
 +
-+/* By default, target has a 80387, with IEEE FP.  */
++/* Use the 80387 for arithmetic and floating returns, as stock NeXT cc does.  */
 +
 +#undef	TARGET_SUBTARGET_DEFAULT
-+#define TARGET_SUBTARGET_DEFAULT  (MASK_80387 | MASK_IEEE_FP)
++#define TARGET_SUBTARGET_DEFAULT  (MASK_80387 | MASK_IEEE_FP | MASK_FLOAT_RETURNS)
 +
 +/* A C statement or statements which output an assembler instruction
 +   opcode to the stdio stream STREAM.  The macro-operand PTR is a
@@ -7337,7 +7337,7 @@ index a865d71..782103d 100644
  };
 -
 diff --git a/gcc/objc/objc-act.c b/gcc/objc/objc-act.c
-index c5ff5ff..9dfd47f 100644
+index c5ff5ff..794fb22 100644
 --- a/gcc/objc/objc-act.c
 +++ b/gcc/objc/objc-act.c
 @@ -8076,10 +8076,12 @@ objc_init_exceptions (void)
@@ -7353,6 +7353,26 @@ index c5ff5ff..9dfd47f 100644
      }
    /* APPLE LOCAL end radar 4590191 */
   /* APPLE LOCAL begin radar 2848255 */
+@@ -13745,6 +13747,10 @@ build_objc_method_call (int super_flag, tree method_prototype,
+       complete_type (ret_type);
+ #endif
+ /* APPLE LOCAL end radar 4491211 */
++      /* Classic NeXT uses ordinary messengers for all result types.  Its
++         aggregate result pointer is in %ebx, not a hidden stack argument;
++         the Darwin stret/fpret entry points do not exist on OPENSTEP.  */
++#ifndef NEXTSTEP_STRUCT_VALUE_REGNUM
+       /* If we are returning a struct in memory, and the address
+ 	 of that memory location is passed as a hidden first
+ 	 argument, then change which messenger entry point this
+@@ -13762,6 +13768,8 @@ build_objc_method_call (int super_flag, tree method_prototype,
+ 	sender = umsg_fpret_decl;
+       /* APPLE LOCAL end radar 4280641 */
+ 
++#endif
++
+       method_params = tree_cons (NULL_TREE, lookup_object,
+ 				 tree_cons (NULL_TREE, selector,
+ 					    method_params));
 diff --git a/gcc/opt-gather.awk b/gcc/opt-gather.awk
 index 084362e..351c2fd 100644
 --- a/gcc/opt-gather.awk

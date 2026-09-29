@@ -27,6 +27,7 @@ done
 cat > "$TMP.c" <<'EOF'
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 long long quad_probe = 0x1122334455667788LL;
 volatile long long numerator = -1234567890123LL;
@@ -39,10 +40,14 @@ static double collect(int count, ...) {
 }
 int main(void) {
     long long quotient, remainder;
+    char *end;
+    double parsed;
     quotient = numerator / divisor; remainder = numerator % divisor;
     if (quotient != -12727504021LL || remainder != -86LL) return 1;
     if (collect(3, 1.25, 2.5, -0.5) != 3.25) return 2;
     if (quad_probe != 0x1122334455667788LL) return 3;
+    parsed = strtod("3.25", &end);
+    if (parsed != 3.25 || *end != '\0') return 4;
     puts("gcc42 c ok"); return 0;
 }
 EOF
@@ -108,6 +113,102 @@ int main(void)
 EOF
 "$CXX" "$TMP.mm" -o "$TMP-objcpp" -framework Foundation
 [ "`"$TMP-objcpp"`" = "gcc42 objcpp ok" ]
+
+# Exercise classic NeXT aggregate/floating returns, super and forwarding.
+cat > "$TMP-return.m" <<'EOF'
+#import <Foundation/Foundation.h>
+typedef struct { int a, b, c; double d; } BootstrapValue;
+@protocol BootstrapProtocol
+- (int) protocolValue;
+@end
+@interface BootstrapBase : NSObject <BootstrapProtocol> { int bias; }
+- (id) initWithBias:(int)value;
+- (BootstrapValue) result:(int)value;
+@end
+@interface BootstrapBase (BootstrapCategory)
+- (int) categoryValue;
+@end
+@implementation BootstrapBase
+- (id) initWithBias:(int)value { self = [super init]; bias = value; return self; }
+- (int) protocolValue { return bias; }
+- (BootstrapValue) result:(int)value {
+    BootstrapValue result;
+    result.a = bias; result.b = value; result.c = bias + value;
+    result.d = 3.25;
+    return result;
+}
+@end
+@implementation BootstrapBase (BootstrapCategory)
+- (int) categoryValue { return [self protocolValue] + 10; }
+@end
+#include <stdio.h>
+@interface BootstrapChild : BootstrapBase { int extra; }
+- (id) initWithBias:(int)value;
+- (BootstrapValue) result:(int)value;
+@end
+@implementation BootstrapChild
+- (id) initWithBias:(int)value {
+    self = [super initWithBias:value]; extra = 100; return self;
+}
+- (BootstrapValue) result:(int)value {
+    BootstrapValue result;
+    result = [super result:value]; result.c += extra; return result;
+}
+@end
+#include <stdio.h>
+@interface BootstrapForwarder : NSObject { BootstrapBase *target; }
+- (id) initWithTarget:(BootstrapBase *)value;
+- (BootstrapValue) result:(int)value;
+@end
+@implementation BootstrapForwarder
+- (id) initWithTarget:(BootstrapBase *)value {
+    self = [super init]; target = [value retain]; return self;
+}
+- (void) dealloc { [target release]; [super dealloc]; }
+- (NSMethodSignature *) methodSignatureForSelector:(SEL)selector {
+    return [target methodSignatureForSelector:selector];
+}
+- (void) forwardInvocation:(NSInvocation *)invocation {
+    [invocation invokeWithTarget:target];
+}
+@end
+int main(void) {
+    NSAutoreleasePool *pool;
+    BootstrapBase *object;
+    BootstrapForwarder *proxy;
+    BootstrapValue direct, forwarded;
+    NSRange range;
+    double number;
+    int ok;
+    pool = [[NSAutoreleasePool alloc] init];
+    object = [[BootstrapChild alloc] initWithBias:7];
+    proxy = [[BootstrapForwarder alloc] initWithTarget:object];
+    direct = [object result:11];
+    forwarded = [proxy result:11];
+    range = [@"bootstrap" rangeOfString:@"strap"];
+    number = [[NSNumber numberWithDouble:3.25] doubleValue];
+    ok = direct.a == 7 && direct.b == 11 && direct.c == 118 && direct.d == 3.25
+        && forwarded.a == 7 && forwarded.b == 11 && forwarded.c == 118
+        && forwarded.d == 3.25 && range.location == 4 && range.length == 5
+        && number == 3.25;
+    [proxy release]; [object release]; [pool release];
+    if (!ok) return 1;
+    puts("gcc42 return ABI ok"); return 0;
+}
+EOF
+for level in 0 2; do
+    "$CC" -O$level -S "$TMP-return.m" -o "$TMP-return.s"
+    if grep 'msgSend.*_stret' "$TMP-return.s" >/dev/null 2>&1 ||
+       grep 'msgSend.*_fpret' "$TMP-return.s" >/dev/null 2>&1; then
+        echo "gcc42 emitted a Darwin-only Objective-C return messenger"
+        exit 1
+    fi
+    "$CC" -O$level "$TMP-return.m" -framework Foundation -o "$TMP-return"
+    [ "`"$TMP-return"`" = "gcc42 return ABI ok" ]
+    "$CXX" -O$level -x objective-c++ "$TMP-return.m" -framework Foundation -o "$TMP-return"
+    [ "`"$TMP-return"`" = "gcc42 return ABI ok" ]
+done
+/bin/rm -f "$TMP-return.m" "$TMP-return.s" "$TMP-return"
 
 /bin/rm -f "$TMP.c" "$TMP.cc" "$TMP.m" "$TMP.mm" "$TMP.s" \
     "$TMP-c" "$TMP-cxx" "$TMP-objc" "$TMP-objcpp" "$TMP.log"
