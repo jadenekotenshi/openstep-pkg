@@ -8,3 +8,10 @@ GAWK="$ROOT_DIR/usr/local/bin/gawk"
 
 value=`/bin/echo 41 | "$GAWK" '{ print $1 + 1 }'`
 [ "$value" = 42 ]
+
+# OPENSTEP vfprintf reports zero on success. The snprintf fallback must
+# recover the byte count or gawk loses the sign while formatting integers.
+value=`"$GAWK" 'BEGIN { printf "%d %d %d %.1f", -1, -42, 0, -1.5 }'`
+[ "$value" = "-1 -42 0 -1.5" ]
+value=`"$GAWK" 'BEGIN { print sprintf("%04d", -7) }'`
+[ "$value" = "-007" ]

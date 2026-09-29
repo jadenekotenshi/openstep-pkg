@@ -7407,17 +7407,93 @@ index 084362e..351c2fd 100644
  
  # Ignore comments and blank lines
  /^[ \t]*(;|$)/  { flag = 0; next }
+diff --git a/gcc/vec.h b/gcc/vec.h
+index 4387afb..3d3ef3c 100644
+--- a/gcc/vec.h
++++ b/gcc/vec.h
+@@ -488,8 +488,15 @@ typedef struct VEC(T,A) GTY						  \
+ 
+ /* Vector of integer-like object.  */
+ #if IN_GENGTYPE
++#if defined (NeXT) && __GNUC__ == 2 && __GNUC_MINOR__ == 7
++/* Stock GNU cpp loses #n placeholders when rescanning VEC arguments.
++   Keep the normal expansion verbatim for the initial gengtype build.  */
++{"DEF_VEC_I", "typedef struct VEC_ #0 _ #1 { unsigned num; unsigned alloc; #0 vec[1]; } VEC_ #0 _ #1" ";", "none"},
++{"DEF_VEC_ALLOC_I", "VEC_TA (#0,#1,#2,#3)" ";", 0},
++#else
+ {"DEF_VEC_I", VEC_STRINGIFY (VEC_T(#0,#1)) ";", "none"},
+ {"DEF_VEC_ALLOC_I", VEC_STRINGIFY (VEC_TA (#0,#1,#2,#3)) ";", NULL},
++#endif
+ #else
+ #define DEF_VEC_I(T)							  \
+ static inline void VEC_OP (T,must_be,integral_type) (void) 		  \
+@@ -509,8 +516,15 @@ struct vec_swallow_trailing_semi
+ 
+ /* Vector of pointer to object.  */
+ #if IN_GENGTYPE
++#if defined (NeXT) && __GNUC__ == 2 && __GNUC_MINOR__ == 7
++/* Stock GNU cpp loses #n placeholders when rescanning VEC arguments.
++   Keep the normal expansion verbatim for the initial gengtype build.  */
++{"DEF_VEC_P", "typedef struct VEC_ #0 _ #1 GTY(()) { unsigned num; unsigned alloc; #0 GTY ((length (\"%h.num\"))) vec[1]; } VEC_ #0 _ #1" ";", "none"},
++{"DEF_VEC_ALLOC_P", "typedef struct VEC_ #0 _ #2 #3 { VEC_ #0 _ #1 base; } VEC_ #0 _ #2" ";", 0},
++#else
+ {"DEF_VEC_P", VEC_STRINGIFY (VEC_T_GTY(#0,#1)) ";", "none"},
+ {"DEF_VEC_ALLOC_P", VEC_STRINGIFY (VEC_TA_GTY (#0,#1,#2,#3)) ";", NULL},
++#endif
+ #else
+ #define DEF_VEC_P(T) 							  \
+ static inline void VEC_OP (T,must_be,pointer_type) (void) 		  \
+@@ -814,8 +828,15 @@ static inline T *VEC_OP (T,A,safe_insert)		     	  	  \
+ 
+ /* Vector of object.  */
+ #if IN_GENGTYPE
++#if defined (NeXT) && __GNUC__ == 2 && __GNUC_MINOR__ == 7
++/* Stock GNU cpp loses #n placeholders when rescanning VEC arguments.
++   Keep the normal expansion verbatim for the initial gengtype build.  */
++{"DEF_VEC_O", "typedef struct VEC_ #0 _ #1 GTY(()) { unsigned num; unsigned alloc; #0 GTY ((length (\"%h.num\"))) vec[1]; } VEC_ #0 _ #1" ";", "none"},
++{"DEF_VEC_ALLOC_O", "typedef struct VEC_ #0 _ #2 #3 { VEC_ #0 _ #1 base; } VEC_ #0 _ #2" ";", 0},
++#else
+ {"DEF_VEC_O", VEC_STRINGIFY (VEC_T_GTY(#0,#1)) ";", "none"},
+ {"DEF_VEC_ALLOC_O", VEC_STRINGIFY (VEC_TA_GTY(#0,#1,#2,#3)) ";", NULL},
++#endif
+ #else
+ #define DEF_VEC_O(T)							  \
+ VEC_T_GTY(T,base);							  \
+diff --git a/include/ansidecl.h b/include/ansidecl.h
+index a1a765d..230a2d5 100644
+--- a/include/ansidecl.h
++++ b/include/ansidecl.h
+@@ -243,7 +243,9 @@ So instead we use the macro below and test it against specific values.  */
+    macros freely, and know that they will come into play for the
+    version of gcc in which they are supported.  */
+ 
+-#if (GCC_VERSION < 2007)
++/* NeXT GCC 2.7 rejects attributes before parameter types, as emitted by
++   gengtype.  Retain attributes when later stages compile themselves.  */
++#if (GCC_VERSION < 2007) || (defined (NeXT) && GCC_VERSION < 2008)
+ # define __attribute__(x)
+ #endif
+ 
 diff --git a/include/stdint.h b/include/stdint.h
 new file mode 100644
-index 0000000..00661eb
+index 0000000..5cfe7b9
 --- /dev/null
 +++ b/include/stdint.h
-@@ -0,0 +1,11 @@
+@@ -0,0 +1,20 @@
 +/* Supply Apple's bundled C99 integer types while bootstrapping on OPENSTEP.  */
 +#ifndef GCC_OPENSTEP_BUILD_STDINT_H
 +#define GCC_OPENSTEP_BUILD_STDINT_H
 +
 +#ifdef NeXT
++/* The stock BSD header already defines the signed exact-width types.
++   NeXT cc rejects even identical repeated typedefs.  */
++# include <sys/types.h>
++# ifdef _MACHTYPES_H_
++#  define _INT8_T
++#  define _INT16_T
++#  define _INT32_T
++#  define _INT64_T
++# endif
 +# include "../more-hdrs/stdint.h"
 +#else
 +# include_next <stdint.h>

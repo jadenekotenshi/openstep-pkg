@@ -1,4 +1,4 @@
-gcc33
+make
 coreutils
 patch
 texinfo

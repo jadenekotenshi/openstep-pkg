@@ -6,14 +6,12 @@ CC="$ROOT_DIR/usr/local/bin/gcc-4.2"
 CXX="$ROOT_DIR/usr/local/bin/g++-4.2"
 CPP="$ROOT_DIR/usr/local/bin/cpp-4.2"
 GCOV="$ROOT_DIR/usr/local/bin/gcov-4.2"
-OLD_CC="$ROOT_DIR/usr/local/bin/gcc"
 TMP=/tmp/pkg-gcc42-$$
 
 [ -x "$CC" ]
 [ -x "$CXX" ]
 [ -x "$CPP" ]
 [ -x "$GCOV" ]
-[ -x "$OLD_CC" ]
 
 for header in IOEISADeviceDescription.h IOPCMCIADirectDevice.h \
     IOPCIDeviceDescription.h IOPCMCIADeviceDescription.h
@@ -22,38 +20,66 @@ do
 done
 
 "$CC" --version | grep '4\.2\.1' >/dev/null 2>&1
-"$OLD_CC" --version | grep '3\.3' >/dev/null 2>&1
 
 /bin/rm -f "$TMP.c" "$TMP.cc" "$TMP.m" "$TMP.mm" "$TMP.s" \
     "$TMP-c" "$TMP-cxx" "$TMP-objc" "$TMP-objcpp" "$TMP.log"
 
 cat > "$TMP.c" <<'EOF'
 #include <stdio.h>
-long long gcc42_quad_probe = 0x1122334455667788LL;
-int main(void) { puts("gcc42 c ok"); return 0; }
+#include <stdarg.h>
+#include <string.h>
+long long quad_probe = 0x1122334455667788LL;
+volatile long long numerator = -1234567890123LL;
+volatile long long divisor = 97;
+static double collect(int count, ...) {
+    va_list ap; double sum; int i;
+    sum = 0.0; va_start(ap, count);
+    for (i = 0; i < count; ++i) sum += va_arg(ap, double);
+    va_end(ap); return sum;
+}
+int main(void) {
+    long long quotient, remainder;
+    quotient = numerator / divisor; remainder = numerator % divisor;
+    if (quotient != -12727504021LL || remainder != -86LL) return 1;
+    if (collect(3, 1.25, 2.5, -0.5) != 3.25) return 2;
+    if (quad_probe != 0x1122334455667788LL) return 3;
+    puts("gcc42 c ok"); return 0;
+}
 EOF
 "$CC" -S "$TMP.c" -o "$TMP.s"
 if grep '\.quad' "$TMP.s" >/dev/null 2>&1; then
     echo "gcc42 emitted unsupported .quad"
     exit 1
 fi
-"$CC" "$TMP.c" -o "$TMP-c"
-[ "`"$TMP-c"`" = "gcc42 c ok" ]
+for level in 0 2; do
+    "$CC" -O$level "$TMP.c" -o "$TMP-c"
+    [ "`"$TMP-c"`" = "gcc42 c ok" ]
+done
 
 cat > "$TMP.cc" <<'EOF'
 #include <iostream>
 #include <string>
+#include <vector>
 #include <ext/pb_ds/assoc_container.hpp>
 #include <ext/pb_ds/priority_queue.hpp>
-int main()
-{
-  try { throw std::string("gcc42 cxx ok"); }
-  catch (const std::string& value) { std::cout << value << std::endl; }
-  return 0;
+struct Base { virtual ~Base() {} };
+struct Derived : Base { int value; Derived() : value(42) {} };
+int main() {
+    Base *base = new Derived;
+    Derived *derived = dynamic_cast<Derived *>(base);
+    if (!derived || derived->value != 42) return 1;
+    delete base;
+    std::vector<int> values(3, 7);
+    if (values[0] + values[2] != 14) return 2;
+    try { throw std::string("gcc42 cxx ok"); }
+    catch (const std::string& message) { std::cout << message << std::endl; return 0; }
+    return 3;
 }
 EOF
-"$CXX" "$TMP.cc" -o "$TMP-cxx"
-[ "`"$TMP-cxx"`" = "gcc42 cxx ok" ]
+for level in 0 2; do
+    "$CXX" -O$level "$TMP.cc" -o "$TMP-cxx"
+    [ "`"$TMP-cxx"`" = "gcc42 cxx ok" ]
+done
 
 cat > "$TMP.m" <<'EOF'
 #import <Foundation/Foundation.h>

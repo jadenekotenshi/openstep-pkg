@@ -13,15 +13,21 @@ esac
 VERSION=$2
 BUILDROOT=`pwd`
 SRCDIR="$BUILDROOT/gcc-gcc-5666.3"
-PATCHFILE="$SRCDIR/gcc-5666.3-openstep.patch"
+# Keep redirection paths short: stock-built pdksh mishandles the long
+# expanded absolute filename under the package cache.
+PATCHFILE=gcc-5666.3-openstep.patch
 BUILDDIR="$SRCDIR/build-openstep"
 TARGET=i386-next-openstep4
 PREFIX=/usr/local
-PATH=/usr/local/bin:/bin:/usr/bin
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
 TMPDIR=/tmp
 CONFIG_SHELL=/usr/local/bin/ksh
-CC=/usr/local/bin/gcc
-CXX=/usr/local/bin/g++
+# Use the stock compiler and its GNU preprocessor for the first stage.
+CC='/bin/cc -traditional-cpp'
+CC_FOR_BUILD=$CC
+CXX=$CC
+AWK=/usr/local/bin/gawk
+MAKE=/usr/local/bin/gnumake
 AS=/bin/as
 LD=/bin/ld
 NM=/bin/nm
@@ -32,6 +38,8 @@ MAKEINFO=/usr/local/bin/makeinfo
 FLEX=/usr/local/bin/flex
 BISON=/usr/local/bin/bison
 BUILD_CFLAGS='-O0 -D_POSIX_SOURCE'
+CFLAGS=$BUILD_CFLAGS
+CXXFLAGS=$BUILD_CFLAGS
 CPPFLAGS='-D_POSIX_SOURCE'
 CFLAGS_FOR_BUILD=$BUILD_CFLAGS
 CXXFLAGS_FOR_BUILD=$BUILD_CFLAGS
@@ -42,9 +50,15 @@ ac_cv_func_mmap=no
 
 export DESTDIR VERSION BUILDROOT SRCDIR PATCHFILE BUILDDIR TARGET PREFIX
 export PATH TMPDIR CONFIG_SHELL CC CXX AS LD NM AS_FOR_TARGET LD_FOR_TARGET NM_FOR_TARGET
-export MAKEINFO FLEX BISON BUILD_CFLAGS CPPFLAGS
+export MAKEINFO FLEX BISON BUILD_CFLAGS CPPFLAGS CC_FOR_BUILD AWK MAKE CFLAGS CXXFLAGS
 export CFLAGS_FOR_BUILD CXXFLAGS_FOR_BUILD CFLAGS_FOR_TARGET CXXFLAGS_FOR_TARGET
 export am_cv_CC_dependencies_compiler_type ac_cv_func_mmap
+
+# Same-version dependencies may predate the OPENSTEP snprintf fix.
+if [ "`"$AWK" 'BEGIN { printf "%d", -1 }'`" != -1 ]; then
+    echo "gcc42: rebuild and reinstall the corrected gawk package first" >&2
+    exit 1
+fi
 
 cd "$SRCDIR"
 patch -p1 < "$PATCHFILE"
@@ -69,8 +83,9 @@ cd "$BUILDDIR"
     --enable-languages=c,c++,objc,obj-c++ \
     --enable-sjlj-exceptions \
     --enable-version-specific-runtime-libs \
-    --disable-bootstrap \
+    --enable-bootstrap \
     --disable-checking \
+    --disable-stage1-checking \
     --disable-libgomp \
     --disable-libmudflap \
     --disable-libssp \
@@ -81,14 +96,17 @@ cd "$BUILDDIR"
     --disable-tls \
     --disable-visibility
 
-/bin/gnumake SHELL="$CONFIG_SHELL" CFLAGS="$BUILD_CFLAGS" CXXFLAGS="$BUILD_CFLAGS" \
-    CFLAGS_FOR_BUILD="$BUILD_CFLAGS" CXXFLAGS_FOR_BUILD="$BUILD_CFLAGS" \
-    CFLAGS_FOR_TARGET="$BUILD_CFLAGS" CXXFLAGS_FOR_TARGET="$BUILD_CFLAGS" \
-    all-gcc
-/bin/gnumake SHELL="$CONFIG_SHELL" CFLAGS="$BUILD_CFLAGS" CXXFLAGS="$BUILD_CFLAGS" \
-    CFLAGS_FOR_BUILD="$BUILD_CFLAGS" CXXFLAGS_FOR_BUILD="$BUILD_CFLAGS" \
-    CFLAGS_FOR_TARGET="$BUILD_CFLAGS" CXXFLAGS_FOR_TARGET="$BUILD_CFLAGS" \
-    all-target-libstdc++-v3
+# Three native compiler stages, followed by GCC's stage-2/stage-3 comparison.
+# Keep the port's conservative compiler build flags identical in every stage.
+"$MAKE" SHELL="$CONFIG_SHELL" STAGE1_CFLAGS="$BUILD_CFLAGS" \
+    BOOT_CFLAGS="$BUILD_CFLAGS" bootstrap
+
+# Force a fresh comparison rather than accepting the existing comparison stamp.
+/bin/rm -f compare
+"$MAKE" SHELL="$CONFIG_SHELL" compare
+"$CONFIG_SHELL" "$SRCDIR/bootstrap-compare"
+# compare parks the final compiler/runtime in stage3-*; restore them for install.
+"$MAKE" SHELL="$CONFIG_SHELL" unstage
 
 # OPENSTEP ar truncates long member names.  When libtool flattens the
 # libsupc++ convenience archive, the long-named exception objects otherwise
@@ -105,12 +123,12 @@ test -d "$LIBSTDCXX_MERGE_DIR" || mkdir "$LIBSTDCXX_MERGE_DIR"
     /bin/ranlib "$LIBSTDCXX_A"
 )
 
-/bin/gnumake SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR" \
+"$MAKE" SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR" \
     CFLAGS="$BUILD_CFLAGS" CXXFLAGS="$BUILD_CFLAGS" \
     CFLAGS_FOR_BUILD="$BUILD_CFLAGS" CXXFLAGS_FOR_BUILD="$BUILD_CFLAGS" \
     CFLAGS_FOR_TARGET="$BUILD_CFLAGS" CXXFLAGS_FOR_TARGET="$BUILD_CFLAGS" \
     install-gcc
-/bin/gnumake SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR" \
+"$MAKE" SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR" \
     CFLAGS="$BUILD_CFLAGS" CXXFLAGS="$BUILD_CFLAGS" \
     CFLAGS_FOR_BUILD="$BUILD_CFLAGS" CXXFLAGS_FOR_BUILD="$BUILD_CFLAGS" \
     CFLAGS_FOR_TARGET="$BUILD_CFLAGS" CXXFLAGS_FOR_TARGET="$BUILD_CFLAGS" \

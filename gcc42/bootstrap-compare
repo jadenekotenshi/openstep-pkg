@@ -1,0 +1,39 @@
+#!/bin/sh
+# Run after GCC's own make compare. Require real, readable object pairs.
+set -e
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
+export PATH
+[ -d stage2-gcc ]
+[ -d stage3-gcc ]
+[ ! -f stage2-lean ]
+find stage2-gcc -name '*.o' -print | sed 's#^stage2-gcc/##' | sort > strict-stage2.objects
+find stage3-gcc -name '*.o' -print | sed 's#^stage3-gcc/##' | sort > strict-stage3.objects
+cmp strict-stage2.objects strict-stage3.objects
+find stage3-gcc -name '*.o' -print > strict-compare.objects
+count=0
+exact=0
+allowed=0
+failed=0
+while read object; do
+    relative=${object#stage3-gcc/}
+    first=stage2-gcc/$relative
+    [ -f "$first" ] && [ -r "$first" ] && [ -r "$object" ] || exit 2
+    count=`expr "$count" + 1`
+    if cmp "$first" "$object" > /dev/null 2>&1; then
+        exact=`expr "$exact" + 1`
+    else
+        result=$?
+        [ "$result" -eq 1 ] || exit 2
+        case "$relative" in
+            cc*-checksum.o|libgcc/*)
+                echo "upstream exclusion differs: $relative"
+                allowed=`expr "$allowed" + 1` ;;
+            *)
+                echo "object differs: $relative"
+                failed=`expr "$failed" + 1` ;;
+        esac
+    fi
+done < strict-compare.objects
+[ "$count" -gt 0 ]
+echo "pairs=$count exact=$exact upstream-exclusions=$allowed failures=$failed"
+[ "$failed" -eq 0 ]

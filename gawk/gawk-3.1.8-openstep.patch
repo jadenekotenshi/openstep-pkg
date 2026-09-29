@@ -67,6 +67,24 @@ index efeae9d..90dc87d 100644
  
  		switch (pid = fork ()) {
  		case 0:
+diff --git a/missing_d/snprintf.c b/missing_d/snprintf.c
+index 254a8e0..d426704 100644
+--- a/missing_d/snprintf.c
++++ b/missing_d/snprintf.c
+@@ -140,6 +140,13 @@ vsnprintf (char *restrict buf, size_t len,
+ 	rewind (fp);
+ #endif
+ 	actual = vfprintf (fp, fmt, args);
++#ifdef NeXT
++	/* OPENSTEP vfprintf returns zero on success, not the byte count.  */
++	if (actual >= 0) {
++		long written = ftell (fp);
++		actual = (written < 0 || written > INT_MAX) ? -1 : (int) written;
++	}
++#endif
+ 	rewind (fp);
+ 	if (actual < 0) {
+ #ifdef SNPRINTF_REENTRANT
 diff --git a/posix/regex.h b/posix/regex.h
 new file mode 100644
 index 0000000..5493597
