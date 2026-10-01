@@ -1,0 +1,67 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+test -f Makefile || cd git-$VERSION
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS='-O2 -std=gnu99 -I/usr/local/include -Icompat/openstep'
+LDFLAGS='-L/usr/local/lib'
+CONFIG_SHELL=/usr/local/bin/ksh
+SHELL_PATH=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+AWK=/usr/local/bin/gawk
+
+export PATH CC CFLAGS LDFLAGS CONFIG_SHELL SHELL_PATH GREP AWK
+
+. "$PKG_BUILD_HELPERS"
+patch -p1 < "git-$VERSION-openstep.patch"
+run_configure \
+    --build=i386-next-openstep4 \
+    --host=i386-next-openstep4 \
+    --prefix=/usr/local \
+    --with-shell=/usr/local/bin/ksh \
+    --with-curl=/usr/local \
+    --with-iconv=/usr/local \
+    --with-openssl=/usr/local \
+    --with-expat=/usr/local \
+    --with-python=/usr/local/bin/python3.11 \
+    --without-tcltk \
+    --disable-pthreads
+
+make_git() {
+/usr/local/bin/gnumake -j2 \
+    SHELL="$CONFIG_SHELL" \
+    CC="$CC" \
+    CFLAGS="$CFLAGS" \
+    LDFLAGS="$LDFLAGS" \
+    SHELL_PATH="$SHELL_PATH" \
+    CURL_CONFIG=/usr/local/bin/curl-config \
+    NO_GETTEXT=YesPlease \
+    NO_PERL=YesPlease \
+    NO_PYTHON= PYTHON_PATH=/usr/local/bin/python3.11 \
+    NO_TCLTK=YesPlease \
+    NO_PTHREADS=YesPlease \
+    NO_RUST=YesPlease \
+    NO_POLL=YesPlease NO_MMAP=YesPlease \
+    COMPUTE_HEADER_DEPENDENCIES=no \
+    NEEDS_SOCKET= NEEDS_LIBGEN= CURL_LDFLAGS="-L/usr/local/lib -lcurl -lssl -lcrypto -lz" \
+    MKDIR_WO_TRAILING_SLASH=YesPlease DEFAULT_PAGER=/usr/ucb/more DEFAULT_EDITOR=/usr/ucb/vi \
+    ARFLAGS=rc OVERRIDE_STRDUP=YesPlease \
+    uname_S=NeXT uname_M=i386 uname_R=4.2 uname_V=Mach uname_O=NeXT NO_SETITIMER= NO_PREAD=YesPlease CSPRNG_METHOD=openssl \
+    NO_CURL= SOCKLEN_T= NO_INTTYPES_H= COCCI_GOALS= COCCI_GLOB= COCCI_TEST_RES= \
+    INSTALL=/usr/local/bin/install INSTALL_STRIP=-s "$@"
+}
+
+make_git
+# Exercise the platform behavior that repository storage and child processes need.
+"$CC" -O2 -Icompat/openstep -I/usr/local/include \
+    compat/openstep-test.c compat/openstep.o compat/snprintf.o \
+    compat/poll/poll.o ctype.o hex-ll.o \
+    -L/usr/local/lib -lcurl -lssl -lcrypto -lz -o openstep-test
+./openstep-test
+# Static dependencies carry large symbol tables on this host.
+# Strip the build copies as well to keep staged-install disk usage bounded.
+make_git strip STRIP=/bin/strip STRIP_OPTS=
+/bin/rm -f openstep-test
+make_git install DESTDIR="$DESTDIR"

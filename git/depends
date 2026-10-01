@@ -1,0 +1,15 @@
+pdksh
+gcc42
+make
+patch
+coreutils
+gawk
+grep
+zlib
+openssl
+curl
+libiconv
+expat
+openssh
+ca-certificates
+python311

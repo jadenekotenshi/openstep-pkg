@@ -1,0 +1,62 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+GIT=${LOCAL_ROOT-/usr/local}/bin/git
+unset GIT_EXEC_PATH GIT_TEMPLATE_DIR GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE || :
+work=/tmp/git-openstep-test-$$
+mkdir "$work"
+trap 'cd /; rm -rf "$work"' 0 1 2 3 15
+HOME=$work
+GIT_CONFIG_NOSYSTEM=1
+GIT_AUTHOR_NAME='OPENSTEP Test'
+GIT_AUTHOR_EMAIL=test@example.invalid
+GIT_COMMITTER_NAME=$GIT_AUTHOR_NAME
+GIT_COMMITTER_EMAIL=$GIT_AUTHOR_EMAIL
+export HOME GIT_CONFIG_NOSYSTEM GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+cd "$work"
+"$GIT" --version
+"$GIT" init -b main original
+cd original
+"$GIT" config test.large 4294967297
+test "`"$GIT" config --type=int --get test.large`" = 4294967297
+"$GIT" config test.negative -4294967297
+test "`"$GIT" config --type=int --get test.negative`" = -4294967297
+printf 'first\n' > file
+"$GIT" add file
+"$GIT" commit -m first
+"$GIT" switch -c side
+printf 'side\n' > side
+"$GIT" add side
+"$GIT" commit -m side
+"$GIT" switch main
+printf 'main\n' > main
+"$GIT" add main
+"$GIT" commit -m main
+"$GIT" merge --no-edit side
+"$GIT" tag test-tag
+test "`"$GIT" rev-list --count HEAD`" = 4
+"$GIT" fsck --full
+"$GIT" gc
+"$GIT" fsck --full
+"$GIT" bundle create ../test.bundle --all
+"$GIT" archive --format=tar HEAD > ../snapshot.tar
+cd ..
+"$GIT" clone --no-local original clone
+"$GIT" clone test.bundle bundled
+cd clone
+test "`cat file`" = first
+test "`cat side`" = side
+test "`cat main`" = main
+"$GIT" fsck --full
+"$GIT" clone --bare . ../remote.git
+"$GIT" remote add destination ../remote.git
+printf 'push\n' >> file
+"$GIT" commit -am pushed
+"$GIT" push destination main
+cd ../bundled
+"$GIT" fetch ../remote.git main
+"$GIT" merge --ff-only FETCH_HEAD
+test "`tail -1 file`" = push
+"$GIT" fsck --full
+echo 'Git OPENSTEP functional tests passed'

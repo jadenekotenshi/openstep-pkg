@@ -1,0 +1,771 @@
+--- /dev/null
++++ b/compat/openstep-test.c
+@@ -0,0 +1,78 @@
++#define _POSIX_SOURCE 1
++#include <standards.h>
++#undef __STRICT_ANSI__
++#define _NEXT_SOURCE 1
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <errno.h>
++#include <stdint.h>
++#include <curl/mprintf.h>
++#include <unistd.h>
++#include <sys/wait.h>
++#include <sys/time.h>
++#include <dirent.h>
++#include <utime.h>
++#include <stdbool.h>
++#include "poll/poll.h"
++int git_next_utime(const char *, const struct utimbuf *);
++int git_next_fflush(FILE *);
++int putenv(char *);
++unsigned long long git_next_strtoull(const char *, char **, int);
++long long git_next_strtoll(const char *, char **, int);
++int git_snprintf(char *, size_t, const char *, ...);
++int main(void)
++{
++    char *end, text[32], small[4];
++    char filename[64], env[] = "GIT_OPENSTEP_REGRESSION=ok", *cwd;
++    struct timeval before, after;
++    long elapsed;
++    int child, status, found = 0;
++    DIR *dir;
++    struct dirent *entry;
++    FILE *file;
++    if (git_next_strtoull("18446744073709551615", &end, 10) != UINT64_MAX || *end) return 1;
++    errno=0;
++    if (git_next_strtoull("18446744073709551616", &end, 10) != UINT64_MAX || errno != ERANGE) return 2;
++    if (git_next_strtoll("-9223372036854775808", &end, 10) != INT64_MIN || *end) return 3;
++    errno=0;
++    if (git_next_strtoll("9223372036854775808", &end, 10) != INT64_MAX || errno != ERANGE) return 4;
++    if (git_next_strtoull("0x100000001rest", &end, 0) != 4294967297ULL || strcmp(end,"rest")) return 5;
++    if (git_snprintf(text, sizeof(text), "%llu", 4294967297ULL) != 10 || strcmp(text,"4294967297")) return 6;
++    if (git_snprintf(small, sizeof(small), "%s", "abcdef") != 6 || strcmp(small,"abc")) return 7;
++    if (git_snprintf(NULL, 0, "%lld", -4294967297LL) != 11) return 8;
++    memset(text, 'x', sizeof(text));
++    if (git_snprintf(text, sizeof(text), "a%cb", 0) != 3 || memcmp(text, "a\0b\0", 4)) return 21;
++    if (sizeof(bool) != 1) return 9;
++    cwd = getcwd(NULL, 0);
++    if (!cwd || cwd[0] != '/') return 10;
++    free(cwd);
++    if (putenv(env) || !getenv("GIT_OPENSTEP_REGRESSION") ||
++        strcmp(getenv("GIT_OPENSTEP_REGRESSION"), "ok")) return 11;
++    if (putenv("GIT_OPENSTEP_REGRESSION") || getenv("GIT_OPENSTEP_REGRESSION")) return 12;
++    child = fork();
++    if (child < 0) return 13;
++    if (!child) _exit(7);
++    if (waitpid(-1, &status, 0) != child || !WIFEXITED(status) || WEXITSTATUS(status) != 7) return 14;
++    git_snprintf(filename, sizeof(filename), ".git-openstep-regression-%d", (int)getpid());
++    file = fopen(filename, "w");
++    if (!file) return 15;
++    fputs("flush", file);
++    if (git_next_fflush(NULL)) return 22;
++    fclose(file);
++    if (git_next_utime(filename, NULL)) { unlink(filename); return 16; }
++    dir = opendir(".");
++    if (!dir) { unlink(filename); return 17; }
++    while ((entry = readdir(dir)))
++        if (!strcmp(entry->d_name, filename)) found = 1;
++    closedir(dir);
++    unlink(filename);
++    if (!found) return 18;
++    gettimeofday(&before, NULL);
++    if (poll(NULL, 0, 20)) return 19;
++    gettimeofday(&after, NULL);
++    elapsed = (after.tv_sec - before.tv_sec) * 1000000L + after.tv_usec - before.tv_usec;
++    if (elapsed < 5000 || elapsed > 2000000) return 20;
++    curl_mprintf("OPENSTEP integer, formatting, process, directory, timestamp and timer regressions passed\n");
++    return 0;
++}
+--- /dev/null
++++ b/compat/openstep/dirent.h
+@@ -0,0 +1,6 @@
++#ifndef GIT_OPENSTEP_DIRENT_H
++#define GIT_OPENSTEP_DIRENT_H
++/* OPENSTEP readdir() returns BSD direct, not the POSIX dirent layout. */
++#define dirent direct
++#include <sys/dir.h>
++#endif
+--- a/t/helper/test-date.c
++++ b/t/helper/test-date.c
+@@ -68,7 +68,13 @@
+ 
+ 		strbuf_reset(&result);
+ 		parse_date(*argv, &result);
++#ifdef NeXT
++		char *end;
++		t = strtoumax(result.buf, &end, 10);
++		if (end != result.buf && sscanf(end, "%d", &tz) == 1)
++#else
+ 		if (sscanf(result.buf, "%"PRItime" %d", &t, &tz) == 2)
++#endif
+ 			printf("%s -> %s\n",
+ 			       *argv, show_date(t, tz, DATE_MODE(ISO8601)));
+ 		else
+--- a/t/unit-tests/clar/clar.c
++++ b/t/unit-tests/clar/clar.c
+@@ -9,6 +9,9 @@
+ #define _DARWIN_C_SOURCE
+ #define _DEFAULT_SOURCE
+ 
++#ifdef NeXT
++#include "compat/posix.h"
++#endif
+ #include <errno.h>
+ #include <setjmp.h>
+ #include <stdlib.h>
+@@ -16,7 +19,9 @@
+ #include <string.h>
+ #include <math.h>
+ #include <stdarg.h>
++#ifndef NeXT
+ #include <wchar.h>
++#endif
+ #include <time.h>
+ #include <inttypes.h>
+ 
+@@ -32,7 +37,7 @@
+ #	endif
+ #endif
+ 
+-#if defined(__UCLIBC__) && ! defined(__UCLIBC_HAS_WCHAR__)
++#if defined(NeXT) || (defined(__UCLIBC__) && ! defined(__UCLIBC_HAS_WCHAR__))
+ 	/*
+ 	 * uClibc can optionally be built without wchar support, in which case
+ 	 * the installed <wchar.h> is a stub that only defines the `whar_t`
+--- /dev/null
++++ b/compat/openstep/stdbool.h
+@@ -0,0 +1,7 @@
++#ifndef GIT_OPENSTEP_STDBOOL_H
++#define GIT_OPENSTEP_STDBOOL_H
++typedef unsigned char bool;
++#define true 1
++#define false 0
++#define __bool_true_false_are_defined 1
++#endif
+--- a/compat/hstrerror.c
++++ b/compat/hstrerror.c
+@@ -1,3 +1,6 @@
++#ifdef NeXT
++#include "../git-compat-util.h"
++#endif
+ #include <string.h>
+ #include <stdio.h>
+ #include <netdb.h>
+--- a/chunk-format.c
++++ b/chunk-format.c
+@@ -93,7 +93,7 @@
+ 		if (hashfile_total(cf->f) - start_offset != cf->chunks[i].size)
+ 			BUG("expected to write %"PRId64" bytes to chunk %"PRIx32", but wrote %"PRId64" instead",
+ 			    cf->chunks[i].size, cf->chunks[i].id,
+-			    hashfile_total(cf->f) - start_offset);
++			    (int64_t)(hashfile_total(cf->f) - start_offset));
+ 	}
+ 
+ cleanup:
+--- a/midx.c
++++ b/midx.c
+@@ -1045,7 +1045,7 @@
+ 
+ 		if (m_offset != p_offset)
+ 			midx_report(_("incorrect object offset for oid[%d] = %s: %"PRIx64" != %"PRIx64),
+-				    pairs[i].pos, oid_to_hex(&oid), m_offset, p_offset);
++				    pairs[i].pos, oid_to_hex(&oid), (uint64_t)m_offset, (uint64_t)p_offset);
+ 
+ 		midx_display_sparse_progress(progress, i + 1);
+ 	}
+--- a/compat/poll/poll.c
++++ b/compat/poll/poll.c
+@@ -399,6 +399,16 @@
+     }
+ 
+   /* examine fd sets */
++#ifdef NeXT
++  /* OPENSTEP select() cannot be used as a no-descriptor timer. */
++  if (maxfd < 0 && timeout >= 0)
++    {
++      for (i = 0; i < nfd; i++) pfd[i].revents = 0;
++      while (timeout >= 1000) { usleep (1000000); timeout -= 1000; }
++      if (timeout) usleep (timeout * 1000);
++      return 0;
++    }
++#endif
+   rc = select (maxfd + 1, &rfds, &wfds, &efds, ptv);
+   if (rc < 0)
+     return rc;
+--- a/Makefile
++++ b/Makefile
+@@ -1355,6 +1355,10 @@
+ ifdef NO_RUST
+ LIB_OBJS += varint.o
+ endif
++ifeq ($(uname_S),NeXT)
++LIB_OBJS += compat/openstep.o
++EXTLIBS += -lcurl -lssl -lcrypto -lz
++endif
+ LIB_OBJS += version.o
+ LIB_OBJS += versioncmp.o
+ LIB_OBJS += walker.o
+@@ -3016,6 +3020,9 @@
+ 
+ $(LIB_FILE): $(LIB_OBJS)
+ 	$(QUIET_AR)$(RM) $@ && $(AR) $(ARFLAGS) $@ $^
++ifeq ($(uname_S),NeXT)
++	/bin/ranlib $@
++endif
+ 
+ $(RUST_LIB): Cargo.toml $(RUST_SOURCES) $(LIB_FILE)
+ 	$(QUIET_CARGO)cargo build $(CARGO_ARGS)
+--- /dev/null
++++ b/compat/openstep.c
+@@ -0,0 +1,238 @@
++#include "../git-compat-util.h"
++
++extern int setpgrp(int, int);
++extern int next_bsd_getpgrp(int) __asm__("_getpgrp");
++
++#undef fflush
++extern void _fwalk(int (*)(FILE *));
++static int next_flush_status;
++static int next_flush_one(FILE *stream)
++{
++    if ((stream->_flag & (_IOWRT | _IORW)) && fflush(stream) == EOF)
++        next_flush_status = EOF;
++    return 0;
++}
++int git_next_fflush(FILE *stream)
++{
++    if (stream) return fflush(stream);
++    next_flush_status = 0;
++    _fwalk(next_flush_one);
++    return next_flush_status;
++}
++
++#undef utime
++int git_next_utime(const char *path, const struct utimbuf *times)
++{
++    struct utimbuf now;
++    if (!times) {
++        now.actime = now.modtime = time(NULL);
++        times = &now;
++    }
++    return utime(path, (struct utimbuf *)times);
++}
++
++char *getcwd(char *buffer, size_t size)
++{
++    char path[MAXPATHLEN];
++    size_t needed;
++    if (!getwd(path)) return NULL;
++    needed = strlen(path) + 1;
++    if (!buffer) {
++        if (!size) size = needed;
++        if (size < needed) { errno = ERANGE; return NULL; }
++        buffer = malloc(size);
++        if (!buffer) { errno = ENOMEM; return NULL; }
++    } else if (size < needed) { errno = ERANGE; return NULL; }
++    memcpy(buffer, path, needed);
++    return buffer;
++}
++
++long sysconf(int name)
++{
++    switch (name) {
++    case _SC_OPEN_MAX: return getdtablesize();
++    case _SC_CLK_TCK: return CLK_TCK;
++    default: errno = EINVAL; return -1;
++    }
++}
++
++pid_t waitpid(pid_t pid, int *status, int options)
++{
++    union wait result;
++    int child;
++    /* NeXT wait4 uses zero for any child and negative process groups. */
++    if (pid == -1) pid = 0;
++    else if (pid == 0) pid = -next_bsd_getpgrp(0);
++    child = wait4(pid, &result, options, NULL);
++    if (child > 0 && status) memcpy(status, &result, sizeof(*status));
++    return child;
++}
++
++int uname(struct utsname *name)
++{
++    memset(name, 0, sizeof(*name));
++    memcpy(name->sysname, "OPENSTEP", 9);
++    memcpy(name->release, "4.2", 4);
++    memcpy(name->version, "Mach", 5);
++#if defined(__i386__) || defined(i386)
++    memcpy(name->machine, "i386", 5);
++#elif defined(__m68k__)
++    memcpy(name->machine, "m68k", 5);
++#else
++    memcpy(name->machine, "unknown", 8);
++#endif
++    if (gethostname(name->nodename, sizeof(name->nodename) - 1) < 0) return -1;
++    return 0;
++}
++
++int git_next_getpgid(int pid)
++{
++    return next_bsd_getpgrp(pid);
++}
++
++pid_t setsid(void)
++{
++    int pid = getpid();
++    if (setpgrp(0, pid) < 0) return -1;
++    return pid;
++}
++
++pid_t tcgetpgrp(int fd)
++{
++    int group;
++    if (ioctl(fd, TIOCGPGRP, &group) < 0) return -1;
++    return group;
++}
++
++int sigemptyset(sigset_t *set) { *set = 0; return 0; }
++int sigfillset(sigset_t *set) { *set = ~0U; return 0; }
++int sigaddset(sigset_t *set, int signo)
++{
++    if (signo <= 0 || signo >= NSIG) { errno = EINVAL; return -1; }
++    *set |= (1U << (signo - 1));
++    return 0;
++}
++int sigprocmask(int how, const sigset_t *set, sigset_t *old)
++{
++    int previous;
++    if (!set) previous = sigblock(0);
++    else if (how == SIG_BLOCK) previous = sigblock(*set);
++    else if (how == SIG_SETMASK) previous = sigsetmask(*set);
++    else if (how == SIG_UNBLOCK) {
++        previous = sigblock(0);
++        sigsetmask(previous & ~*set);
++    } else { errno = EINVAL; return -1; }
++    if (old) *old = previous;
++    return 0;
++}
++int sigaction(int signo, const struct sigaction *act, struct sigaction *old)
++{
++    struct sigvec next, previous;
++    int result;
++    if (act) {
++        next.sv_handler = act->sa_handler;
++        next.sv_mask = act->sa_mask;
++        /* BSD restarts calls by default. Extra SIGCHLD wakeups on stop
++         * are harmless to Git's waitpid(WNOHANG) reaper. */
++        next.sv_flags = 0;
++    }
++    result = sigvec(signo, act ? &next : NULL, old ? &previous : NULL);
++    if (!result && old) {
++        old->sa_handler = previous.sv_handler;
++        old->sa_mask = previous.sv_mask;
++        old->sa_flags = 0;
++    }
++    return result;
++}
++
++int putenv(char *entry)
++{
++    extern char **environ;
++    static char **owned;
++    char *equals = strchr(entry, '=');
++    size_t length = equals ? (size_t)(equals - entry) : strlen(entry);
++    size_t count = 0, slot;
++    char **next;
++    if (!length) { errno = EINVAL; return -1; }
++    while (environ && environ[count]) count++;
++    for (slot = 0; slot < count; slot++)
++        if (!strncmp(environ[slot], entry, length) && environ[slot][length] == '=') break;
++    if (!equals) {
++        if (slot < count)
++            memmove(environ + slot, environ + slot + 1, (count - slot) * sizeof(char *));
++        return 0;
++    }
++    if (slot < count) { environ[slot] = entry; return 0; }
++    next = malloc((count + 2) * sizeof(char *));
++    if (!next) { errno = ENOMEM; return -1; }
++    if (count) memcpy(next, environ, count * sizeof(char *));
++    next[count] = entry;
++    next[count + 1] = NULL;
++    if (environ == owned) free(owned);
++    environ = owned = next;
++    return 0;
++}
++
++/* Convert without narrowing through the 32-bit host strtoul(). */
++static uint64_t next_parse_integer(const char *s, char **end, int base,
++                                  int *negative, int *overflow)
++{
++    const char *start = s, *digits;
++    uint64_t value = 0;
++    unsigned int d;
++    *negative = *overflow = 0;
++    while (isspace((unsigned char)*s)) s++;
++    if (*s == '-' || *s == '+') *negative = *s++ == '-';
++    if (base && (base < 2 || base > 36)) {
++        errno = EINVAL;
++        if (end) *end = (char *)start;
++        return 0;
++    }
++    if ((base == 0 || base == 16) && s[0] == '0' &&
++        (s[1] == 'x' || s[1] == 'X') && isxdigit((unsigned char)s[2])) {
++        s += 2; base = 16;
++    }
++    if (!base) base = *s == '0' ? 8 : 10;
++    digits = s;
++    for (;; s++) {
++        unsigned char c = *s;
++        if (c >= '0' && c <= '9') d = c - '0';
++        else if (c >= 'a' && c <= 'z') d = c - 'a' + 10;
++        else if (c >= 'A' && c <= 'Z') d = c - 'A' + 10;
++        else break;
++        if (d >= (unsigned int)base) break;
++        if (value > (UINT64_MAX - d) / base) *overflow = 1;
++        else value = value * base + d;
++    }
++    if (end) *end = (char *)(s == digits ? start : s);
++    return value;
++}
++
++unsigned long long git_next_strtoull(const char *s, char **end, int base)
++{
++    int negative, overflow;
++    uint64_t v = next_parse_integer(s, end, base, &negative, &overflow);
++    if (overflow) { errno = ERANGE; return UINT64_MAX; }
++    return negative ? -v : v;
++}
++
++long long git_next_strtoll(const char *s, char **end, int base)
++{
++    int negative, overflow;
++    uint64_t v = next_parse_integer(s, end, base, &negative, &overflow);
++    uint64_t limit = negative ? (uint64_t)INT64_MAX + 1 : INT64_MAX;
++    if (overflow || v > limit) {
++        errno = ERANGE;
++        return negative ? INT64_MIN : INT64_MAX;
++    }
++    return negative ? -(int64_t)(v - (v != 0)) - (v != 0) : (int64_t)v;
++}
++
++int git_next_scan_uint64(const char *s, uint64_t *out)
++{
++    char *end;
++    uint64_t v = git_next_strtoull(s, &end, 10);
++    if (end == s) return 0;
++    *out = v;
++    return 1;
++}
+--- a/bundle-uri.c
++++ b/bundle-uri.c
+@@ -217,7 +217,11 @@
+ 	}
+ 
+ 	if (!strcmp(subkey, "creationtoken")) {
++		#ifdef NeXT
++		if (git_next_scan_uint64(value, &bundle->creationToken) != 1)
++#else
+ 		if (sscanf(value, "%"PRIu64, &bundle->creationToken) != 1)
++#endif
+ 			warning(_("could not parse bundle list key %s with value '%s'"),
+ 				"creationToken", value);
+ 		return 0;
+@@ -572,7 +576,11 @@
+ 	if (!repo_config_get_value(r,
+ 				   "fetch.bundlecreationtoken",
+ 				   &creationTokenStr)) {
++		#ifdef NeXT
++		if (git_next_scan_uint64(creationTokenStr, &maxCreationToken) != 1)
++#else
+ 		if (sscanf(creationTokenStr, "%"PRIu64, &maxCreationToken) != 1)
++#endif
+ 			maxCreationToken = 0;
+ 		if (bundles.items[0]->creationToken <= maxCreationToken) {
+ 			free(bundles.items);
+--- a/builtin/gc.c
++++ b/builtin/gc.c
+@@ -721,7 +721,11 @@
+ 	char my_host[HOST_NAME_MAX + 1];
+ 	struct strbuf sb = STRBUF_INIT;
+ 	struct stat st;
+-	uintmax_t pid;
++#ifdef NeXT
++    unsigned long pid;
++#else
++    uintmax_t pid;
++#endif
+ 	FILE *fp;
+ 	int fd;
+ 	char *pidfile_path;
+@@ -742,7 +746,11 @@
+ 		int should_exit;
+ 
+ 		if (!scan_fmt)
+-			scan_fmt = xstrfmt("%s %%%ds", "%"SCNuMAX, HOST_NAME_MAX);
++#ifdef NeXT
++            scan_fmt = xstrfmt("%%lu %%%ds", HOST_NAME_MAX);
++#else
++            scan_fmt = xstrfmt("%s %%%ds", "%"SCNuMAX, HOST_NAME_MAX);
++#endif
+ 		fp = fopen(pidfile_path, "r");
+ 		memset(locking_host, 0, sizeof(locking_host));
+ 		should_exit =
+--- a/compat/disk.h
++++ b/compat/disk.h
+@@ -3,6 +3,10 @@
+ 
+ #include "abspath.h"
+ #include "gettext.h"
++#ifdef NeXT
++#include <sys/vfs.h>
++extern int statfs(const char *, struct statfs *);
++#endif
+ 
+ static int get_disk_info(struct strbuf *out)
+ {
+@@ -34,10 +38,18 @@
+ 	strbuf_humanise_bytes(out, avail2caller.QuadPart);
+ 	strbuf_addch(out, '\n');
+ #else
+-	struct statvfs stat;
++#ifdef NeXT
++    struct statfs stat;
++#else
++    struct statvfs stat;
++#endif
+ 
+ 	strbuf_realpath(&buf, ".", 1);
+-	if (statvfs(buf.buf, &stat) < 0) {
++#ifdef NeXT
++    if (statfs(buf.buf, &stat) < 0) {
++#else
++    if (statvfs(buf.buf, &stat) < 0) {
++#endif
+ 		error_errno(_("could not determine free disk size for '%s'"),
+ 			    buf.buf);
+ 		res = -1;
+@@ -46,7 +58,11 @@
+ 
+ 	strbuf_addf(out, "Available space on '%s': ", buf.buf);
+ 	strbuf_humanise_bytes(out, (off_t)stat.f_bsize * (off_t)stat.f_bavail);
+-	strbuf_addf(out, " (mount flags 0x%lx)\n", stat.f_flag);
++#ifdef NeXT
++    strbuf_addch(out, '\n');
++#else
++    strbuf_addf(out, " (mount flags 0x%lx)\n", stat.f_flag);
++#endif
+ #endif
+ 
+ cleanup:
+--- a/compat/snprintf.c
++++ b/compat/snprintf.c
+@@ -17,6 +17,12 @@
+ #endif
+ 
+ #undef vsnprintf
++#ifdef NeXT
++#include <curl/mprintf.h>
++/* libcurl preserves embedded NULs and returns the bytes actually written.
++ * The existing retry loop below obtains the full, untruncated length. */
++#define vsnprintf curl_mvsnprintf
++#endif
+ int git_vsnprintf(char *str, size_t maxsize, const char *format, va_list ap)
+ {
+ 	va_list cp;
+--- a/bundle-uri.h
++++ b/bundle-uri.h
+@@ -107,7 +107,9 @@
+ 			    bundle_iterator iter,
+ 			    void *data);
+ 
++#ifndef NeXT
+ struct FILE;
++#endif
+ void print_bundle_list(FILE *fp, struct bundle_list *list);
+ 
+ /**
+--- a/compat/posix.h
++++ b/compat/posix.h
+@@ -2,6 +2,17 @@
+ #define COMPAT_POSIX_H
+ 
+ #define _FILE_OFFSET_BITS 64
++
++#ifdef NeXT
++#include <machine/endian.h>
++#define _POSIX_SOURCE 1
++#include <standards.h>
++#undef __STRICT_ANSI__
++#define _NEXT_SOURCE 1
++#define map_fd next_system_map_fd
++#include <libc.h>
++#undef map_fd
++#endif
+ 
+ /*
+  * Convenience macros to test the versions of GCC (or a compatible compiler).
+@@ -147,7 +158,9 @@
+ #include <sys/resource.h>
+ #include <sys/socket.h>
+ #include <sys/ioctl.h>
++#ifndef NeXT
+ #include <sys/statvfs.h>
++#endif
+ #include <termios.h>
+ #ifndef NO_SYS_SELECT_H
+ #include <sys/select.h>
+@@ -182,6 +195,9 @@
+ #endif
+ #undef _ALL_SOURCE /* AIX 5.3L defines a struct list with _ALL_SOURCE. */
+ #include <grp.h>
++#ifdef NeXT
++#include "openstep.h"
++#endif
+ #define _ALL_SOURCE 1
+ #endif
+ 
+@@ -341,6 +357,7 @@
+ 
+ #ifdef NO_MKDTEMP
+ #define mkdtemp git_mkdtemp
++char *git_mkdtemp(char *);
+ #endif
+ 
+ #ifdef NO_UNSETENV
+--- /dev/null
++++ b/compat/openstep.h
+@@ -0,0 +1,67 @@
++#ifndef GIT_OPENSTEP_H
++#define GIT_OPENSTEP_H
++#ifndef INET_ADDRSTRLEN
++#define INET_ADDRSTRLEN 16
++#endif
++#ifndef SA_RESTART
++/* BSD calls restart unless the interrupt flag is explicitly requested. */
++#define SA_RESTART 0
++#endif
++int git_next_getpgid(int);
++#define getpgid(pid) git_next_getpgid(pid)
++#ifndef SHUT_WR
++#define SHUT_WR 1
++#endif
++#ifndef ENOTSUP
++#define ENOTSUP EOPNOTSUPP
++#endif
++#ifndef EOVERFLOW
++#define EOVERFLOW ERANGE
++#endif
++#ifndef S_ISSOCK
++#define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
++#endif
++#define ftello ftell
++#ifndef CLOCKS_PER_SEC
++#define CLOCKS_PER_SEC CLK_TCK
++#endif
++#ifndef S_ISLNK
++#define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
++#endif
++
++/* Builds on OPENSTEP are single threaded. Copy libc's static result. */
++static inline struct tm *git_next_localtime_r(const time_t *t, struct tm *out)
++{
++    struct tm *tmp = localtime(t);
++    if (!tmp) return NULL;
++    *out = *tmp;
++    return out;
++}
++static inline struct tm *git_next_gmtime_r(const time_t *t, struct tm *out)
++{
++    struct tm *tmp = gmtime(t);
++    if (!tmp) return NULL;
++    *out = *tmp;
++    return out;
++}
++/* NeXT libc lacks the C99 long-long format modifiers. */
++#include <curl/mprintf.h>
++#define printf(...) curl_mprintf(__VA_ARGS__)
++#define fprintf(...) curl_mfprintf(__VA_ARGS__)
++#define vprintf(...) curl_mvprintf(__VA_ARGS__)
++#define vfprintf(...) curl_mvfprintf(__VA_ARGS__)
++#define sprintf(...) curl_msprintf(__VA_ARGS__)
++#define vsprintf(...) curl_mvsprintf(__VA_ARGS__)
++extern int putenv(char *);
++int git_next_fflush(FILE *);
++#define fflush git_next_fflush
++int git_next_utime(const char *, const struct utimbuf *);
++#define utime git_next_utime
++unsigned long long git_next_strtoull(const char *, char **, int);
++long long git_next_strtoll(const char *, char **, int);
++int git_next_scan_uint64(const char *, uint64_t *);
++#define strtoull git_next_strtoull
++#define strtoll git_next_strtoll
++#define localtime_r git_next_localtime_r
++#define gmtime_r git_next_gmtime_r
++#endif
+--- /dev/null
++++ b/compat/openstep/stdint.h
+@@ -0,0 +1,33 @@
++#ifndef GIT_OPENSTEP_STDINT_H
++#define GIT_OPENSTEP_STDINT_H
++/* OPENSTEP's machine/types.h supplies the signed fixed-width types.
++ * The installed OpenSSL port supplies their unsigned counterparts. */
++#include <openssl/e_os2.h>
++typedef long intptr_t;
++typedef unsigned long uintptr_t;
++typedef int64_t intmax_t;
++typedef uint64_t uintmax_t;
++#define INT8_MIN (-127-1)
++#define INT8_MAX 127
++#define UINT8_MAX 255U
++#define INT16_MIN (-32767-1)
++#define INT16_MAX 32767
++#define UINT16_MAX 65535U
++#define INT32_MIN (-2147483647-1)
++#define INT32_MAX 2147483647
++#define UINT32_MAX 4294967295U
++#define INT64_MAX 9223372036854775807LL
++#define INT64_MIN (-INT64_MAX-1)
++#define UINT64_MAX 18446744073709551615ULL
++#define INTMAX_MAX INT64_MAX
++#define INTMAX_MIN INT64_MIN
++#define UINTMAX_MAX UINT64_MAX
++#define SIZE_MAX UINT32_MAX
++#define INTPTR_MAX INT32_MAX
++#define PTRDIFF_MAX INT32_MAX
++#define UINTPTR_MAX UINT32_MAX
++#define INT64_C(x) x##LL
++#define UINT64_C(x) x##ULL
++#define UINT32_C(x) x##U
++#define INT32_C(x) x
++#endif
+--- /dev/null
++++ b/compat/openstep/inttypes.h
+@@ -0,0 +1,14 @@
++#ifndef GIT_OPENSTEP_INTTYPES_H
++#define GIT_OPENSTEP_INTTYPES_H
++#include <stdint.h>
++#define PRIdMAX "lld"
++#define PRIuMAX "llu"
++#define PRIxMAX "llx"
++#define PRIoMAX "llo"
++#define PRId64 "lld"
++#define PRIu64 "llu"
++#define PRIx64 "llx"
++#define PRId32 "d"
++#define PRIu32 "u"
++#define PRIx32 "x"
++#endif
+--- a/tools/generate-configlist.sh
++++ b/tools/generate-configlist.sh
+@@ -40,7 +40,7 @@
+ 
+ if test -n "$DEPFILE"
+ then
+-	QUOTED_OUTPUT="$(printf '%s\n' "$OUTPUT" | sed 's,[&/\],\\&,g')"
++	QUOTED_OUTPUT="$(printf '%s\n' "$OUTPUT" | sed -e 's,\\,\\\\,g' -e 's,[&/],\\&,g')"
+ 	{
+ 		printf '%s' "$QUOTED_OUTPUT: "
+ 		printf '%s\n' "$SOURCE_DIR"/Documentation/*config.adoc \
