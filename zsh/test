@@ -1,3 +1,16 @@
 #!/bin/sh
 
-/usr/local/bin/zsh -fc 'print zsh:$ZSH_VERSION'
+set -e
+
+ZSH="$LOCAL_ROOT/bin/zsh"
+"$ZSH" -fc 'print zsh:$ZSH_VERSION'
+value=`"$ZSH" -fc '
+    typeset -a words
+    words=(alpha beta gamma)
+    [[ ${#words} == 3 && ${words[2]} == beta ]] || exit 1
+    [[ ${words[1]:u} == ALPHA ]] || exit 2
+    (( 7 * 6 == 42 )) || exit 3
+    [[ $(print -r -- child-ok) == child-ok ]] || exit 4
+    print -r -- zsh-regression-ok
+'`
+[ "$value" = zsh-regression-ok ]

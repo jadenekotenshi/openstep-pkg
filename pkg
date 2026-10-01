@@ -824,14 +824,19 @@ test_name() {
 
     log "testing $PKG_NAME $PKG_VERSION"
 
+    # Use the build shell for tests too. Stock OPENSTEP sh can replace a
+    # failing hook's exit status with the status of its EXIT cleanup trap.
+    test_shell=`build_shell_path "$PKG_NAME"`
+    [ -x "$test_shell" ] || die "missing test shell: $test_shell"
+
     if trace_enabled; then
         PKG_NAME=$PKG_NAME PKG_VERSION=$PKG_VERSION ROOT_DIR=$ROOT_DIR LOCAL_ROOT=$LOCAL_ROOT \
             PATH=$LOCAL_ROOT/bin:$LOCAL_ROOT/sbin:$PATH \
-            sh -x "$INST_DIR/test"
+            "$test_shell" -x "$INST_DIR/test" || die "test failed for $PKG_NAME $PKG_VERSION"
     else
         PKG_NAME=$PKG_NAME PKG_VERSION=$PKG_VERSION ROOT_DIR=$ROOT_DIR LOCAL_ROOT=$LOCAL_ROOT \
             PATH=$LOCAL_ROOT/bin:$LOCAL_ROOT/sbin:$PATH \
-            sh "$INST_DIR/test"
+            "$test_shell" "$INST_DIR/test" || die "test failed for $PKG_NAME $PKG_VERSION"
     fi
 
     log "test passed for $PKG_NAME $PKG_VERSION"

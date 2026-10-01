@@ -52,6 +52,20 @@ index 046dd9a..ab83b8b 100644
  #include <regex.h>
  #endif
  #include "flexint.h"
+diff --git a/flexint.h b/flexint.h
+index f9fa80c..2c7db12 100644
+--- a/flexint.h
++++ b/flexint.h
+@@ -5,7 +5,8 @@
+ 
+ /* C99 systems have <inttypes.h>. Non-C99 systems may or may not. */
+ 
+-#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
++/* OPENSTEP has no inttypes.h, including when using a C99 compiler. */
++#if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L && !defined (NeXT)
+ 
+ /* C99 says to define __STDC_LIMIT_MACROS before including stdint.h,
+  * if you want the limit (max/min) macros for int types. 
 diff --git a/main.c b/main.c
 index 069b7b2..73c8229 100644
 --- a/main.c

@@ -137,7 +137,7 @@ index df35c0d..429742d 100644
 -
 diff --git a/include/parserutils/openstep.h b/include/parserutils/openstep.h
 new file mode 100644
-index 0000000..a6688cb
+index 0000000..585d85d
 --- /dev/null
 +++ b/include/parserutils/openstep.h
 @@ -0,0 +1,48 @@
@@ -155,7 +155,7 @@ index 0000000..a6688cb
 +#ifndef OPENSTEP_C99_TYPES_DEFINED
 +#define OPENSTEP_C99_TYPES_DEFINED
 +
-+#ifndef __cplusplus
++#if !defined(__cplusplus) && !defined(__bool_true_false_are_defined)
 +typedef unsigned char bool;
 +#ifndef true
 +#define true 1

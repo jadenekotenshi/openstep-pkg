@@ -6,17 +6,19 @@ TMP=/usr/tmp/libparserutils-test.$$
 
 cat > "$TMP.c" <<'EOF'
 #include <stdio.h>
+#include <stdbool.h>
 #include <parserutils/charset/mibenum.h>
 
 int main(void)
 {
+    if (sizeof(bool) != 1) return 1;
     printf("%u\n",
         (unsigned) parserutils_charset_mibenum_from_name("UTF-8", 5));
     return 0;
 }
 EOF
 
-/usr/local/bin/gcc -DNeXT -I"$LOCAL_ROOT/include" "$TMP.c" \
+/usr/local/bin/gcc-4.2 -DNeXT -I"$LOCAL_ROOT/include" "$TMP.c" \
     "$LOCAL_ROOT/lib/libparserutils.a" -o "$TMP"
 
 "$TMP" > "$TMP.out"

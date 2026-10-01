@@ -13,11 +13,12 @@ cat > "$TMP.c" <<'EOF'
 NSLOG_DEFINE_CATEGORY(probe, "probe category");
 
 static int seen = 0;
+static int long_seen = 0;
 
 static void render(void *pw, nslog_entry_context_t *ctx,
         const char *fmt, va_list args)
 {
-    char buf[64];
+    char buf[9000];
 
     (void) pw;
     vsprintf(buf, fmt, args);
@@ -25,12 +26,15 @@ static void render(void *pw, nslog_entry_context_t *ctx,
             strcmp(ctx->category->name, "probe") == 0 &&
             strcmp(buf, "value 42") == 0)
         seen++;
+    if (strlen(buf) == 8192 && buf[0] == 'x' && buf[8191] == 'x')
+        long_seen++;
 }
 
 int main(void)
 {
     nslog_filter_t *filter = 0;
     char *text;
+    char message[8193];
 
     if (nslog_filter_from_text("(lvl:WARN || cat:probe)", &filter) !=
             NSLOG_NO_ERROR)
@@ -44,14 +48,17 @@ int main(void)
     nslog_filter_unref(filter);
     nslog_set_render_callback(render, 0);
     NSLOG(probe, INFO, "value %d", 42);
+    memset(message, 'x', sizeof(message) - 1);
+    message[sizeof(message) - 1] = '\0';
+    NSLOG(probe, INFO, "%s", message);
     if (nslog_uncork() != NSLOG_NO_ERROR)
         return 3;
 
-    return seen == 1 ? 0 : 4;
+    return seen == 1 && long_seen == 1 ? 0 : 4;
 }
 EOF
 
-/usr/local/bin/gcc -DNeXT -I"$LOCAL_ROOT/include" "$TMP.c" \
+/usr/local/bin/gcc-4.2 -DNeXT -I"$LOCAL_ROOT/include" "$TMP.c" \
     "$LOCAL_ROOT/lib/libnslog.a" -o "$TMP"
 
 "$TMP"

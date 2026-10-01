@@ -1,4 +1,6 @@
-gcc33
+gcc42
 make
 netsurf-buildsystem
+bison
+flex
 patch

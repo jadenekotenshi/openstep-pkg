@@ -25,6 +25,32 @@ index 30b5d44..4e392bd 100644
      if (tccan(multcap) && (!tccan(cap) || tclen[multcap] <= tclen[cap] * ct)) {
  	tcoutarg(multcap, ct);
  	return 1;
+diff --git a/Src/jobs.c b/Src/jobs.c
+index a91ef78..c2efd30 100644
+--- a/Src/jobs.c
++++ b/Src/jobs.c
+@@ -693,7 +693,7 @@ get_clktck(void)
+ 	 * sysconf only the first time       */
+ 	clktck = sysconf(_SC_CLK_TCK);
+ #else
+-# ifdef __NeXT__
++# if defined(NeXT) || defined(__NeXT__)
+     /* NeXTStep 3.3 defines CLK_TCK wrongly */
+     clktck = 60;
+ # else
+diff --git a/Src/prototypes.h b/Src/prototypes.h
+index e3db4f5..80ffdbe 100644
+--- a/Src/prototypes.h
++++ b/Src/prototypes.h
+@@ -96,7 +96,7 @@ extern int getdomainname _((char *name, int maxlength));
+ extern int select _((int nfds, fd_set * readfds, fd_set * writefds, fd_set * exceptfds, struct timeval *timeout));
+ #endif /* DGUX and __STDC__ */
+ 
+-#ifdef __NeXT__
++#if defined(NeXT) || defined(__NeXT__)
+ extern pid_t getppid(void);
+ #endif
+ 
 diff --git a/Src/utils.c b/Src/utils.c
 index 62bd3e6..561d83d 100644
 --- a/Src/utils.c
@@ -48,14 +74,32 @@ index 62bd3e6..561d83d 100644
  		    ct++;
  		}
 diff --git a/Src/zsh_system.h b/Src/zsh_system.h
-index 6f4efce..27eba80 100644
+index 6f4efce..c69ec0d 100644
 --- a/Src/zsh_system.h
 +++ b/Src/zsh_system.h
+@@ -50,7 +50,7 @@
+ 
+ /* NeXT has half-implemented POSIX support *
+  * which currently fools configure         */
+-#ifdef __NeXT__
++#if defined(NeXT) || defined(__NeXT__)
+ # undef HAVE_TERMIOS_H
+ # undef HAVE_SYS_UTSNAME_H
+ #endif
+@@ -113,7 +113,7 @@ char *alloca _((size_t));
+  * defines dup() as a synonym for dup2(), which has a different
+  * number of arguments), so just include it for next.
+  */
+-#ifdef __NeXT__
++#if defined(NeXT) || defined(__NeXT__)
+ # ifdef HAVE_LIBC_H
+ #  include <libc.h>
+ # endif
 @@ -123,6 +123,10 @@ char *alloca _((size_t));
  # include <sys/types.h>
  #endif
  
-+#if defined(__NeXT__) && !defined(_SSIZE_T)
++#if (defined(NeXT) || defined(__NeXT__)) && !defined(_SSIZE_T)
 +typedef long ssize_t;
 +#endif
 +
@@ -66,7 +110,7 @@ index 6f4efce..27eba80 100644
  # include <errno.h>
  #endif
  
-+#if defined(__NeXT__) && !defined(ENOSYS)
++#if (defined(NeXT) || defined(__NeXT__)) && !defined(ENOSYS)
 +# define ENOSYS EINVAL
 +#endif
 +

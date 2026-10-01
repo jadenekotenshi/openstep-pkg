@@ -15,6 +15,6 @@ trap 'rm -rf "$TMPDIR"' 0 1 2 3 15
 echo '#include <expat.h>' > "$TMPDIR/conftest.c"
 echo 'int main(){XML_Parser p=XML_ParserCreate(0); if(p==0) return 1; XML_ParserFree(p); return 0;}' >> "$TMPDIR/conftest.c"
 
-/usr/local/bin/gcc -DNeXT -I"$LOCAL_ROOT/include" "$TMPDIR/conftest.c" \
+/usr/local/bin/gcc-4.2 -DNeXT -I"$LOCAL_ROOT/include" "$TMPDIR/conftest.c" \
   "$LOCAL_ROOT/lib/libexpat.a" -o "$TMPDIR/conftest"
 "$TMPDIR/conftest"

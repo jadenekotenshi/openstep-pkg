@@ -10,3 +10,37 @@ QJSC="$ROOT_DIR/usr/local/bin/qjsc"
 
 out=`"$QJS" -e 'print(1 + 2)'`
 [ "$out" = 3 ]
+
+out=`"$QJS" -e '
+function check(value) { if (!value) throw new Error("quickjs regression"); }
+check(Math.clz32(1) === 31 && Math.clz32(0) === 32);
+check(Math.imul(0x7fffffff, 3) === 2147483645);
+check(Array.from(new Uint8ClampedArray([0.5, 1.5, 2.5])).join() === "0,2,2");
+check(((1n << 130n) + 7n) >> 130n === 1n);
+check(BigInt("0x" + ((1n << 130n) + 7n).toString(16)) === (1n << 130n) + 7n);
+check(Math.sqrt(81) === 9 && Math.abs(Math.log(Math.E) - 1) < 1e-12);
+check(Math.abs(Math.expm1(1e-12) / 1e-12 - 1) < 1e-11);
+check(Math.abs(Math.log1p(1e-12) / 1e-12 - 1) < 1e-11);
+check(Math.abs(Math.log1p(-1e-12) / -1e-12 - 1) < 1e-11);
+check(Math.log1p(1e-20) === 1e-20 && Math.log1p(-1e-20) === -1e-20);
+check(Object.is(Math.log1p(-0), -0));
+check(Math.tanh(1000) === 1 && Math.tanh(-1000) === -1);
+check(Number.isFinite(Math.asinh(-1e100)));
+check(JSON.parse(JSON.stringify("x".repeat(70000))).length === 70000);
+print("quickjs regression ok");
+'`
+[ "$out" = 'quickjs regression ok' ]
+
+out=`"$QJS" --std -e '
+let padded = std.sprintf("%70000d", 1);
+if (padded.length !== 70000 || padded[69999] !== "1")
+    throw new Error("long formatted output");
+print("quickjs formatting ok");
+'`
+[ "$out" = 'quickjs formatting ok' ]
+
+TMP=/tmp/quickjs-compile-$$
+trap 'rm -f "$TMP.js" "$TMP"' 0 1 2 3 15
+echo 'print("qjsc executable ok");' > "$TMP.js"
+"$QJSC" -o "$TMP" "$TMP.js"
+[ "`"$TMP"`" = 'qjsc executable ok' ]

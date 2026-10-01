@@ -14,6 +14,16 @@ sh ./pkg list
 sh ./pkg remove bash
 ```
 
+## Compiler selection
+
+Packages that need the newer compiler depend on `gcc42` and explicitly use
+`/usr/local/bin/gcc-4.2` or `/usr/local/bin/g++-4.2`, including their test hooks.
+The GCC 4.2 package bootstraps directly from stock `/bin/cc`: stage 1 uses
+`-O0`, stages 2/3 and runtimes use `-O2`, and stage 2 is compared with stage 3.
+
+Python 3.11 builds at `-O3`, except its generated `deepfreeze.c` unit, which uses
+`-O0 -g0` to avoid GCC42 allocation failures and optimizer crashes on OPENSTEP.
+
 ## Package layout
 
 Each package is a directory named after the package:
@@ -84,7 +94,7 @@ Example:
 ```text
 make
 grep
-!gcc33
+!alternative-make
 ```
 
 Behavior:
@@ -108,6 +118,10 @@ Behavior:
 - `PKG_BUILD_HELPERS` exported as the path to `build-helpers.sh`
 - `/usr/local/bin/ksh` used as the build shell for normal packages when
   available; the bootstrap `pdksh` package is built with `/bin/sh`
+
+`pkg test` uses the same shell selection and propagates test failures explicitly.
+This avoids stock OPENSTEP `/bin/sh` masking a failure with a successful cleanup
+trap.
 
 Example:
 

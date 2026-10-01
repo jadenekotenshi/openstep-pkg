@@ -1,5 +1,5 @@
 diff --git a/src/Makefile b/src/Makefile
-index fa1ddc87b..aa74b6d63 100644
+index fa1ddc8..aa74b6d 100644
 --- a/src/Makefile
 +++ b/src/Makefile
 @@ -14,6 +14,9 @@ $(BUILDDIR)/%-lexer.c $(BUILDDIR)/%-lexer.h: src/%-lexer.l
@@ -13,7 +13,7 @@ index fa1ddc87b..aa74b6d63 100644
  # Bison 2.6 and later require api.prefix
  # Bison 2.5 and earlier require name-prefix switch
 diff --git a/src/duk-libdom-common.c b/src/duk-libdom-common.c
-index a75f14840..2d13ba37f 100644
+index a75f148..2d13ba3 100644
 --- a/src/duk-libdom-common.c
 +++ b/src/duk-libdom-common.c
 @@ -11,7 +11,9 @@
@@ -27,7 +27,7 @@ index a75f14840..2d13ba37f 100644
  #include <ctype.h>
  
 diff --git a/src/duk-libdom-dictionary.c b/src/duk-libdom-dictionary.c
-index bc531474d..8be0d5996 100644
+index bc53147..8be0d59 100644
 --- a/src/duk-libdom-dictionary.c
 +++ b/src/duk-libdom-dictionary.c
 @@ -11,7 +11,9 @@
@@ -41,7 +41,7 @@ index bc531474d..8be0d5996 100644
  #include <ctype.h>
  
 diff --git a/src/duk-libdom-generated.c b/src/duk-libdom-generated.c
-index 13194e07d..ef7e08f81 100644
+index 13194e0..ef7e08f 100644
 --- a/src/duk-libdom-generated.c
 +++ b/src/duk-libdom-generated.c
 @@ -17,7 +17,9 @@
@@ -55,7 +55,7 @@ index 13194e07d..ef7e08f81 100644
  #include <ctype.h>
  
 diff --git a/src/duk-libdom-interface.c b/src/duk-libdom-interface.c
-index 46436c460..6c9586e54 100644
+index 46436c4..6c9586e 100644
 --- a/src/duk-libdom-interface.c
 +++ b/src/duk-libdom-interface.c
 @@ -11,7 +11,9 @@
@@ -69,7 +69,7 @@ index 46436c460..6c9586e54 100644
  #include <ctype.h>
  
 diff --git a/src/duk-libdom.c b/src/duk-libdom.c
-index 61cd20e63..3210f8634 100644
+index 61cd20e..3210f86 100644
 --- a/src/duk-libdom.c
 +++ b/src/duk-libdom.c
 @@ -11,7 +11,9 @@
@@ -83,7 +83,7 @@ index 61cd20e63..3210f8634 100644
  #include <ctype.h>
  
 diff --git a/src/nsgenbind.c b/src/nsgenbind.c
-index 73b9673a5..726db1e44 100644
+index 73b9673..726db1e 100644
 --- a/src/nsgenbind.c
 +++ b/src/nsgenbind.c
 @@ -11,7 +11,13 @@
@@ -101,7 +101,7 @@ index 73b9673a5..726db1e44 100644
  
  #include "options.h"
 diff --git a/src/output.c b/src/output.c
-index 84579f27d..8dc0a5d85 100644
+index 84579f2..8dc0a5d 100644
 --- a/src/output.c
 +++ b/src/output.c
 @@ -63,26 +63,51 @@ int output_close(struct opctx *opctx)
@@ -166,10 +166,10 @@ index 84579f27d..8dc0a5d85 100644
  
  int outputc(struct opctx *opctx, int c)
 diff --git a/src/utils.c b/src/utils.c
-index 85d26f26e..9e4108b33 100644
+index 85d26f2..e7bd117 100644
 --- a/src/utils.c
 +++ b/src/utils.c
-@@ -11,12 +11,61 @@
+@@ -11,12 +11,78 @@
  #include <stdbool.h>
  #include <errno.h>
  #include <stdlib.h>
@@ -202,18 +202,35 @@ index 85d26f26e..9e4108b33 100644
 +
 +int vsnprintf(char *str, size_t size, const char *format, va_list ap)
 +{
-+        char tmp[8192];
-+        int ret;
++        FILE *stream;
++        long length;
 +        size_t copy;
 +
-+        ret = vsprintf(tmp, format, ap);
-+        if ((str != NULL) && (size != 0)) {
-+                copy = (ret >= 0 && (size_t)ret < size) ?
-+                        (size_t)ret : size - 1;
-+                memcpy(str, tmp, copy);
++        if (size != 0)
++                str[0] = 0;
++        stream = tmpfile();
++        if (stream == NULL)
++                return -1;
++        /* NeXT vfprintf returns zero on success; measure the stream. */
++        if (vfprintf(stream, format, ap) < 0 || fflush(stream) != 0) {
++                fclose(stream);
++                return -1;
++        }
++        length = ftell(stream);
++        if (length < 0 || fseek(stream, 0L, SEEK_SET) != 0) {
++                fclose(stream);
++                return -1;
++        }
++        if (size != 0) {
++                copy = (size_t)length < size ? (size_t)length : size - 1;
++                if (fread(str, 1, copy, stream) != copy) {
++                        fclose(stream);
++                        return -1;
++                }
 +                str[copy] = 0;
 +        }
-+        return ret;
++        fclose(stream);
++        return (int)length;
 +}
 +
 +int snprintf(char *str, size_t size, const char *format, ...)
@@ -231,7 +248,7 @@ index 85d26f26e..9e4108b33 100644
  /* exported function documented in utils.h */
  char *genb_fpath(const char *fname)
  {
-@@ -35,7 +84,7 @@ static char *genb_fpath_tmp(const char *fname)
+@@ -35,7 +101,7 @@ static char *genb_fpath_tmp(const char *fname)
          char *fpath;
          int fpathl;
  
@@ -241,7 +258,7 @@ index 85d26f26e..9e4108b33 100644
          snprintf(fpath, fpathl, "%s/%s.%d", options->outdirname, fname, getpid());
  
 diff --git a/src/utils.h b/src/utils.h
-index c9dfd36cf..b4c67d9a4 100644
+index c9dfd36..b4c67d9 100644
 --- a/src/utils.h
 +++ b/src/utils.h
 @@ -36,7 +36,7 @@ FILE *genb_fopen_tmp(const char *fname);
@@ -254,7 +271,7 @@ index c9dfd36cf..b4c67d9a4 100644
  char *strndup(const char *s, size_t n);
  #endif
 diff --git a/src/webidl-parser.y b/src/webidl-parser.y
-index 9b4c2011a..dc2abe37e 100644
+index 9b4c201..dc2abe3 100644
 --- a/src/webidl-parser.y
 +++ b/src/webidl-parser.y
 @@ -17,8 +17,25 @@

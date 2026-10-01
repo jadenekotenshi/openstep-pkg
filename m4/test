@@ -8,7 +8,7 @@ TMPFILE=/tmp/pkg-m4-$$.m4
 [ -x "$M4" ]
 /bin/rm -f "$TMPFILE"
 /bin/cat > "$TMPFILE" <<'EOF'
-define(`x', `ok')
+define(`x', `ok')dnl
 x
 EOF
 

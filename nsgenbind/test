@@ -1,27 +1,48 @@
 #!/bin/sh
-
 set -e
 
-TMP=/usr/tmp/nsgenbind-test.$$
-
-rm -rf "$TMP"
+NSGENBIND="$LOCAL_ROOT/bin/nsgenbind"
+TMP=/tmp/nsgenbind-test-$$
+test -x "$NSGENBIND"
 mkdir "$TMP"
-mkdir "$TMP/idl"
-mkdir "$TMP/out"
+mkdir "$TMP/output"
+trap 'rm -rf "$TMP"' 0 1 2 3 15
 
-cat > "$TMP/blankidl.bnd" <<'EOF'
+cat > "$TMP/probe.bnd" <<'EOF'
 binding duk_libdom {
-	webidl "blank.idl";
+    webidl "probe.idl";
+    preface %{ /*
+EOF
+# Percent signs force the lexer to concatenate C fragments beyond 8 KiB.
+/bin/awk 'BEGIN { for (i = 0; i < 160; i++) print "012345678901234567890123456789012345678901234567890123456789 %"; exit }' >> "$TMP/probe.bnd"
+cat >> "$TMP/probe.bnd" <<'EOF'
+long-binding-end */ %};
+};
+EOF
+cat > "$TMP/probe.idl" <<'EOF'
+interface Probe {
+    readonly attribute long value;
+    void ping();
 };
 EOF
 
-cat > "$TMP/idl/blank.idl" <<'EOF'
+"$NSGENBIND" -I "$TMP" "$TMP/probe.bnd" "$TMP/output"
+test -s "$TMP/output/binding.c"
+test -s "$TMP/output/binding.h"
+test -s "$TMP/output/prototype.h"
+test -s "$TMP/output/private.h"
+test -s "$TMP/output/Makefile"
+(cd "$TMP/output" && grep -i probe *.c > /dev/null)
+grep 'long-binding-end' "$TMP/output/binding.c" > /dev/null
 
+echo 'interface Broken {' > "$TMP/broken.idl"
+cat > "$TMP/broken.bnd" <<'EOF'
+binding duk_libdom {
+    webidl "broken.idl";
+};
 EOF
-
-"$LOCAL_ROOT/bin/nsgenbind" -I "$TMP/idl" "$TMP/blankidl.bnd" "$TMP/out"
-
-test -f "$TMP/out/binding.c"
-test -f "$TMP/out/Makefile"
-
-rm -rf "$TMP"
+if "$NSGENBIND" -I "$TMP" "$TMP/broken.bnd" "$TMP/output" > "$TMP/invalid.log" 2>&1; then
+    echo 'nsgenbind accepted incomplete WebIDL' >&2
+    exit 1
+fi
+echo 'nsgenbind generation and parse-error checks passed'

@@ -2,14 +2,20 @@
 
 set -e
 
+ulimit -d 65536
+ulimit -s 8192
+
 DESTDIR=$1
 VERSION=$2
 PREFIX=/usr/local
 PATCHFILE="python-$VERSION-openstep.patch"
 
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
-CC=/usr/local/bin/gcc
+CC=/usr/local/bin/gcc-4.2
 CFLAGS="-O3 -DNeXT"
+# GCC42 exhausts memory or crashes optimizing the generated deepfreeze unit.
+# Keep the interpreter optimized; only frozen-object initialization uses -O0.
+DEEPFREEZE_CFLAGS="-O0 -g0"
 CPPFLAGS="-I. -I./Include -I/usr/local/include -I/NextDeveloper/Headers -I/NextDeveloper/Headers/bsd"
 LDFLAGS="-L/usr/local/lib"
 GREP=/usr/local/bin/grep
@@ -20,6 +26,7 @@ ac_cv_prog_cc_c99=
 ac_cv_sizeof_wchar_t=4
 
 export DESTDIR VERSION PREFIX PATCHFILE PATH CC CFLAGS CPPFLAGS LDFLAGS
+export DEEPFREEZE_CFLAGS
 export GREP EGREP AWK SED ac_cv_prog_cc_c99 ac_cv_sizeof_wchar_t
 . "$PKG_BUILD_HELPERS"
 

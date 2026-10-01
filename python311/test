@@ -4,6 +4,7 @@ set -e
 
 /usr/local/bin/python3.11 -E - <<'PY'
 import decimal
+import fractions
 import hashlib
 import math
 import pathlib
@@ -25,6 +26,31 @@ def check(name, actual, expected):
 check("major.minor", sys.version_info[:2], (3, 11))
 check("platform", sys.platform, "openstep")
 check("math.sqrt", math.sqrt(81.0), 9.0)
+check("math.frexp", math.frexp(12.0), (0.75, 4))
+check("math.ldexp", math.ldexp(0.75, 4), 12.0)
+check("math.modf", math.modf(-3.25), (-0.25, -3.0))
+check("integer to float", float((1 << 60) + 129), float(1 << 60) + 256.0)
+check("integer bit count", ((1 << 200) - 1).bit_count(), 200)
+check("integer bit length", (1 << 1000).bit_length(), 1001)
+check("float hash", hash(3.25), hash(fractions.Fraction(13, 4)))
+tiny = float.fromhex('0x0.0000000000001p-1022')
+check("subnormal hash", hash(tiny), hash(fractions.Fraction(1, 1 << 1074)))
+check("nextafter equal", math.nextafter(2.0, 2.0), 2.0)
+check("nextafter upward", math.nextafter(1.0, 2.0), 1.0 + 2.0 ** -52)
+check("nextafter downward", math.nextafter(1.0, 0.0), 1.0 - 2.0 ** -53)
+check("nextafter subnormal", math.nextafter(0.0, 1.0), tiny)
+check("nextafter negative subnormal", math.nextafter(0.0, -1.0), -tiny)
+check("nextafter signed zero", math.copysign(1.0, math.nextafter(0.0, -0.0)), -1.0)
+check("nextafter infinity", math.nextafter(math.inf, 0.0), sys.float_info.max)
+check("ulp zero", math.ulp(0.0), tiny)
+check("exp2 subnormal", math.exp2(-1074.0), tiny)
+check("exp2 integer", math.exp2(10.0), 1024.0)
+check("log1p small", abs(math.log1p(1e-12) / 1e-12 - 1.0) < 1e-11, True)
+check("log1p negative small", abs(math.log1p(-1e-12) / -1e-12 - 1.0) < 1e-11, True)
+check("log1p tiny", math.log1p(1e-20), 1e-20)
+check("log1p negative tiny", math.log1p(-1e-20), -1e-20)
+check("log1p signed zero", math.copysign(1.0, math.log1p(-0.0)), -1.0)
+check("expm1 small", abs(math.expm1(1e-12) / 1e-12 - 1.0) < 1e-11, True)
 check("zlib roundtrip", zlib.decompress(zlib.compress(b"ok")), b"ok")
 check("sha256 prefix", hashlib.sha256(b"x").hexdigest()[:8], "2d711642")
 check("decimal addition", decimal.Decimal("1.25") + decimal.Decimal("2.75"),

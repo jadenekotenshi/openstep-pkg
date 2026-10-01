@@ -41,7 +41,7 @@ int main(void)
 }
 EOF
 
-/usr/local/bin/gcc -DNeXT -I"$LOCAL_ROOT/include" "$TMP.c" \
+/usr/local/bin/gcc-4.2 -DNeXT -I"$LOCAL_ROOT/include" "$TMP.c" \
     "$LOCAL_ROOT/lib/libnsbmp.a" -o "$TMP"
 
 "$TMP"

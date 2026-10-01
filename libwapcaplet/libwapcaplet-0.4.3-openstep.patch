@@ -1,5 +1,5 @@
 diff --git a/include/libwapcaplet/libwapcaplet.h b/include/libwapcaplet/libwapcaplet.h
-index 57e2e48..8407be7 100644
+index 57e2e48..d543abd 100644
 --- a/include/libwapcaplet/libwapcaplet.h
 +++ b/include/libwapcaplet/libwapcaplet.h
 @@ -14,10 +14,41 @@ extern "C"
@@ -10,7 +10,7 @@ index 57e2e48..8407be7 100644
 +#if defined(NeXT)
 +#ifndef OPENSTEP_C99_TYPES_DEFINED
 +#define OPENSTEP_C99_TYPES_DEFINED
-+#ifndef __cplusplus
++#if !defined(__cplusplus) && !defined(__bool_true_false_are_defined)
 +typedef unsigned char bool;
 +#ifndef true
 +#define true 1

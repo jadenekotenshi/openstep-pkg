@@ -8,8 +8,8 @@ PREFIX=/usr/local
 PATCHFILE="libcss-$VERSION-openstep.patch"
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 NSSHARED=/usr/local/share/netsurf-buildsystem
-CC=/usr/local/bin/gcc
-BUILD_CC=/usr/local/bin/gcc
+CC=/usr/local/bin/gcc-4.2
+BUILD_CC=/usr/local/bin/gcc-4.2
 PERL=/usr/bin/perl
 MAKE=gnumake
 CCACHE=
@@ -29,7 +29,7 @@ fi
 
 patch -p1 < "$PATCHFILE"
 
-BUILD_CC="/usr/local/bin/gcc -DNeXT -I/NextDeveloper/Headers -I`pwd`/include"
+BUILD_CC="/usr/local/bin/gcc-4.2 -DNeXT -I/NextDeveloper/Headers -I`pwd`/include"
 export BUILD_CC
 
 cat > Makefile.config.override <<'EOF'

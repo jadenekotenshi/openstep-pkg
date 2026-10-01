@@ -20,6 +20,9 @@ main(void)
 	bool equal = false;
 	lwc_error err;
 
+	if (sizeof(bool) != 1)
+		return 6;
+
 	err = lwc_intern_string("OpenStep", 8, &mixed);
 	if (err != lwc_error_ok || mixed == 0)
 		return 1;
@@ -52,3 +55,11 @@ cc -I"$LOCAL_ROOT/include" -L"$LOCAL_ROOT/lib" \
 	-o "$TMPDIR/lwc_probe" "$TMPDIR/lwc_probe.c" -lwapcaplet
 
 "$TMPDIR/lwc_probe"
+
+# Also check public-header ordering when the newer compiler is available.
+if [ -x /usr/local/bin/gcc-4.2 ]; then
+    /usr/local/bin/gcc-4.2 -DNeXT -include stdbool.h \
+        -I"$LOCAL_ROOT/include" -L"$LOCAL_ROOT/lib" \
+        -o "$TMPDIR/lwc_probe_c99" "$TMPDIR/lwc_probe.c" -lwapcaplet
+    "$TMPDIR/lwc_probe_c99"
+fi

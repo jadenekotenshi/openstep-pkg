@@ -7,7 +7,7 @@ VERSION=$2
 
 PATH=/usr/local/bin:$PATH
 CONFIG_SHELL=/usr/local/bin/ksh
-CC=/usr/local/bin/gcc
+CC=/usr/local/bin/gcc-4.2
 CPPFLAGS=-I/NextDeveloper/Headers/bsd
 GREP=/usr/local/bin/grep
 EGREP=/usr/local/bin/egrep

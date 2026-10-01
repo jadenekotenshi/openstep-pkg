@@ -1,4 +1,4 @@
-diff --git b/architecture/byte_order.h b/architecture/byte_order.h
+diff --git a/architecture/byte_order.h b/architecture/byte_order.h
 new file mode 100644
 index 0000000..de5b172
 --- /dev/null
@@ -32,7 +32,7 @@ index 0000000..de5b172
 +#define NXSwapHostLongToBig(x) NXSwapLong(x)
 +
 +#endif
-diff --git b/bsd/machine/endian.h b/bsd/machine/endian.h
+diff --git a/bsd/machine/endian.h b/bsd/machine/endian.h
 new file mode 100644
 index 0000000..d9be178
 --- /dev/null
@@ -44,7 +44,7 @@ index 0000000..d9be178
 +#include <bsd/i386/endian.h>
 +
 +#endif
-diff --git b/bsd/machine/label_t.h b/bsd/machine/label_t.h
+diff --git a/bsd/machine/label_t.h b/bsd/machine/label_t.h
 new file mode 100644
 index 0000000..2a2c8a4
 --- /dev/null
@@ -56,7 +56,7 @@ index 0000000..2a2c8a4
 +#include <bsd/i386/label_t.h>
 +
 +#endif
-diff --git b/bsd/machine/signal.h b/bsd/machine/signal.h
+diff --git a/bsd/machine/signal.h b/bsd/machine/signal.h
 new file mode 100644
 index 0000000..5a99691
 --- /dev/null
@@ -68,7 +68,7 @@ index 0000000..5a99691
 +#include <bsd/i386/signal.h>
 +
 +#endif
-diff --git b/bsd/machine/types.h b/bsd/machine/types.h
+diff --git a/bsd/machine/types.h b/bsd/machine/types.h
 new file mode 100644
 index 0000000..7a6d4da
 --- /dev/null
@@ -81,7 +81,7 @@ index 0000000..7a6d4da
 +
 +#endif
 diff --git a/cutils.h b/cutils.h
-index 9fcb7a6..57ccdc3 100644
+index 9fcb7a6..1371ab5 100644
 --- a/cutils.h
 +++ b/cutils.h
 @@ -29,6 +29,14 @@
@@ -99,63 +99,7 @@ index 9fcb7a6..57ccdc3 100644
  #define likely(x)       __builtin_expect(!!(x), 1)
  #define unlikely(x)     __builtin_expect(!!(x), 0)
  #define force_inline inline __attribute__((always_inline))
-@@ -128,25 +136,55 @@ static inline int64_t min_int64(int64_t a, int64_t b)
- /* WARNING: undefined if a = 0 */
- static inline int clz32(unsigned int a)
- {
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+    int n = 0;
-+    while ((a & 0x80000000U) == 0) {
-+        n++;
-+        a <<= 1;
-+    }
-+    return n;
-+#else
-     return __builtin_clz(a);
-+#endif
- }
- 
- /* WARNING: undefined if a = 0 */
- static inline int clz64(uint64_t a)
- {
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+    if ((a >> 32) != 0)
-+        return clz32((unsigned int)(a >> 32));
-+    return 32 + clz32((unsigned int)a);
-+#else
-     return __builtin_clzll(a);
-+#endif
- }
- 
- /* WARNING: undefined if a = 0 */
- static inline int ctz32(unsigned int a)
- {
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+    int n = 0;
-+    while ((a & 1U) == 0) {
-+        n++;
-+        a >>= 1;
-+    }
-+    return n;
-+#else
-     return __builtin_ctz(a);
-+#endif
- }
- 
- /* WARNING: undefined if a = 0 */
- static inline int ctz64(uint64_t a)
- {
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+    if ((uint32_t)a != 0)
-+        return ctz32((unsigned int)a);
-+    return 32 + ctz32((unsigned int)(a >> 32));
-+#else
-     return __builtin_ctzll(a);
-+#endif
- }
- 
- struct __attribute__((packed)) packed_u64 {
-diff --git b/dirent.h b/dirent.h
+diff --git a/dirent.h b/dirent.h
 new file mode 100644
 index 0000000..3d020f8
 --- /dev/null
@@ -169,7 +113,7 @@ index 0000000..3d020f8
 +#define dirent direct
 +
 +#endif
-diff --git b/fenv.h b/fenv.h
+diff --git a/fenv.h b/fenv.h
 new file mode 100644
 index 0000000..d7c45b0
 --- /dev/null
@@ -188,7 +132,7 @@ index 0000000..d7c45b0
 +#define FE_ALL_EXCEPT 0
 +
 +#endif
-diff --git b/inttypes.h b/inttypes.h
+diff --git a/inttypes.h b/inttypes.h
 new file mode 100644
 index 0000000..4e8883f
 --- /dev/null
@@ -206,7 +150,7 @@ index 0000000..4e8883f
 +#define PRIX64 "llX"
 +
 +#endif
-diff --git b/limits.h b/limits.h
+diff --git a/limits.h b/limits.h
 new file mode 100644
 index 0000000..c9117f8
 --- /dev/null
@@ -230,7 +174,7 @@ index 0000000..c9117f8
 +#define ULONG_MAX 4294967295UL
 +
 +#endif
-diff --git b/machine/endian.h b/machine/endian.h
+diff --git a/machine/endian.h b/machine/endian.h
 new file mode 100644
 index 0000000..04fd382
 --- /dev/null
@@ -242,7 +186,7 @@ index 0000000..04fd382
 +#include <bsd/i386/endian.h>
 +
 +#endif
-diff --git b/machine/label_t.h b/machine/label_t.h
+diff --git a/machine/label_t.h b/machine/label_t.h
 new file mode 100644
 index 0000000..ba56ad2
 --- /dev/null
@@ -254,7 +198,7 @@ index 0000000..ba56ad2
 +#include <bsd/i386/label_t.h>
 +
 +#endif
-diff --git b/machine/signal.h b/machine/signal.h
+diff --git a/machine/signal.h b/machine/signal.h
 new file mode 100644
 index 0000000..09eab59
 --- /dev/null
@@ -266,7 +210,7 @@ index 0000000..09eab59
 +#include <bsd/i386/signal.h>
 +
 +#endif
-diff --git b/machine/types.h b/machine/types.h
+diff --git a/machine/types.h b/machine/types.h
 new file mode 100644
 index 0000000..5248660
 --- /dev/null
@@ -278,12 +222,12 @@ index 0000000..5248660
 +#include <bsd/i386/types.h>
 +
 +#endif
-diff --git b/math.h b/math.h
+diff --git a/math.h b/math.h
 new file mode 100644
-index 0000000..55904cb
+index 0000000..85ec2b7
 --- /dev/null
 +++ b/math.h
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,42 @@
 +#ifndef QUICKJS_OPENSTEP_MATH_H
 +#define QUICKJS_OPENSTEP_MATH_H
 +
@@ -297,6 +241,7 @@ index 0000000..55904cb
 +#define INFINITY 1.0e999
 +#endif
 +
++extern double rint(double);
 +extern double acos(double);
 +extern double asin(double);
 +extern double atan(double);
@@ -325,12 +270,12 @@ index 0000000..55904cb
 +extern double cbrt(double);
 +
 +#endif
-diff --git b/openstep-compat.h b/openstep-compat.h
+diff --git a/openstep-compat.h b/openstep-compat.h
 new file mode 100644
-index 0000000..542ddd5
+index 0000000..a6580e0
 --- /dev/null
 +++ b/openstep-compat.h
-@@ -0,0 +1,381 @@
+@@ -0,0 +1,357 @@
 +#ifndef QUICKJS_OPENSTEP_COMPAT_H
 +#define QUICKJS_OPENSTEP_COMPAT_H
 +
@@ -390,15 +335,35 @@ index 0000000..542ddd5
 +static int qjs_openstep_vsnprintf(char *str, size_t size,
 +                                  const char *format, va_list ap)
 +{
-+    char tmpbuf[65536];
-+    int rc;
++    FILE *stream;
++    long length;
++    size_t copied;
 +
-+    rc = vsprintf(tmpbuf, format, ap);
-+    if (size > 0) {
-+        strncpy(str, tmpbuf, size - 1);
-+        str[size - 1] = '\0';
++    if (size > 0)
++        str[0] = '\0';
++    stream = tmpfile();
++    if (stream == NULL)
++        return -1;
++    /* NeXT vfprintf returns zero on success. ftell supplies the length. */
++    if (vfprintf(stream, format, ap) < 0 || fflush(stream) != 0) {
++        fclose(stream);
++        return -1;
 +    }
-+    return rc;
++    length = ftell(stream);
++    if (length < 0 || fseek(stream, 0L, SEEK_SET) != 0) {
++        fclose(stream);
++        return -1;
++    }
++    if (size > 0) {
++        copied = (size_t)length < size ? (size_t)length : size - 1;
++        if (fread(str, 1, copied, stream) != copied) {
++            fclose(stream);
++            return -1;
++        }
++        str[copied] = '\0';
++    }
++    fclose(stream);
++    return (int)length;
 +}
 +
 +static int qjs_openstep_snprintf(char *str, size_t size,
@@ -432,7 +397,14 @@ index 0000000..542ddd5
 +
 +static double qjs_openstep_round(double d)
 +{
-+    return d < 0 ? ceil(d - 0.5) : floor(d + 0.5);
++    double magnitude, integral;
++    if (d != d || d == HUGE_VAL || d == -HUGE_VAL || d == 0.0)
++        return d;
++    magnitude = fabs(d);
++    integral = floor(magnitude);
++    if (magnitude - integral >= 0.5)
++        integral += 1.0;
++    return d < 0 ? -integral : integral;
 +}
 +
 +static double qjs_openstep_log2(double d)
@@ -440,59 +412,17 @@ index 0000000..542ddd5
 +    return log(d) / log(2.0);
 +}
 +
-+static double qjs_openstep_cosh(double d)
-+{
-+    return (exp(d) + exp(-d)) / 2.0;
-+}
-+
-+static double qjs_openstep_sinh(double d)
-+{
-+    return (exp(d) - exp(-d)) / 2.0;
-+}
-+
-+static double qjs_openstep_tanh(double d)
-+{
-+    double e2x;
-+
-+    e2x = exp(2.0 * d);
-+    return (e2x - 1.0) / (e2x + 1.0);
-+}
-+
-+static double qjs_openstep_hypot(double a, double b)
-+{
-+    return sqrt(a * a + b * b);
-+}
-+
-+static double qjs_openstep_acosh(double d)
-+{
-+    return log(d + sqrt(d - 1.0) * sqrt(d + 1.0));
-+}
-+
-+static double qjs_openstep_asinh(double d)
-+{
-+    return log(d + sqrt(d * d + 1.0));
-+}
-+
-+static double qjs_openstep_atanh(double d)
-+{
-+    return 0.5 * log((1.0 + d) / (1.0 - d));
-+}
-+
-+static double qjs_openstep_expm1(double d)
-+{
-+    return exp(d) - 1.0;
-+}
-+
 +static double qjs_openstep_log1p(double d)
 +{
-+    return log(1.0 + d);
-+}
-+
-+static double qjs_openstep_cbrt(double d)
-+{
-+    if (d < 0)
-+        return -pow(-d, 1.0 / 3.0);
-+    return pow(d, 1.0 / 3.0);
++    volatile double u;
++    /* OPENSTEP log1p loses small arguments while forming 1+d. */
++    if (d > -0.5 && d < 0.5) {
++        u = 1.0 + d;
++        if (u == 1.0)
++            return d;
++        return log(u) * (d / (u - 1.0));
++    }
++    return log1p(d);
 +}
 +
 +static double qjs_openstep_fmin(double a, double b)
@@ -515,7 +445,7 @@ index 0000000..542ddd5
 +
 +static long qjs_openstep_lrint(double d)
 +{
-+    return (long)(d < 0 ? d - 0.5 : d + 0.5);
++    return (long)rint(d);
 +}
 +
 +static int qjs_openstep_isnan(double d)
@@ -682,16 +612,7 @@ index 0000000..542ddd5
 +#define trunc qjs_openstep_trunc
 +#define round qjs_openstep_round
 +#define log2 qjs_openstep_log2
-+#define cosh qjs_openstep_cosh
-+#define sinh qjs_openstep_sinh
-+#define tanh qjs_openstep_tanh
-+#define hypot qjs_openstep_hypot
-+#define acosh qjs_openstep_acosh
-+#define asinh qjs_openstep_asinh
-+#define atanh qjs_openstep_atanh
-+#define expm1 qjs_openstep_expm1
 +#define log1p qjs_openstep_log1p
-+#define cbrt qjs_openstep_cbrt
 +#define fmin qjs_openstep_fmin
 +#define fmax qjs_openstep_fmax
 +#define lrint qjs_openstep_lrint
@@ -732,7 +653,7 @@ index a88e39a..fc5ce4a 100644
  
  static void
 diff --git a/qjsc.c b/qjsc.c
-index e55ca61..8c536fa 100644
+index e55ca61..eab8d23 100644
 --- a/qjsc.c
 +++ b/qjsc.c
 @@ -36,6 +36,19 @@
@@ -744,7 +665,7 @@ index e55ca61..8c536fa 100644
 +#define R_OK 4
 +#endif
 +#ifndef CONFIG_CC
-+#define CONFIG_CC "/usr/local/bin/gcc"
++#define CONFIG_CC "/usr/local/bin/gcc-4.2"
 +#endif
 +#ifndef CONFIG_PREFIX
 +#define CONFIG_PREFIX "/usr/local"
@@ -755,6 +676,17 @@ index e55ca61..8c536fa 100644
  typedef struct {
      char *name;
      char *short_name;
+@@ -502,8 +515,10 @@ static int output_executable(const char *out_filename, const char *cfilename,
+              lib_dir, bn_suffix, lto_suffix);
+     *arg++ = libjsname;
+     *arg++ = "-lm";
++#ifndef NeXT
+     *arg++ = "-ldl";
+     *arg++ = "-lpthread";
++#endif
+     *arg = NULL;
+ 
+     if (verbose) {
 diff --git a/quickjs-libc.c b/quickjs-libc.c
 index 54a7a15..cc98a75 100644
 --- a/quickjs-libc.c
@@ -838,7 +770,7 @@ index 0004383..72e71c6 100644
  }
  
  static void *js_def_malloc(JSMallocState *s, size_t size)
-diff --git b/setjmp.h b/setjmp.h
+diff --git a/setjmp.h b/setjmp.h
 new file mode 100644
 index 0000000..216e1fa
 --- /dev/null
@@ -850,7 +782,7 @@ index 0000000..216e1fa
 +#include <ansi/i386/setjmp.h>
 +
 +#endif
-diff --git b/stdint.h b/stdint.h
+diff --git a/stdint.h b/stdint.h
 new file mode 100644
 index 0000000..0f8cb4b
 --- /dev/null

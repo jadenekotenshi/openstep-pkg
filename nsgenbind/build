@@ -8,18 +8,17 @@ PREFIX=/usr/local
 PATCHFILE="nsgenbind-$VERSION-openstep.patch"
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 NSSHARED=/usr/local/share/netsurf-buildsystem
-CC=/usr/local/bin/gcc
-BUILD_CC=/usr/local/bin/gcc
+CC=/usr/local/bin/gcc-4.2
+BUILD_CC=/usr/local/bin/gcc-4.2
 MAKE=gnumake
 CCACHE=
 CC_CAN_BUILD_AND_DEP=no
 CC_CANNOT_DEP=yes
-GCCVER=2
 BUILDDIR=build-openstep
 CFLAGS=-DNeXT
 
 export DESTDIR VERSION PREFIX PATH NSSHARED CC BUILD_CC MAKE
-export CCACHE CC_CAN_BUILD_AND_DEP CC_CANNOT_DEP GCCVER BUILDDIR CFLAGS
+export CCACHE CC_CAN_BUILD_AND_DEP CC_CANNOT_DEP BUILDDIR CFLAGS
 
 if [ -d "nsgenbind-$VERSION" ]; then
     cd "nsgenbind-$VERSION"
@@ -27,7 +26,7 @@ fi
 
 patch -p1 < "$PATCHFILE"
 
-gnumake Q= PREFIX="$PREFIX" NSSHARED="$NSSHARED" GCCVER=2 WARNFLAGS=
+gnumake Q= PREFIX="$PREFIX" NSSHARED="$NSSHARED" WARNFLAGS=
 
 test -d "$DESTDIR/usr" || mkdir "$DESTDIR/usr"
 test -d "$DESTDIR/usr/local" || mkdir "$DESTDIR/usr/local"

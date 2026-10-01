@@ -53,7 +53,7 @@ int main(void)
 }
 EOF
 
-/usr/local/bin/gcc -DNeXT -I/NextDeveloper/Headers -I"$LOCAL_ROOT/include" "$TMP.c" \
+/usr/local/bin/gcc-4.2 -DNeXT -I/NextDeveloper/Headers -I"$LOCAL_ROOT/include" "$TMP.c" \
     "$LOCAL_ROOT/lib/libdom.a" "$LOCAL_ROOT/lib/libhubbub.a" \
     "$LOCAL_ROOT/lib/libparserutils.a" "$LOCAL_ROOT/lib/libwapcaplet.a" \
     "$LOCAL_ROOT/lib/libexpat.a" -o "$TMP"

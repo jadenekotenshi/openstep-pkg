@@ -76,46 +76,14 @@ index 5840966..db6a526 100644
  
     This does not work on pointers, or arrays declared as [], or function
 diff --git a/Include/pymath.h b/Include/pymath.h
-index 772b67e..33db53b 100644
+index 772b67e..94e2233 100644
 --- a/Include/pymath.h
 +++ b/Include/pymath.h
-@@ -37,6 +37,112 @@
+@@ -37,6 +37,47 @@
  
  // Py_IS_FINITE(X)
  // Return 1 if float or double arg is neither infinite nor NAN, else 0.
 +#ifdef NeXT
-+extern double _Py_next_acos(double);
-+extern double _Py_next_acosh(double);
-+extern double _Py_next_asin(double);
-+extern double _Py_next_asinh(double);
-+extern double _Py_next_atan(double);
-+extern double _Py_next_atan2(double, double);
-+extern double _Py_next_atanh(double);
-+extern double _Py_next_cbrt(double);
-+extern double _Py_next_ceil(double);
-+extern double _Py_next_copysign(double, double);
-+extern double _Py_next_cos(double);
-+extern double _Py_next_cosh(double);
-+extern double _Py_next_exp(double);
-+extern double _Py_next_expm1(double);
-+extern double _Py_next_fabs(double);
-+extern double _Py_next_floor(double);
-+extern double _Py_next_fmod(double, double);
-+extern double _Py_next_frexp(double, int *);
-+extern double _Py_next_hypot(double, double);
-+extern double _Py_next_ldexp(double, int);
-+extern double _Py_next_log(double);
-+extern double _Py_next_log1p(double);
-+extern double _Py_next_log10(double);
-+extern double _Py_next_modf(double, double *);
-+extern double _Py_next_pow(double, double);
-+extern double _Py_next_round(double);
-+extern double _Py_next_sin(double);
-+extern double _Py_next_sinh(double);
-+extern double _Py_next_sqrt(double);
-+extern double _Py_next_tan(double);
-+extern double _Py_next_tanh(double);
-+
 +extern double acos(double);
 +extern double acosh(double);
 +extern double asin(double);
@@ -155,45 +123,12 @@ index 772b67e..33db53b 100644
 +#    define isinf(X) (!isnan(X) && !finite(X))
 +#  endif
 +#  define isfinite(X) finite(X)
-+#  ifndef _Py_BUILD_NEXT_LIBM_WRAPPERS
-+#    define acos _Py_next_acos
-+#    define acosh _Py_next_acosh
-+#    define asin _Py_next_asin
-+#    define asinh _Py_next_asinh
-+#    define atan _Py_next_atan
-+#    define atan2 _Py_next_atan2
-+#    define atanh _Py_next_atanh
-+#    define cbrt _Py_next_cbrt
-+#    define ceil _Py_next_ceil
-+#    define copysign _Py_next_copysign
-+#    define cos _Py_next_cos
-+#    define cosh _Py_next_cosh
-+#    define exp _Py_next_exp
-+#    define expm1 _Py_next_expm1
-+#    define fabs _Py_next_fabs
-+#    define floor _Py_next_floor
-+#    define fmod _Py_next_fmod
-+#    define frexp _Py_next_frexp
-+#    define hypot _Py_next_hypot
-+#    define ldexp _Py_next_ldexp
-+#    define log _Py_next_log
-+#    define log1p _Py_next_log1p
-+#    define log10 _Py_next_log10
-+#    define modf _Py_next_modf
-+#    define pow _Py_next_pow
-+#    define round _Py_next_round
-+#    define sin _Py_next_sin
-+#    define sinh _Py_next_sinh
-+#    define sqrt _Py_next_sqrt
-+#    define tan _Py_next_tan
-+#    define tanh _Py_next_tanh
-+#  endif
 +#endif
  #define Py_IS_FINITE(X) isfinite(X)
  
  /* HUGE_VAL is supposed to expand to a positive double infinity.  Python
 diff --git a/Makefile.pre.in b/Makefile.pre.in
-index 81d4d50..07e5853 100644
+index 81d4d50..e98627d 100644
 --- a/Makefile.pre.in
 +++ b/Makefile.pre.in
 @@ -39,6 +39,7 @@ CXX=		@CXX@
@@ -246,6 +181,17 @@ index 81d4d50..07e5853 100644
  
  # BEGIN: deepfreeze modules
  $(DEEPFREEZE_C): $(DEEPFREEZE_DEPS)
+@@ -2388,6 +2392,10 @@ config.status:	$(srcdir)/configure
+ .c.o:
+ 	$(CC) -c $(PY_CORE_CFLAGS) -o $@ $<
+ 
++# Permit a compiler-specific override for the large generated frozen data.
++$(DEEPFREEZE_OBJS): $(DEEPFREEZE_C)
++	$(CC) -c $(PY_CORE_CFLAGS) $(DEEPFREEZE_CFLAGS) -o $@ $(DEEPFREEZE_C)
++
+ # bpo-30104: dtoa.c uses union to cast double to unsigned long[2]. clang 4.0
+ # with -O2 or higher and strict aliasing miscompiles the ratio() function
+ # causing rounding issues. Compile dtoa.c using -fno-strict-aliasing on clang.
 diff --git a/Modules/_io/fileio.c b/Modules/_io/fileio.c
 index fee97f2..1b2c26b 100644
 --- a/Modules/_io/fileio.c
@@ -300,6 +246,27 @@ index fee97f2..1b2c26b 100644
          if (!PyUnicode_FSConverter(nameobj, &stringobj)) {
              return -1;
          }
+diff --git a/Modules/_math.h b/Modules/_math.h
+index 4a6bc22..e97b094 100644
+--- a/Modules/_math.h
++++ b/Modules/_math.h
+@@ -17,6 +17,16 @@ _Py_log1p(double x)
+         return x;
+     }
+     else {
++#ifdef NeXT
++        /* OPENSTEP log1p loses small x when forming 1+x. Store the rounded
++           sum and compensate for that rounding before returning log(1+x). */
++        if (x > -0.5 && x < 0.5) {
++            volatile double u = 1.0 + x;
++            if (u == 1.0)
++                return x;
++            return log(u) * (x / (u - 1.0));
++        }
++#endif
+         return log1p(x);
+     }
+ }
 diff --git a/Modules/_posixsubprocess.c b/Modules/_posixsubprocess.c
 index d91bf21..04f2772 100644
 --- a/Modules/_posixsubprocess.c
@@ -406,43 +373,44 @@ index f6dade1..e7ef5ee 100644
          .argc = argc,
          .use_bytes_argv = 1,
 diff --git a/Modules/mathmodule.c b/Modules/mathmodule.c
-index 5f5b71c..fde41f8 100644
+index 5f5b71c..39047be 100644
 --- a/Modules/mathmodule.c
 +++ b/Modules/mathmodule.c
-@@ -70,6 +70,42 @@ raised for division by zero and mod by zero.
+@@ -70,6 +70,43 @@ raised for division by zero and mod by zero.
  
  #include "clinic/mathmodule.c.h"
  
 +#ifdef NeXT
-+#ifndef isnan
-+#  define isnan(X) ((X) != (X))
-+#endif
-+#ifndef isinf
-+#  define isinf(X) (!isnan(X) && !finite(X))
-+#endif
-+
 +static double
 +next_exp2(double x)
 +{
++    /* ldexp handles exact integer powers, including subnormal results. */
++    if (x > INT_MIN && x < INT_MAX && x == floor(x))
++        return ldexp(1.0, (int)x);
 +    return pow(2.0, x);
 +}
 +
 +static double
 +next_nextafter(double x, double y)
 +{
-+    double step;
-+
-+    if (isnan(x) || isnan(y) || x == y) {
++    uint64_t bits;
++    if (isnan(x) || isnan(y))
 +        return x + y;
-+    }
++    if (x == y)
++        return y;
++    /* The OPENSTEP i386 ABI uses IEEE binary64. Step its representation
++       by one ULP, including signed zero, subnormals and infinity. */
 +    if (x == 0.0) {
-+        return y > 0.0 ? DBL_MIN : -DBL_MIN;
++        bits = ((uint64_t)(y < 0.0) << 63) | 1;
++    } else {
++        memcpy(&bits, &x, sizeof(bits));
++        if ((x > 0.0) == (y > x))
++            ++bits;
++        else
++            --bits;
 +    }
-+    step = fabs(x) * DBL_EPSILON;
-+    if (step == 0.0) {
-+        step = DBL_MIN;
-+    }
-+    return y > x ? x + step : x - step;
++    memcpy(&x, &bits, sizeof(x));
++    return x;
 +}
 +
 +#define exp2 next_exp2
@@ -637,65 +605,6 @@ index 7f3a13f..25e3200 100644
  PyDoc_STRVAR(xxsubtype__doc__,
  "xxsubtype is an example module showing how to subtype builtin types from C.\n"
  "test_descr.py in the standard test suite requires it in order to complete.\n"
-diff --git a/Objects/longobject.c b/Objects/longobject.c
-index 487c062..c7c9327 100644
---- a/Objects/longobject.c
-+++ b/Objects/longobject.c
-@@ -3074,6 +3074,13 @@ PyLong_AsDouble(PyObject *v)
- {
-     Py_ssize_t exponent;
-     double x;
-+#ifdef NeXT
-+    PyLongObject *lv;
-+    Py_ssize_t i;
-+    Py_ssize_t ndigits;
-+    Py_ssize_t bits;
-+    double base;
-+#endif
- 
-     if (v == NULL) {
-         PyErr_BadInternalCall();
-@@ -3083,6 +3090,32 @@ PyLong_AsDouble(PyObject *v)
-         PyErr_SetString(PyExc_TypeError, "an integer is required");
-         return -1.0;
-     }
-+#ifdef NeXT
-+    lv = (PyLongObject *)v;
-+    ndigits = Py_ABS(Py_SIZE(lv));
-+    if (ndigits == 0) {
-+        return 0.0;
-+    }
-+    if (ndigits > DBL_MAX_EXP / PyLong_SHIFT + 2) {
-+        PyErr_SetString(PyExc_OverflowError,
-+                        "int too large to convert to float");
-+        return -1.0;
-+    }
-+    bits = (ndigits - 1) * PyLong_SHIFT +
-+           bit_length_digit(lv->ob_digit[ndigits - 1]);
-+    if (bits > DBL_MAX_EXP) {
-+        PyErr_SetString(PyExc_OverflowError,
-+                        "int too large to convert to float");
-+        return -1.0;
-+    }
-+    x = 0.0;
-+    base = (double)PyLong_BASE;
-+    i = ndigits;
-+    while (i-- > 0) {
-+        x = x * base + (double)lv->ob_digit[i];
-+    }
-+    return Py_SIZE(lv) < 0 ? -x : x;
-+#else
-     if (IS_MEDIUM_VALUE(v)) {
-         /* Fast path; single digit long (31 bits) will cast safely
-            to double.  This improves performance of FP/long operations
-@@ -3097,6 +3130,7 @@ PyLong_AsDouble(PyObject *v)
-         return -1.0;
-     }
-     return ldexp(x, (int)exponent);
-+#endif
- }
- 
- /* Methods */
 diff --git a/Programs/_freeze_module.c b/Programs/_freeze_module.c
 index 7c4d60a..971e8bd 100644
 --- a/Programs/_freeze_module.c
@@ -1320,256 +1229,31 @@ index ead0337..43496cc 100644
      b->ab_mem = (void *)(b + 1);
      b->ab_next = NULL;
      b->ab_offset = (char *)_Py_ALIGN_UP(b->ab_mem, ALIGNMENT) -
-diff --git a/Python/pyhash.c b/Python/pyhash.c
-index d5ac9f8..32c0406 100644
---- a/Python/pyhash.c
-+++ b/Python/pyhash.c
-@@ -5,6 +5,10 @@
- */
- #include "Python.h"
- 
-+#ifdef NeXT
-+#  include <float.h>
-+#endif
-+
- #ifdef __APPLE__
- #  include <libkern/OSByteOrder.h>
- #elif defined(HAVE_LE64TOH) && defined(HAVE_ENDIAN_H)
-@@ -102,6 +106,12 @@ _Py_HashDouble(PyObject *inst, double v)
-             return _Py_HashPointer(inst);
-     }
- 
-+#ifdef NeXT
-+    if (v == 0.0 || (-DBL_MIN < v && v < DBL_MIN)) {
-+        return 0;
-+    }
-+#endif
-+
-     m = frexp(v, &e);
- 
-     sign = 1;
-@@ -113,7 +123,15 @@ _Py_HashDouble(PyObject *inst, double v)
-     /* process 28 bits at a time;  this should work well both for binary
-        and hexadecimal floating point. */
-     x = 0;
-+#ifdef NeXT
-+    int guard = 0;
-+#endif
-     while (m) {
-+#ifdef NeXT
-+        if (++guard > 64) {
-+            break;
-+        }
-+#endif
-         x = ((x << 28) & _PyHASH_MODULUS) | x >> (_PyHASH_BITS - 28);
-         m *= 268435456.0;  /* 2**28 */
-         e -= 28;
 diff --git a/Python/pymath.c b/Python/pymath.c
-index e7d0161..8ab7044 100644
+index e7d0161..c874c82 100644
 --- a/Python/pymath.c
 +++ b/Python/pymath.c
-@@ -1,5 +1,201 @@
-+#define _Py_BUILD_NEXT_LIBM_WRAPPERS
- #include "Python.h"
- 
+@@ -17,3 +17,20 @@ void _Py_set_387controlword(unsigned short cw) {
+     __asm__ __volatile__ ("fldcw %0" : : "m" (cw));
+ }
+ #endif  // HAVE_GCC_ASM_FOR_X87
++
 +#ifdef NeXT
-+typedef union {
-+    double d;
-+    struct {
-+        unsigned int lo;
-+        unsigned int hi;
-+    } w;
-+} next_double_words;
-+
-+#define NEXT_LIBM_UNARY(name, symbol) \
-+double \
-+_Py_next_##name(double x) \
-+{ \
-+    next_double_words arg; \
-+    next_double_words result; \
-+    arg.d = x; \
-+    __asm__ volatile( \
-+        "pushl %2\n\t" \
-+        "pushl %1\n\t" \
-+        "call " symbol "\n\t" \
-+        "addl $8, %%esp\n\t" \
-+        "fstpl %0" \
-+        : "=m" (result.d) \
-+        : "r" (arg.w.lo), "r" (arg.w.hi) \
-+        : "eax", "edx", "cc", "memory"); \
-+    return result.d; \
-+}
-+
-+#define NEXT_LIBM_BINARY(name, symbol) \
-+double \
-+_Py_next_##name(double x, double y) \
-+{ \
-+    next_double_words arg0; \
-+    next_double_words arg1; \
-+    next_double_words result; \
-+    arg0.d = x; \
-+    arg1.d = y; \
-+    __asm__ volatile( \
-+        "pushl %4\n\t" \
-+        "pushl %3\n\t" \
-+        "pushl %2\n\t" \
-+        "pushl %1\n\t" \
-+        "call " symbol "\n\t" \
-+        "addl $16, %%esp\n\t" \
-+        "fstpl %0" \
-+        : "=m" (result.d) \
-+        : "r" (arg0.w.lo), "r" (arg0.w.hi), \
-+          "r" (arg1.w.lo), "r" (arg1.w.hi) \
-+        : "eax", "edx", "cc", "memory"); \
-+    return result.d; \
-+}
-+
-+NEXT_LIBM_UNARY(acos, "_acos")
-+NEXT_LIBM_UNARY(asin, "_asin")
-+NEXT_LIBM_UNARY(atan, "_atan")
-+NEXT_LIBM_BINARY(atan2, "_atan2")
-+NEXT_LIBM_UNARY(ceil, "_ceil")
-+NEXT_LIBM_BINARY(copysign, "_copysign")
-+NEXT_LIBM_UNARY(cos, "_cos")
-+NEXT_LIBM_UNARY(cosh, "_cosh")
-+NEXT_LIBM_UNARY(exp, "_exp")
-+NEXT_LIBM_UNARY(fabs, "_fabs")
-+NEXT_LIBM_UNARY(floor, "_floor")
-+NEXT_LIBM_BINARY(fmod, "_fmod")
-+NEXT_LIBM_BINARY(hypot, "_hypot")
-+NEXT_LIBM_UNARY(log, "_log")
-+NEXT_LIBM_UNARY(log10, "_log10")
-+NEXT_LIBM_BINARY(pow, "_pow")
-+NEXT_LIBM_UNARY(sin, "_sin")
-+NEXT_LIBM_UNARY(sinh, "_sinh")
-+NEXT_LIBM_UNARY(sqrt, "_sqrt")
-+NEXT_LIBM_UNARY(tan, "_tan")
-+NEXT_LIBM_UNARY(tanh, "_tanh")
-+
-+double
-+_Py_next_acosh(double x)
-+{
-+    return _Py_next_log(x + _Py_next_sqrt(x * x - 1.0));
-+}
-+
-+double
-+_Py_next_asinh(double x)
-+{
-+    double ax;
-+
-+    ax = x < 0.0 ? -x : x;
-+    if (x < 0.0) {
-+        return -_Py_next_log(ax + _Py_next_sqrt(ax * ax + 1.0));
-+    }
-+    return _Py_next_log(x + _Py_next_sqrt(x * x + 1.0));
-+}
-+
-+double
-+_Py_next_atanh(double x)
-+{
-+    return 0.5 * _Py_next_log((1.0 + x) / (1.0 - x));
-+}
-+
-+double
-+_Py_next_cbrt(double x)
-+{
-+    if (x < 0.0) {
-+        return -_Py_next_pow(-x, 1.0 / 3.0);
-+    }
-+    return _Py_next_pow(x, 1.0 / 3.0);
-+}
-+
-+double
-+_Py_next_expm1(double x)
-+{
-+    return _Py_next_exp(x) - 1.0;
-+}
-+
-+double
-+_Py_next_log1p(double x)
-+{
-+    return _Py_next_log(1.0 + x);
-+}
-+
-+double
-+_Py_next_frexp(double x, int *e)
-+{
-+    next_double_words arg;
-+    next_double_words result;
-+    arg.d = x;
-+    __asm__ volatile(
-+        "pushl %2\n\t"
-+        "pushl %4\n\t"
-+        "pushl %3\n\t"
-+        "call _frexp\n\t"
-+        "addl $12, %%esp\n\t"
-+        "fstpl %0"
-+        : "=m" (result.d)
-+        : "r" (arg.w.lo), "r" (e), "r" (arg.w.lo), "r" (arg.w.hi)
-+        : "eax", "edx", "cc", "memory");
-+    return result.d;
-+}
-+
-+double
-+_Py_next_ldexp(double x, int e)
-+{
-+    next_double_words arg;
-+    next_double_words result;
-+    arg.d = x;
-+    __asm__ volatile(
-+        "pushl %2\n\t"
-+        "pushl %4\n\t"
-+        "pushl %3\n\t"
-+        "call _ldexp\n\t"
-+        "addl $12, %%esp\n\t"
-+        "fstpl %0"
-+        : "=m" (result.d)
-+        : "r" (arg.w.lo), "r" (e), "r" (arg.w.lo), "r" (arg.w.hi)
-+        : "eax", "edx", "cc", "memory");
-+    return result.d;
-+}
-+
-+double
-+_Py_next_modf(double x, double *iptr)
-+{
-+    next_double_words arg;
-+    next_double_words result;
-+    arg.d = x;
-+    __asm__ volatile(
-+        "pushl %2\n\t"
-+        "pushl %4\n\t"
-+        "pushl %3\n\t"
-+        "call _modf\n\t"
-+        "addl $12, %%esp\n\t"
-+        "fstpl %0"
-+        : "=m" (result.d)
-+        : "r" (arg.w.lo), "r" (iptr), "r" (arg.w.lo), "r" (arg.w.hi)
-+        : "eax", "edx", "cc", "memory");
-+    return result.d;
-+}
-+
-+double
-+_Py_next_round(double x)
-+{
-+    if (x >= 0.0) {
-+        return _Py_next_floor(x + 0.5);
-+    }
-+    return _Py_next_ceil(x - 0.5);
-+}
-+
++/* OPENSTEP lacks C99 round().  Preserve signed zero and avoid rounding
++   values just below a half-integer upward through addition of 0.5. */
 +double
 +round(double x)
 +{
-+    if (x >= 0.0) {
-+        return _Py_next_floor(x + 0.5);
-+    }
-+    return _Py_next_ceil(x - 0.5);
++    double magnitude, integral;
++    if (!finite(x) || x == 0.0)
++        return x;
++    magnitude = fabs(x);
++    integral = floor(magnitude);
++    if (magnitude - integral >= 0.5)
++        integral += 1.0;
++    return copysign(integral, x);
 +}
 +#endif
-+
- 
- #ifdef HAVE_GCC_ASM_FOR_X87
- // Inline assembly for getting and setting the 387 FPU control word on
 diff --git a/Python/pytime.c b/Python/pytime.c
 index f4f112f..721bb41 100644
 --- a/Python/pytime.c
@@ -2013,7 +1697,7 @@ index 7b4000f..8406a55 100644
  LIBS=$LIBS_SAVE
  
  dnl For multiprocessing module, check that sem_open
-diff --git a/work/Python-3.11.15/inttypes.h b/inttypes.h
+diff --git a/inttypes.h b/inttypes.h
 new file mode 100644
 index 0000000..345480f
 --- /dev/null
@@ -2085,7 +1769,7 @@ index ad8fb81..dc84288 100644
  
          if (not sysconfig.get_config_var("LIBFFI_INCLUDEDIR") and MACOS):
              self.use_system_libffi = True
-diff --git a/work/Python-3.11.15/stdint.h b/stdint.h
+diff --git a/stdint.h b/stdint.h
 new file mode 100644
 index 0000000..3b1f7b3
 --- /dev/null
@@ -2171,7 +1855,7 @@ index 0000000..3b1f7b3
 +#endif
 +
 +#endif
-diff --git a/work/Python-3.11.15/wchar.h b/wchar.h
+diff --git a/wchar.h b/wchar.h
 new file mode 100644
 index 0000000..6b88052
 --- /dev/null
