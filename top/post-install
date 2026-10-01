@@ -3,6 +3,7 @@
 TOPBIN="$ROOT_DIR/usr/local/bin/top"
 
 if [ -f "$TOPBIN" ]; then
-    chgrp kmem "$TOPBIN" 2>/dev/null || :
+    chgrp kmem "$TOPBIN" 2>/dev/null ||
+        echo "top: rerun this post-install hook as root to grant /dev/kmem access" >&2
     chmod 2755 "$TOPBIN" 2>/dev/null || :
 fi

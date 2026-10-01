@@ -14,3 +14,11 @@ case "$output" in
         exit 1
         ;;
 esac
+
+TMP=/tmp/pkg-top-$$
+trap '/bin/rm -f "$TMP"' EXIT HUP INT TERM
+"$TOP" -b -d 1 5 > "$TMP" 2>&1 || {
+    cat "$TMP" >&2
+    exit 1
+}
+grep PID "$TMP" >/dev/null
