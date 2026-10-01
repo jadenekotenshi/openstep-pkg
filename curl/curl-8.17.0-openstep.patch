@@ -19,10 +19,10 @@ index 62ed2b0..5deb8a3 100644
  #  if !defined(__LP64__) &&                                             \
    (defined(__ILP32__) || defined(__i386__) || defined(__hppa__) ||      \
 diff --git a/lib/curl_setup.h b/lib/curl_setup.h
-index 7c03362..0b5a821 100644
+index 7c03362..c18e968 100644
 --- a/lib/curl_setup.h
 +++ b/lib/curl_setup.h
-@@ -477,10 +477,76 @@
+@@ -477,10 +477,77 @@
  
  #if defined(HAVE_STDINT_H) || defined(USE_WOLFSSL)
  #include <stdint.h>
@@ -62,6 +62,7 @@ index 7c03362..0b5a821 100644
  #include <limits.h>
  
 +#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
++#include <libc.h>
 +#undef HAVE_STRDUP
 +#undef HAVE_SNPRINTF
 +#ifndef FD_CLOEXEC
@@ -161,46 +162,40 @@ index f45a487..56aa44e 100644
  #include "urldata.h"
  #include <curl/curl.h>
  #include "progress.h"
-diff --git a/lib/multi.c b/lib/multi.c
-index c27e8bd..b16e8f1 100644
---- a/lib/multi.c
-+++ b/lib/multi.c
-@@ -1424,6 +1424,11 @@ static CURLMcode multi_wait(struct Curl_multi *multi,
-   if((timeout_internal >= 0) && (timeout_internal < (long)timeout_ms))
-     timeout_ms = (int)timeout_internal;
+diff --git a/lib/vtls/vtls_scache.c b/lib/vtls/vtls_scache.c
+index b9abc6e..e893049 100644
+--- a/lib/vtls/vtls_scache.c
++++ b/lib/vtls/vtls_scache.c
+@@ -47,6 +47,11 @@
+ #include "../rand.h"
+ #include "../curlx/warnless.h"
  
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+  if(cpfds.n && !timeout_ms)
-+    timeout_ms = 10;
++#ifdef NeXT
++#include <sys/param.h>
++extern char *realpath(const char *, char *);
 +#endif
 +
-   if(data)
-     CURL_TRC_M(data, "multi_wait(fds=%d, timeout=%d) tinternal=%ld",
-                cpfds.n, timeout_ms, timeout_internal);
-@@ -2831,6 +2836,11 @@ CURLMcode curl_multi_perform(CURLM *m, int *running_handles)
-       /* the removed may have another timeout in queue */
-       struct Curl_easy *data = Curl_splayget(t);
-       (void)add_next_timeout(now, multi, data);
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+      if((data->state.expiretime.tv_sec || data->state.expiretime.tv_usec) &&
-+         (curlx_timediff_us(data->state.expiretime, now) > 0))
-+        break;
+ /* The last #include files should be: */
+ #include "../curl_memory.h"
+ #include "../memdebug.h"
+@@ -396,10 +401,17 @@ static CURLcode cf_ssl_peer_key_add_path(struct dynbuf *buf,
+     *is_local = TRUE;
+ #elif defined(HAVE_REALPATH)
+     if(path[0] != '/') {
++#ifdef NeXT
++      char resolved[MAXPATHLEN];
++      char *abspath = realpath(path, resolved);
++#else
+       char *abspath = realpath(path, NULL);
 +#endif
-       if(data->mstate == MSTATE_PENDING) {
-         bool stream_unused;
-         CURLcode result_unused;
-@@ -3095,6 +3105,11 @@ static void multi_mark_expired_as_dirty(struct multi_run_ctx *mrc)
-     }
- #endif
-     (void)add_next_timeout(mrc->now, multi, data);
-+#if defined(NeXT) || defined(__NeXT__) || defined(__NeXT)
-+    if((data->state.expiretime.tv_sec || data->state.expiretime.tv_usec) &&
-+       (curlx_timediff_us(data->state.expiretime, mrc->now) > 0))
-+      return;
+       if(abspath) {
+         CURLcode r = curlx_dyn_addf(buf, ":%s-%s", name, abspath);
++#ifndef NeXT
+         (free)(abspath); /* allocated by libc, free without memdebug */
 +#endif
-     Curl_multi_mark_dirty(data);
-   }
- }
+         return r;
+       }
+       *is_local = TRUE;
 diff --git a/src/tool_dirhie.c b/src/tool_dirhie.c
 index 91cc1b6..27d3b66 100644
 --- a/src/tool_dirhie.c

@@ -5,10 +5,12 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
-CC=/bin/cc
+CC=/usr/local/bin/gcc-4.2
 GREP=/bin/grep
 EGREP=/usr/bin/egrep
 AWK=/usr/local/bin/gawk
+# pdksh can bus-error on libtool's long archive command in a clean build.
+CONFIG_SHELL=/usr/local/bin/bash
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 # OPENSTEP's poll() is present but can ignore timeout values. curl's select()
@@ -17,7 +19,7 @@ ac_cv_func_poll=no
 
 PATCHFILE="curl-$VERSION-openstep.patch"
 
-export DESTDIR VERSION PATH CC GREP EGREP AWK CPPFLAGS LDFLAGS ac_cv_func_poll
+export DESTDIR VERSION PATH CC GREP EGREP AWK CONFIG_SHELL CPPFLAGS LDFLAGS ac_cv_func_poll
 . "$PKG_BUILD_HELPERS"
 
 patch -p1 < "$PATCHFILE"
@@ -28,6 +30,13 @@ run_configure \
   --with-zlib=/usr/local \
   --prefix=/usr/local
 
+# These probes omit OPENSTEP's libc.h declarations. The NeXT source block
+# includes it. The working socket path uses select and ioctl(FIONBIO).
+sed -e 's@/\* #undef HAVE_SELECT \*/@#define HAVE_SELECT 1@' \
+    -e 's@/\* #undef HAVE_IOCTL_FIONBIO \*/@#define HAVE_IOCTL_FIONBIO 1@' \
+    lib/curl_config.h > lib/curl_config.h.tmp
+mv lib/curl_config.h.tmp lib/curl_config.h
+
 for mf in Makefile lib/Makefile src/Makefile; do
   if [ -f "$mf" ]; then
     sed 's/-isystem \/usr\/local\/include/-I\/usr\/local\/include/g' "$mf" > "$mf.tmp"
@@ -35,5 +44,5 @@ for mf in Makefile lib/Makefile src/Makefile; do
   fi
 done
 
-gnumake
-gnumake install DESTDIR="$DESTDIR"
+gnumake SHELL="$CONFIG_SHELL"
+gnumake SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"

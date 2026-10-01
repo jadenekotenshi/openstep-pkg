@@ -1,6 +1,8 @@
+bash
 ca-certificates
 coreutils
 gawk
+gcc42
 grep
 openssl
 patch

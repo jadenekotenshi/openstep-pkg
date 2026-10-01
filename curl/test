@@ -25,3 +25,36 @@ value=`"$CURL" -fsS "file://$TMPFILE"`
 [ "$value" = hello ]
 
 /bin/rm -f "$TMPFILE"
+
+# Regression: stock GCC 2.7 miscompiled the signed timer bounds.
+TIMESRC=/tmp/pkg-curl-time-$$.c
+TIMEBIN=/tmp/pkg-curl-time-$$
+trap '/bin/rm -f "$TIMESRC" "$TIMEBIN"' EXIT HUP INT TERM
+cat > "$TIMESRC" <<'EOF'
+#include <stdio.h>
+#include <time.h>
+struct curltime { time_t tv_sec; int tv_usec; };
+extern long long curlx_timediff_us(struct curltime, struct curltime);
+int main(void)
+{
+    struct curltime a, b;
+    long long r;
+    a.tv_sec = 100; a.tv_usec = 1;
+    b.tv_sec = 99; b.tv_usec = 0;
+    r = curlx_timediff_us(a, b);
+    printf("positive: high=%ld low=%lu\n", (long)(r >> 32), (unsigned long)r);
+    if (r != 1000001) return 1;
+    r = curlx_timediff_us(b, a);
+    printf("negative: high=%ld low=%lu\n", (long)(r >> 32), (unsigned long)r);
+    if (r != -1000001) return 2;
+    if (curlx_timediff_us(a, a) != 0) return 3;
+    a.tv_sec = (time_t)~0; a.tv_usec = -1;
+    b.tv_sec = 1790880000; b.tv_usec = 500000;
+    r = curlx_timediff_us(a, b);
+    printf("sentinel: high=%ld low=%lu\n", (long)(r >> 32), (unsigned long)r);
+    if (r == 0) return 4;
+    return 0;
+}
+EOF
+"$LOCAL_ROOT/bin/gcc-4.2" "$TIMESRC" `"$LOCAL_ROOT/bin/curl-config" --static-libs` -o "$TIMEBIN"
+"$TIMEBIN"
