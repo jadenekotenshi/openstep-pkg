@@ -3,6 +3,54 @@
 set -e
 
 OPENSSL="$ROOT_DIR/usr/local/bin/openssl"
-
-[ -x "$OPENSSL" ]
+TMP=/tmp/pkg-openssl-$$
+test -x "$OPENSSL"
 "$OPENSSL" version >/dev/null
+mkdir "$TMP"
+trap '/bin/rm -rf "$TMP"' EXIT HUP INT TERM
+cat > "$TMP/lookup.c" <<'EOF'
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+
+static int check(const char *host, enum BIO_lookup_type kind,
+                 const unsigned char *expected)
+{
+    BIO_ADDRINFO *result = NULL;
+    unsigned char address[4];
+    size_t size = sizeof(address);
+    const BIO_ADDR *value;
+    if (!BIO_lookup(host, "443", kind, AF_INET, SOCK_STREAM, &result)) {
+        fprintf(stderr, "lookup failed: %s\n", host);
+        ERR_print_errors_fp(stderr);
+        return 1;
+    }
+    value = BIO_ADDRINFO_address(result);
+    if (!BIO_ADDR_rawaddress(value, address, &size) || size != 4
+        || memcmp(address, expected, 4) != 0
+        || ntohs(BIO_ADDR_rawport(value)) != 443) {
+        BIO_ADDRINFO_free(result);
+        return 2;
+    }
+    BIO_ADDRINFO_free(result);
+    return 0;
+}
+
+int main(void)
+{
+    static const unsigned char loopback[4] = {127, 0, 0, 1};
+    static const unsigned char broadcast[4] = {255, 255, 255, 255};
+    if (check("127.0.0.1", BIO_LOOKUP_CLIENT, loopback)
+        || check("127.0.0.1", BIO_LOOKUP_SERVER, loopback)
+        || check("localhost", BIO_LOOKUP_CLIENT, loopback)
+        || check("255.255.255.255", BIO_LOOKUP_CLIENT, broadcast))
+        return 1;
+    puts("numeric and hostname BIO lookups passed");
+    return 0;
+}
+EOF
+/bin/cc -I"$LOCAL_ROOT/include" "$TMP/lookup.c" -L"$LOCAL_ROOT/lib" -lcrypto -o "$TMP/lookup"
+"$TMP/lookup"

@@ -2477,9 +2477,9 @@ index 0000000..a9dca55
 +}
 +
 +exit $RET;
-diff --git "a/apps/ocsp.c" b/apps/ocsp.c
+diff --git a/apps/ocsp.c b/apps/ocsp.c
 index 8f20864..52da446 100644
---- "a/apps/ocsp.c"
+--- a/apps/ocsp.c
 +++ b/apps/ocsp.c
 @@ -33,6 +33,39 @@
  #include <openssl/x509v3.h>
@@ -3043,9 +3043,9 @@ index 0000000..b7c2e31
 +    {0, NULL, NULL}
 +};
 +#endif
-diff --git "a/apps/rehash.c" b/apps/rehash.c
+diff --git a/apps/rehash.c b/apps/rehash.c
 index fc1dffe..c837713 100644
---- "a/apps/rehash.c"
+--- a/apps/rehash.c
 +++ b/apps/rehash.c
 @@ -42,6 +42,13 @@
  # include <openssl/pem.h>
@@ -3061,9 +3061,9 @@ index fc1dffe..c837713 100644
  
  # ifndef PATH_MAX
  #  define PATH_MAX 4096
-diff --git "a/apps/s_socket.c" b/apps/s_socket.c
+diff --git a/apps/s_socket.c b/apps/s_socket.c
 index 96f16d2..ad648ef 100644
---- "a/apps/s_socket.c"
+--- a/apps/s_socket.c
 +++ b/apps/s_socket.c
 @@ -160,7 +160,9 @@ int init_client(int *sock, const char *host, const char *port,
      if (*sock == INVALID_SOCKET) {
@@ -14641,9 +14641,9 @@ index 0000000..befdb2f
 +
 +=cut
 +
-diff --git "a/crypto/LPdir_unix.c" b/crypto/LPdir_unix.c
+diff --git a/crypto/LPdir_unix.c b/crypto/LPdir_unix.c
 index bbbec0a..172df37 100644
---- "a/crypto/LPdir_unix.c"
+--- a/crypto/LPdir_unix.c
 +++ b/crypto/LPdir_unix.c
 @@ -41,7 +41,12 @@
  #include <limits.h>
@@ -14659,6 +14659,25 @@ index bbbec0a..172df37 100644
  #include <errno.h>
  #ifndef LPDIR_H
  # include "LPdir.h"
+diff --git a/crypto/bio/b_addr.c b/crypto/bio/b_addr.c
+index 0af7a33..aed5006 100644
+--- a/crypto/bio/b_addr.c
++++ b/crypto/bio/b_addr.c
+@@ -776,6 +776,14 @@ int BIO_lookup_ex(const char *host, const char *service, int lookup_type,
+ 
+         CRYPTO_THREAD_write_lock(bio_lookup_lock);
+         he_fallback_address = INADDR_ANY;
++#ifdef NeXT
++        /* OPENSTEP gethostbyname() does not accept numeric IPv4 addresses. */
++        if (host != NULL
++            && ((he_fallback_address = inet_addr(host)) != (in_addr_t)-1
++                || strcmp(host, "255.255.255.255") == 0)) {
++            he = &he_fallback;
++        } else
++#endif
+         if (host == NULL) {
+             he = &he_fallback;
+             switch(lookup_type) {
 diff --git a/crypto/buildinf.h b/crypto/buildinf.h
 new file mode 100644
 index 0000000..8b26568
@@ -14689,9 +14708,9 @@ index 0000000..8b26568
 +    'c','o','m','p','i','l','e','r',':',' ','c','c',' ','-','O',' ',
 +    '-','W','a','l','l','\0'
 +};
-diff --git "a/crypto/conf/conf_lib.c" b/crypto/conf/conf_lib.c
+diff --git a/crypto/conf/conf_lib.c b/crypto/conf/conf_lib.c
 index add1dfa..7716478 100644
---- "a/crypto/conf/conf_lib.c"
+--- a/crypto/conf/conf_lib.c
 +++ b/crypto/conf/conf_lib.c
 @@ -20,6 +20,22 @@
  
@@ -14744,9 +14763,9 @@ index add1dfa..7716478 100644
          if (newappname == NULL)
              return 0;
      }
-diff --git "a/crypto/conf/conf_sap.c" b/crypto/conf/conf_sap.c
+diff --git a/crypto/conf/conf_sap.c b/crypto/conf/conf_sap.c
 index db4f94e..5eff31c 100644
---- "a/crypto/conf/conf_sap.c"
+--- a/crypto/conf/conf_sap.c
 +++ b/crypto/conf/conf_sap.c
 @@ -19,6 +19,22 @@
  # define strdup _strdup
@@ -14785,9 +14804,9 @@ index db4f94e..5eff31c 100644
      settings.flags = DEFAULT_CONF_MFLAGS;
      OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, &settings);
  }
-diff --git "a/crypto/dh/dh_rfc5114.c" b/crypto/dh/dh_rfc5114.c
+diff --git a/crypto/dh/dh_rfc5114.c b/crypto/dh/dh_rfc5114.c
 index e3603a0..d1471d7 100644
---- "a/crypto/dh/dh_rfc5114.c"
+--- a/crypto/dh/dh_rfc5114.c
 +++ b/crypto/dh/dh_rfc5114.c
 @@ -36,6 +36,56 @@ DH *DH_get_##x(void) \
      return dh; \
@@ -14846,9 +14865,9 @@ index e3603a0..d1471d7 100644
  make_dh(2048_224)
  make_dh(2048_256)
 +#endif
-diff --git "a/crypto/ec/curve448/curve448.c" b/crypto/ec/curve448/curve448.c
+diff --git a/crypto/ec/curve448/curve448.c b/crypto/ec/curve448/curve448.c
 index 3d4db44..97fd743 100644
---- "a/crypto/ec/curve448/curve448.c"
+--- a/crypto/ec/curve448/curve448.c
 +++ b/crypto/ec/curve448/curve448.c
 @@ -500,7 +500,8 @@ struct smvt_control {
      int power, addend;
@@ -14860,9 +14879,9 @@ index 3d4db44..97fd743 100644
  # define NUMTRAILINGZEROS	__builtin_ctz
  #else
  # define NUMTRAILINGZEROS	numtrailingzeros
-diff --git "a/crypto/ec/curve448/field.h" b/crypto/ec/curve448/field.h
+diff --git a/crypto/ec/curve448/field.h b/crypto/ec/curve448/field.h
 index 4e4eda6..0d491fd 100644
---- "a/crypto/ec/curve448/field.h"
+--- a/crypto/ec/curve448/field.h
 +++ b/crypto/ec/curve448/field.h
 @@ -22,7 +22,7 @@
  # define X_SER_BYTES 56
@@ -14873,9 +14892,9 @@ index 4e4eda6..0d491fd 100644
  #  define INLINE_UNUSED __inline__ __attribute__((__unused__,__always_inline__))
  #  define RESTRICT __restrict__
  #  define ALIGNED __attribute__((__aligned__(16)))
-diff --git "a/crypto/init.c" b/crypto/init.c
+diff --git a/crypto/init.c b/crypto/init.c
 index b23af79..d56138c 100644
---- "a/crypto/init.c"
+--- a/crypto/init.c
 +++ b/crypto/init.c
 @@ -136,6 +136,12 @@ DEFINE_RUN_ONCE_STATIC(ossl_init_register_atexit)
      /* We use _onexit() in preference because it gets called on DLL unload */
@@ -14890,9 +14909,9 @@ index b23af79..d56138c 100644
  # else
      if (atexit(OPENSSL_cleanup) != 0)
          return 0;
-diff --git "a/crypto/mem.c" b/crypto/mem.c
+diff --git a/crypto/mem.c b/crypto/mem.c
 index 2b39ca3..5276310 100644
---- "a/crypto/mem.c"
+--- a/crypto/mem.c
 +++ b/crypto/mem.c
 @@ -45,6 +45,22 @@ static int md_fail_percent = 0;
  static int md_tracefd = -1;
@@ -14933,9 +14952,9 @@ index 2b39ca3..5276310 100644
          parseit();
      if ((cp = getenv("OPENSSL_MALLOC_FD")) != NULL)
          md_tracefd = atoi(cp);
-diff --git "a/crypto/modes/ctr128.c" b/crypto/modes/ctr128.c
+diff --git a/crypto/modes/ctr128.c b/crypto/modes/ctr128.c
 index 1ed7dec..4e7c511 100644
---- "a/crypto/modes/ctr128.c"
+--- a/crypto/modes/ctr128.c
 +++ b/crypto/modes/ctr128.c
 @@ -11,7 +11,7 @@
  #include "modes_local.h"
@@ -14946,9 +14965,9 @@ index 1ed7dec..4e7c511 100644
  typedef size_t size_t_aX __attribute((__aligned__(1)));
  #else
  typedef size_t size_t_aX;
-diff --git "a/crypto/modes/modes_local.h" b/crypto/modes/modes_local.h
+diff --git a/crypto/modes/modes_local.h b/crypto/modes/modes_local.h
 index 8881416..2da7d92 100644
---- "a/crypto/modes/modes_local.h"
+--- a/crypto/modes/modes_local.h
 +++ b/crypto/modes/modes_local.h
 @@ -38,7 +38,7 @@ typedef unsigned char u8;
  #endif
@@ -14968,9 +14987,9 @@ index 8881416..2da7d92 100644
  #  if defined(__x86_64) || defined(__x86_64__)
  #   define BSWAP8(x) ({ u64 ret_=(x);                   \
                          asm ("bswapq %0"                \
-diff --git "a/crypto/rand/rand_unix.c" b/crypto/rand/rand_unix.c
+diff --git a/crypto/rand/rand_unix.c b/crypto/rand/rand_unix.c
 index 0f45251..ef83d2a 100644
---- "a/crypto/rand/rand_unix.c"
+--- a/crypto/rand/rand_unix.c
 +++ b/crypto/rand/rand_unix.c
 @@ -42,9 +42,86 @@
  # include <unistd.h>
@@ -15133,9 +15152,9 @@ index 0f45251..ef83d2a 100644
      return rand_pool_entropy_available(pool);
  #  endif
  }
-diff --git "a/crypto/ui/ui_openssl.c" b/crypto/ui/ui_openssl.c
+diff --git a/crypto/ui/ui_openssl.c b/crypto/ui/ui_openssl.c
 index 0f630a5..c94be8a 100644
---- "a/crypto/ui/ui_openssl.c"
+--- a/crypto/ui/ui_openssl.c
 +++ b/crypto/ui/ui_openssl.c
 @@ -111,8 +111,13 @@
  #  include <termios.h>
@@ -15187,9 +15206,9 @@ index 0000000..459055c
 +#define THIRTY_TWO_BIT
 +
 +#endif
-diff --git "a/include/crypto/bn_dh.h" b/include/crypto/bn_dh.h
+diff --git a/include/crypto/bn_dh.h b/include/crypto/bn_dh.h
 index 70ebca2..5e11da7 100644
---- "a/include/crypto/bn_dh.h"
+--- a/include/crypto/bn_dh.h
 +++ b/include/crypto/bn_dh.h
 @@ -12,9 +12,21 @@
      extern const BIGNUM _bignum_dh##x##_g;              \
@@ -15235,9 +15254,9 @@ index 0000000..8cc3aaf
 +# define DSO_NONE
 +# define DSO_EXTENSION ".so"
 +#endif
-diff --git "a/include/openssl/e_os2.h" b/include/openssl/e_os2.h
+diff --git a/include/openssl/e_os2.h b/include/openssl/e_os2.h
 index 5c88e51..13762f9 100644
---- "a/include/openssl/e_os2.h"
+--- a/include/openssl/e_os2.h
 +++ b/include/openssl/e_os2.h
 @@ -205,6 +205,11 @@ extern "C" {
  #  endif
@@ -15299,9 +15318,9 @@ index 5c88e51..13762f9 100644
  #  define ossl_unused __attribute__((unused))
  # else
  #  define ossl_unused
-diff --git "a/include/openssl/ocsp.h" b/include/openssl/ocsp.h
+diff --git a/include/openssl/ocsp.h b/include/openssl/ocsp.h
 index 4d759a4..4206e61 100644
---- "a/include/openssl/ocsp.h"
+--- a/include/openssl/ocsp.h
 +++ b/include/openssl/ocsp.h
 @@ -70,11 +70,36 @@ extern "C" {
  
