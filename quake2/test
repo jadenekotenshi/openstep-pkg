@@ -2,4 +2,29 @@
 
 set -e
 
-/usr/local/bin/quake2 +set vid_fullscreen 0 +set dedicated 1 +quit >/tmp/quake2-test.log 2>&1
+APP=/usr/local/Apps/quake2.app
+test -x "$APP/quake2"
+test -s "$APP/icon.tiff"
+test -s "$APP/README.txt"
+test -s "$APP/COPYING"
+test -s "$APP/baseq2/config.cfg"
+
+TESTDIR=${TMPDIR:-/tmp}/quake2-test.$$
+(umask 077; mkdir "$TESTDIR")
+trap 'rm -rf "$TESTDIR"' 0
+trap 'exit 1' 1 2 3 15
+
+# An explicit basedir bypasses the bundle's missing-data dialog. Dedicated
+# startup needs no game data or display, and leaves player settings untouched.
+if /usr/local/bin/quake2 +set basedir "$TESTDIR" +set dedicated 1 \
+    +version +echo QUAKE2_STARTUP_OK +quit \
+    < /dev/null > "$TESTDIR/startup.log" 2>&1; then
+    cat "$TESTDIR/startup.log"
+else
+    cat "$TESTDIR/startup.log"
+    exit 1
+fi
+
+grep '====== Quake2 Initialized ======' "$TESTDIR/startup.log" > /dev/null
+grep '"version" is "3.21 ' "$TESTDIR/startup.log" > /dev/null
+grep '^QUAKE2_STARTUP_OK' "$TESTDIR/startup.log" > /dev/null
