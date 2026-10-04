@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS='-O2 -DNeXT'
+CPPFLAGS=-I/usr/local/include
+LDFLAGS=-L/usr/local/lib
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/bin/sed
+# configure tests snprintf after choosing its bundled Trio source list.
+NEED_TRIO=1
+export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED NEED_TRIO
+. "$PKG_BUILD_HELPERS"
+patch -p1 < "libxml2-$VERSION-openstep.patch"
+run_configure --prefix=/usr/local \
+  --build=i386-next-openstep4 --host=i386-next-openstep4 \
+  --disable-shared --enable-static --disable-dependency-tracking \
+  --without-python --with-iconv=/usr/local --with-zlib=/usr/local
+# The shipped Makefile omits trionan from the bundled Trio objects.
+/bin/gnumake 'am__objects_2=triostr.lo trio.lo trionan.lo'
+/bin/gnumake install 'am__objects_2=triostr.lo trio.lo trionan.lo' DESTDIR="$DESTDIR"
+ranlib "$DESTDIR/usr/local/lib/libxml2.a"
