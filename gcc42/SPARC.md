@@ -13,7 +13,9 @@ on OPENSTEP/SPARC yet.
 - `sparc/next.h` is the SPARC counterpart of `i386/next.h`; `sparc/t-next` copies
   `/NextDeveloper/Headers/*/sparc` to `include/*/__next_sparc__`.
 - `nextstep.c` calls `NEXTSTEP_CPU_FILE_END` (only i386 defines it).
-- Defaults: SPARC V7 (`-mcpu=v7`, calls `.mul/.div/...`), 64-bit `long double`,
+- Defaults: SPARC V8 (`with_cpu=v8` in `config.gcc`: OPENSTEP runs only on sun4m, so
+  hardware `smul/sdiv/umul/udiv` are used; `-mcpu=v7` restores the `.mul/.div/...` calls),
+  64-bit `long double`,
   standard SPARC struct return (hidden pointer in `[%sp+64]`, `unimp` word),
   `objc_msgSend_stret` for aggregate Objective-C results.
 
@@ -33,7 +35,7 @@ Run on OPENSTEP/SPARC and send the output:
     nm /usr/lib/libsys_s.a 2>/dev/null | egrep '\.(u?mul|u?div|u?rem)\b|muldi3|divdi3'
     nm -o /usr/lib/libobjc* 2>/dev/null | grep msgSend
 
-and whether `/bin/as` accepts `.register`, `umul`/`sdiv`, and `.align N` as a log2.
+and whether `/bin/as` accepts `umul`/`sdiv`/`smul` (now emitted by default) and `.align N` as a log2.
 Open questions the output answers: the exact `.mul`/`.div` symbol names (with or
 without a leading underscore), whether the native compiler calls `objc_msgSend_stret`,
-whether `long double` should be 128-bit, and whether V8 (`-mcpu=v8`) is safe as the default.
+whether `long double` should be 128-bit.
