@@ -16,5 +16,5 @@ patch -p1 < "$PATCHFILE"
 run_configure --prefix=/usr/local
 sed 's|^mkdir_p = $(top_builddir)/\./install-sh -c -d$|mkdir_p = .././install-sh -c -d|' po/Makefile > po/Makefile.tmp
 mv po/Makefile.tmp po/Makefile
-gnumake
-gnumake install DESTDIR="$DESTDIR"
+/bin/gnumake
+/bin/gnumake install DESTDIR="$DESTDIR"

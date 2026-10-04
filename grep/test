@@ -6,4 +6,19 @@ GREP="$ROOT_DIR/usr/local/bin/grep"
 
 [ -x "$GREP" ]
 
-/bin/echo needle | "$GREP" needle >/dev/null
+WORK=/tmp/pkg-grep.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+printf 'alpha\nbeta42\na.b\n' > "$WORK/input"
+"$GREP" --version
+test "`"$GREP" -E '^[a-z]+[0-9]+$' "$WORK/input"`" = beta42
+test "`"$GREP" -F 'a.b' "$WORK/input"`" = a.b
+test "`"$GREP" -c -e alpha -e beta "$WORK/input"`" = 2
+test "`"$GREP" -v -e alpha -e beta "$WORK/input"`" = a.b
+"$GREP" -r -q beta42 "$WORK"
+status=0
+"$GREP" absent "$WORK/input" >/dev/null || status=$?
+test "$status" -eq 1
+status=0
+"$GREP" '[' "$WORK/input" >/dev/null 2>&1 || status=$?
+test "$status" -eq 2
