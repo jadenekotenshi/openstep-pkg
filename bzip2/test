@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+PREFIX="$ROOT_DIR/usr/local"
+PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-bzip2.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+printf 'OPENSTEP bzip2 round trip\nsecond line\n' > input
+"$PREFIX/bin/bzip2" -c input > input.bz2
+"$PREFIX/bin/bzip2" -t input.bz2
+"$PREFIX/bin/bunzip2" -c input.bz2 > output
+cmp input output
+"$PREFIX/bin/bzcat" input.bz2 > output
+cmp input output
+"$PREFIX/bin/bzgrep" OPENSTEP input.bz2 >/dev/null
+cp input.bz2 second.bz2
+"$PREFIX/bin/bzgrep" OPENSTEP input.bz2 second.bz2 > matches
+test "`wc -l < matches`" -eq 2
+"$PREFIX/bin/bzcmp" input.bz2 second.bz2
+"$PREFIX/bin/bzdiff" input.bz2 input
+printf 'invalid archive\n' > invalid.bz2
+if "$PREFIX/bin/bzip2" -t invalid.bz2 2>/dev/null; then exit 1; fi
+cat > check.c <<'EOF'
+#include <bzlib.h>
+#include <string.h>
+int main(void) {
+    char input[] = "libbz2 public API";
+    char packed[256], output[256];
+    unsigned int plen = sizeof packed, olen = sizeof output;
+    if (BZ2_bzBuffToBuffCompress(packed, &plen, input, sizeof input, 9, 0, 30) != BZ_OK) return 1;
+    if (BZ2_bzBuffToBuffDecompress(output, &olen, packed, plen, 0, 0) != BZ_OK) return 2;
+    return olen != sizeof input || memcmp(input, output, olen) != 0;
+}
+EOF
+/bin/cc -O2 -I"$PREFIX/include" check.c -L"$PREFIX/lib" -lbz2 -o check
+./check

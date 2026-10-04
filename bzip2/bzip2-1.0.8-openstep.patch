@@ -1,0 +1,54 @@
+diff --git a/bzdiff b/bzdiff
+index bd96c27..c27d66d 100644
+--- a/bzdiff
++++ b/bzdiff
+@@ -1,4 +1,4 @@
+-#!/bin/sh
++#!/usr/local/bin/ksh
+ # sh is buggy on RS/6000 AIX 3.2. Replace above line with #!/bin/ksh
+ 
+ # Bzcmp/diff wrapped for bzip2, 
+@@ -12,7 +12,7 @@
+ # necessary) and fed to cmp or diff.  The exit status from cmp
+ # or diff is preserved.
+ 
+-PATH="/usr/bin:/bin:$PATH"; export PATH
++PATH="/usr/local/bin:/usr/bin:/bin:$PATH"; export PATH
+ prog=`echo $0 | sed 's|.*/||'`
+ case "$prog" in
+   *cmp) comp=${CMP-cmp}   ;;
+diff --git a/bzgrep b/bzgrep
+index 0314ca6..eb1addd 100644
+--- a/bzgrep
++++ b/bzgrep
+@@ -1,4 +1,4 @@
+-#!/bin/sh
++#!/usr/local/bin/ksh
+ 
+ # Bzgrep wrapped for bzip2, 
+ # adapted from zgrep by Philippe Troin <phil@fifi.org> for Debian GNU/Linux.
+@@ -6,7 +6,7 @@
+ ## zgrep -- a wrapper around a grep program that decompresses files as needed
+ ## Adapted from a version sent by Charles Levert <charles@comm.polymtl.ca>
+ 
+-PATH="/usr/bin:$PATH"; export PATH
++PATH="/usr/local/bin:/usr/bin:$PATH"; export PATH
+ 
+ prog=`echo $0 | sed 's|.*/||'`
+ case "$prog" in
+diff --git a/bzmore b/bzmore
+index d314043..e3c39b8 100644
+--- a/bzmore
++++ b/bzmore
+@@ -1,9 +1,9 @@
+-#!/bin/sh
++#!/usr/local/bin/ksh
+ 
+ # Bzmore wrapped for bzip2, 
+ # adapted from zmore by Philippe Troin <phil@fifi.org> for Debian GNU/Linux.
+ 
+-PATH="/usr/bin:$PATH"; export PATH
++PATH="/usr/local/bin:/usr/bin:$PATH"; export PATH
+ 
+ prog=`echo $0 | sed 's|.*/||'`
+ case "$prog" in
