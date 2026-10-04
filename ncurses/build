@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:$PATH
+CC=/usr/local/bin/gcc-4.2
+CPPFLAGS=-I/NextDeveloper/Headers/bsd
+GREP=/usr/local/bin/grep
+EGREP=/usr/local/bin/egrep
+AWK=/usr/local/bin/gawk
+CONFIG_SHELL=/usr/local/bin/ksh
+MAKE=/bin/gnumake
+# GNU make 3.74 includes variable assignments in MAKEFLAGS, not MFLAGS.
+cf_cv_makeflags='$(MFLAGS)'
+# OPENSTEP ships a termios header but not its POSIX functions.
+ac_cv_header_termios_h=no
+export PATH CC CPPFLAGS GREP EGREP AWK CONFIG_SHELL MAKE
+export cf_cv_makeflags ac_cv_header_termios_h
+. "$PKG_BUILD_HELPERS"
+
+patch -p1 < "ncurses-$VERSION-openstep.patch"
+run_configure --prefix=/usr/local \
+    --build=i386-next-openstep4 --host=i386-next-openstep4 \
+    --without-shared --without-debug --with-normal \
+    --without-cxx --without-cxx-binding --without-ada --without-tests \
+    --disable-widec --with-chtype=long --with-mmask-t=long \
+    --enable-pc-files --with-pkg-config-libdir=/usr/local/lib/pkgconfig
+
+# The detected -static/-dynamic pair produces broken Mach-O executables.
+/bin/gnumake LIBS_TIC='-L../lib -lncurses' LIBS_TINFO=-lncurses
+/bin/gnumake install DESTDIR="$DESTDIR" \
+    LIBS_TIC='-L../lib -lncurses' LIBS_TINFO=-lncurses
+for archive in "$DESTDIR"/usr/local/lib/*.a; do
+    /bin/ranlib "$archive"
+done

@@ -1,0 +1,9 @@
+gcc42
+patch
+make
+texinfo
+grep
+gawk
+gzip
+curl
+ncurses

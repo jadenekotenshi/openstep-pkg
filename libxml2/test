@@ -1,0 +1,60 @@
+#!/bin/sh
+set -e
+PREFIX="$ROOT_DIR/usr/local"
+XMLLINT="$PREFIX/bin/xmllint"
+WORK=/tmp/pkg-libxml2.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+"$XMLLINT" --version
+"$PREFIX/bin/xml2-config" --version
+printf '<root><n>7</n><n>5</n></root>\n' > input.xml
+test "`"$XMLLINT" --xpath 'sum(/root/n)' input.xml`" = 12
+test "`"$XMLLINT" --xpath 'string(0 div 0)' input.xml`" = NaN
+test "`"$XMLLINT" --xpath 'string(1 div 0)' input.xml`" = Infinity
+"$XMLLINT" --noout input.xml
+printf '<root><unclosed></root>\n' > bad.xml
+if "$XMLLINT" --noout bad.xml 2>/dev/null; then exit 1; fi
+cat > schema.xsd <<'EOF'
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+ <xs:element name="root"><xs:complexType><xs:sequence>
+  <xs:element name="n" type="xs:integer" maxOccurs="unbounded"/>
+ </xs:sequence></xs:complexType></xs:element>
+</xs:schema>
+EOF
+"$XMLLINT" --noout --schema schema.xsd input.xml
+printf '<root><n>invalid</n></root>\n' > invalid.xml
+if "$XMLLINT" --noout --schema schema.xsd invalid.xml 2>/dev/null; then exit 1; fi
+printf '<child>included</child>\n' > child.xml
+printf '<root xmlns:xi="http://www.w3.org/2001/XInclude"><xi:include href="child.xml"/></root>\n' > include.xml
+test "`"$XMLLINT" --xinclude --xpath 'string(/root/child)' include.xml`" = included
+"$PREFIX/bin/gzip" -c input.xml > input.xml.gz
+test "`"$XMLLINT" --xpath 'sum(/root/n)' input.xml.gz`" = 12
+"$PREFIX/bin/xmlcatalog" --create --noout catalog.xml
+"$PREFIX/bin/xmlcatalog" --noout --add system urn:pkg-libxml2 child.xml catalog.xml
+test "`"$PREFIX/bin/xmlcatalog" catalog.xml urn:pkg-libxml2`" = child.xml
+cat > check.c <<'EOF'
+#include <libxml/parser.h>
+#include <libxml/xpath.h>
+#include <string.h>
+int main(void) {
+    const char *s = "<root><n>42</n></root>";
+    xmlDocPtr doc = xmlReadMemory(s, strlen(s), "test.xml", 0, XML_PARSE_NONET);
+    xmlXPathContextPtr ctx;
+    xmlXPathObjectPtr value;
+    int result;
+    if (!doc) return 1;
+    ctx = xmlXPathNewContext(doc);
+    if (!ctx) return 2;
+    value = xmlXPathEvalExpression((const xmlChar *)"sum(/root/n)", ctx);
+    result = !value || value->floatval != 42;
+    if (value) xmlXPathFreeObject(value);
+    xmlXPathFreeContext(ctx);
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
+    return result;
+}
+EOF
+"$PREFIX/bin/gcc-4.2" -O2 -DNeXT -I"$PREFIX/include/libxml2" -I"$PREFIX/include" \
+  check.c -L"$PREFIX/lib" -lxml2 -lz -liconv -lm -o check
+./check

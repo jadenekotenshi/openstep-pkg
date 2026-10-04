@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+MKTEMP="$ROOT_DIR/usr/local/bin/mktemp"
+WORK=/tmp/pkg-mktemp.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+umask 000
+a=`"$MKTEMP" "$WORK/file.XXXXXXXXXX"`
+b=`"$MKTEMP" "$WORK/file.XXXXXXXXXX"`
+test "$a" != "$b"
+test -f "$a"
+test -f "$b"
+mode=`/bin/ls -ld "$a"`
+case "$mode" in -rw-------*) ;; *) exit 1 ;; esac
+d=`"$MKTEMP" -d "$WORK/dir.XXXXXXXXXX"`
+test -d "$d"
+mode=`/bin/ls -ld "$d"`
+case "$mode" in drwx------*) ;; *) exit 1 ;; esac
+printf 'preserve\n' > "$WORK/existing"
+if "$MKTEMP" "$WORK/existing" 2>/dev/null; then exit 1; fi
+test "`cat "$WORK/existing"`" = preserve

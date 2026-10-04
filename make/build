@@ -5,15 +5,19 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:$PATH
-export DESTDIR VERSION PATH
+CC=/usr/local/bin/gcc-4.2
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+export DESTDIR VERSION PATH CC GREP EGREP AWK
 . "$PKG_BUILD_HELPERS"
 
 PATCHFILE="make-$VERSION-openstep.patch"
 
 patch -p1 < "$PATCHFILE"
-run_configure --prefix=/usr/local
-gnumake
-gnumake install DESTDIR="$DESTDIR"
+run_configure --prefix=/usr/local --disable-nls --disable-dependency-tracking
+/bin/gnumake SHELL="$CONFIG_SHELL"
+/bin/gnumake SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"
 
 cd "$DESTDIR/usr/local/bin"
 rm -f gnumake
