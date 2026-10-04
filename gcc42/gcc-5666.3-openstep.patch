@@ -81,6 +81,20 @@ index 8fe7ea1..84643d0 100644
  
  # These programs are not linked with the MD reader.
  build/gengenrtl$(build_exeext) : $(BUILD_ERRORS)
+diff --git a/gcc/c-common.c b/gcc/c-common.c
+--- a/gcc/c-common.c
++++ b/gcc/c-common.c
+@@ -7120,7 +7120,9 @@
+ /* Default value of the constraint table.  */
+ /* ??? This should be in defaults.h or a CW asm specific header.  */
+ #ifndef TARGET_IASM_OP_CONSTRAINT
+-#define TARGET_IASM_OP_CONSTRAINT {}
++/* An empty initializer crashes old host compilers (OPENSTEP's cc 2.7.2.1), so
++   give the table one entry that no real opcode can match.  */
++#define TARGET_IASM_OP_CONSTRAINT { "", ~0U, "" }
+ #endif
+ 
+ /* Comparison function for bsearch to find an opcode/argument number
 diff --git a/gcc/config.gcc b/gcc/config.gcc
 index df57fe2..b9fb712 100644
 --- a/gcc/config.gcc
