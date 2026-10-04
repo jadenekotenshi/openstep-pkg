@@ -17,7 +17,13 @@ SRCDIR="$BUILDROOT/gcc-gcc-5666.3"
 # expanded absolute filename under the package cache.
 PATCHFILE=gcc-5666.3-openstep.patch
 BUILDDIR="$SRCDIR/build-openstep"
-TARGET=i386-next-openstep4
+# Build the compiler for the architecture this system runs.  OPENSTEP's arch(1)
+# prints i386, sparc, ...; GCC42_ARCH overrides it.  i386 stays the default.
+case "${GCC42_ARCH:-`/usr/bin/arch 2>/dev/null`}" in
+sparc*) ARCH=sparc ;;
+*)      ARCH=i386 ;;
+esac
+TARGET=$ARCH-next-openstep4
 PREFIX=/usr/local
 PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
 TMPDIR=/tmp
@@ -49,7 +55,7 @@ CXXFLAGS_FOR_TARGET=$BUILD_CFLAGS
 am_cv_CC_dependencies_compiler_type=none
 ac_cv_func_mmap=no
 
-export DESTDIR VERSION BUILDROOT SRCDIR PATCHFILE BUILDDIR TARGET PREFIX
+export ARCH DESTDIR VERSION BUILDROOT SRCDIR PATCHFILE BUILDDIR TARGET PREFIX
 export PATH TMPDIR CONFIG_SHELL CC CXX AS LD NM AS_FOR_TARGET LD_FOR_TARGET NM_FOR_TARGET
 export MAKEINFO FLEX BISON BUILD_CFLAGS CPPFLAGS CC_FOR_BUILD AWK MAKE CFLAGS CXXFLAGS
 export CFLAGS_FOR_BUILD CXXFLAGS_FOR_BUILD CFLAGS_FOR_TARGET CXXFLAGS_FOR_TARGET
@@ -138,15 +144,18 @@ test -d "$LIBSTDCXX_MERGE_DIR" || mkdir "$LIBSTDCXX_MERGE_DIR"
 
 # The package installer's legacy tar cannot transport these four paths even
 # though the OPENSTEP filesystem accepts them.  Stage short-path copies for
-# post-install to restore after the image has been extracted.
-DRIVERKIT_FIXED="$DESTDIR/usr/local/lib/gcc/$TARGET/4.2.1/include/driverkit/__next_i386__"
-DRIVERKIT_HOLD="$DESTDIR/usr/local/lib/gcc42-header-hold"
-test -d "$DRIVERKIT_HOLD" || /usr/local/bin/mkdir -p "$DRIVERKIT_HOLD"
-for header in IOEISADeviceDescription.h IOPCMCIADirectDevice.h \
-    IOPCIDeviceDescription.h IOPCMCIADeviceDescription.h
-do
-    /bin/cp "$DRIVERKIT_FIXED/$header" "$DRIVERKIT_HOLD/$header"
-done
+# post-install to restore after the image has been extracted.  (i386 only: the
+# driverkit headers exist only for that architecture.)
+if [ "$ARCH" = i386 ]; then
+    DRIVERKIT_FIXED="$DESTDIR/usr/local/lib/gcc/$TARGET/4.2.1/include/driverkit/__next_i386__"
+    DRIVERKIT_HOLD="$DESTDIR/usr/local/lib/gcc42-header-hold"
+    test -d "$DRIVERKIT_HOLD" || /usr/local/bin/mkdir -p "$DRIVERKIT_HOLD"
+    for header in IOEISADeviceDescription.h IOPCMCIADirectDevice.h \
+        IOPCIDeviceDescription.h IOPCMCIADeviceDescription.h
+    do
+        /bin/cp "$DRIVERKIT_FIXED/$header" "$DRIVERKIT_HOLD/$header"
+    done
+fi
 
 for archive in \
     "$DESTDIR/usr/local/lib/gcc/$TARGET/4.2.1/libgcc.a" \

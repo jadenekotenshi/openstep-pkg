@@ -1,4 +1,5 @@
 gcc-5666.3.tar.gz
 libstdc++-v3-4.2.1.tar.gz gcc-gcc-5666.3
+gcc-sparc-config-4.2.1.tar.gz gcc-gcc-5666.3
 gcc-5666.3-openstep.patch gcc-gcc-5666.3
 bootstrap-compare gcc-gcc-5666.3

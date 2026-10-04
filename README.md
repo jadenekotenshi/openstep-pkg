@@ -21,6 +21,12 @@ Packages that need the newer compiler depend on `gcc42` and explicitly use
 The GCC 4.2 package bootstraps directly from stock `/bin/cc`: stage 1 uses
 `-O0`, stages 2/3 and runtimes use `-O2`, and stage 2 is compared with stage 3.
 
+`gcc42` builds for the architecture it runs on (`/usr/bin/arch`): `i386-next-openstep4`
+by default, or `sparc-next-openstep4` on OPENSTEP/SPARC (override with `GCC42_ARCH=sparc`).
+The SPARC back end is not in Apple's GCC tree, so it comes from FSF GCC 4.2.1
+(`gcc-sparc-config-4.2.1.tar.gz`, unpacked over the source) with the NeXT layer in the patch
+(`gcc/config/sparc/next.h`). See `gcc42/SPARC.md` for its status and bring-up checklist.
+
 Python 3.11 builds at `-O3`, except its generated `deepfreeze.c` unit, which uses
 `-O0 -g0` to avoid GCC42 allocation failures and optimizer crashes on OPENSTEP.
 
