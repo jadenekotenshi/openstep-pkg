@@ -1,0 +1,82 @@
+#!/bin/sh
+set -e
+work=${TMPDIR-/tmp}/ncurses-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+TERMINFO="$LOCAL_ROOT/share/terminfo"
+export TERMINFO
+"$LOCAL_ROOT/bin/tic" -V
+"$LOCAL_ROOT/bin/infocmp" xterm > "$work/xterm.src"
+"$LOCAL_ROOT/bin/infocmp" vt100 > "$work/vt100.src"
+"$LOCAL_ROOT/bin/infocmp" next > "$work/next.src"
+"$LOCAL_ROOT/bin/tic" -x -o "$work/terminfo" "$work/xterm.src"
+cat > "$work/smoke.c" <<'EOF'
+#include <curses.h>
+#include <panel.h>
+#include <menu.h>
+#include <form.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+
+/* Exercise the OPENSTEP environment fallback as well as the public API. */
+extern void _nc_setenv_num(const char *, int);
+
+int main(void)
+{
+    FILE *input = tmpfile(), *output = tmpfile();
+    SCREEN *screen;
+    WINDOW *window;
+    PANEL *panel;
+    ITEM *item;
+    FIELD *field;
+    char text[16];
+    struct timeval before, after;
+    long elapsed;
+
+    gettimeofday(&before, 0);
+    napms(40);
+    gettimeofday(&after, 0);
+    elapsed = (after.tv_sec - before.tv_sec) * 1000000L
+        + after.tv_usec - before.tv_usec;
+    if (elapsed < 20000) return 14;
+
+    _nc_setenv_num("NCURSES_PKG_TEST", 24);
+    if (!getenv("NCURSES_PKG_TEST") ||
+        strcmp(getenv("NCURSES_PKG_TEST"), "24")) return 1;
+    _nc_setenv_num("NCURSES_PKG_TEST", 80);
+    if (strcmp(getenv("NCURSES_PKG_TEST"), "80")) return 2;
+    if (!input || !output) return 3;
+    screen = newterm("xterm", output, input);
+    if (!screen) return 4;
+    window = newwin(3, 20, 0, 0);
+    if (!window) return 5;
+    if (keypad(window, TRUE) == ERR) return 6;
+    if (waddstr(window, "OPENSTEP nano") == ERR) return 7;
+    if (mvwinnstr(window, 0, 0, text, 13) == ERR) return 8;
+    if (strncmp(text, "OPENSTEP nano", 13)) return 9;
+    if (ungetch(KEY_LEFT) == ERR || wgetch(window) != KEY_LEFT) return 10;
+    if (wresize(window, 4, 24) == ERR) return 11;
+    if (!has_colors() || start_color() == ERR) return 12;
+    panel = new_panel(window);
+    item = new_item("test", "item");
+    field = new_field(1, 10, 0, 0, 0, 0);
+    if (!panel || !item || !field) return 13;
+    del_panel(panel);
+    free_item(item);
+    free_field(field);
+    delwin(window);
+    endwin();
+    delscreen(screen);
+    fclose(input);
+    fclose(output);
+    puts("ncurses OPENSTEP smoke test passed");
+    return 0;
+}
+EOF
+/usr/local/bin/gcc-4.2 -I"$LOCAL_ROOT/include/ncurses" \
+    "$work/smoke.c" -L"$LOCAL_ROOT/lib" -lpanel -lmenu -lform -lncurses \
+    -o "$work/smoke"
+"$work/smoke"
