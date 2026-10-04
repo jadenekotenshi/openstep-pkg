@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+PREFIX="$ROOT_DIR/usr/local"
+FIND="$PREFIX/bin/find"
+XARGS="$PREFIX/bin/xargs"
+LOCATE="$PREFIX/bin/locate"
+WORK=/tmp/pkg-findutils.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+mkdir "$WORK/tree" "$WORK/tree/sub" "$WORK/tree/pruned"
+printf 'one\n' > "$WORK/tree/a space.txt"
+printf 'two\n' > "$WORK/tree/sub/second.txt"
+printf 'hidden\n' > "$WORK/tree/pruned/hidden.txt"
+ln -s sub "$WORK/tree/link"
+"$FIND" --version
+"$XARGS" --version
+"$LOCATE" --version
+test "`"$FIND" "$WORK/tree" -type f -name '*.txt' -print | wc -l`" -eq 3
+test "`"$FIND" "$WORK/tree" -name pruned -prune -o -type f -print | wc -l`" -eq 2
+test "`"$FIND" "$WORK/tree" -maxdepth 1 -type f -print`" = "$WORK/tree/a space.txt"
+"$FIND" "$WORK/tree" -type f -print0 > "$WORK/names"
+"$XARGS" -0 -n 1 /bin/echo < "$WORK/names" > "$WORK/output"
+test "`wc -l < "$WORK/output"`" -eq 3
+"$FIND" "$WORK/tree" -type f -exec /bin/echo '{}' + > "$WORK/exec"
+"$PREFIX/bin/grep" -q 'a space.txt' "$WORK/exec"
+test "`"$FIND" -L "$WORK/tree/link" -type f -print`" = "$WORK/tree/link/second.txt"
+printf 'x\n' | "$XARGS" /usr/local/bin/ksh -c 'exit 7' && exit 1
+status=$?
+test "$status" -eq 123
+printf 'remove\n' > "$WORK/tree/delete-me"
+"$FIND" "$WORK/tree" -name delete-me -delete
+test ! -f "$WORK/tree/delete-me"
+BINDIR="$PREFIX/bin"
+LIBEXECDIR="$PREFIX/libexec"
+export BINDIR LIBEXECDIR
+"$PREFIX/bin/updatedb" --localpaths="$WORK/tree" --netpaths= --prunepaths= \
+  --output="$WORK/locatedb"
+test "`"$LOCATE" -d "$WORK/locatedb" second.txt`" = "$WORK/tree/sub/second.txt"
