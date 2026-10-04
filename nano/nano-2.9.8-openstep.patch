@@ -1,0 +1,420 @@
+--- a/lib/glob.c
++++ b/lib/glob.c
+@@ -39,6 +39,7 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <alloca.h>
++#include "openstep.h"
+ 
+ #ifdef _LIBC
+ # undef strdup
+@@ -1156,7 +1157,12 @@
+     return 1;
+   if (s2 == NULL)
+     return -1;
++#ifdef NeXT
++  /* NeXT's strcoll has an incompatible declaration and broken collation. */
++  return strcmp (s1, s2);
++#else
+   return strcoll (s1, s2);
++#endif
+ }
+ 
+ 
+--- /dev/null
++++ b/lib/libgen.h
+@@ -0,0 +1,41 @@
++/* OPENSTEP has no POSIX libgen.h.  Only nano's private callers use this. */
++#ifndef NANO_LIBGEN_H
++#define NANO_LIBGEN_H
++#ifndef NeXT
++# include_next <libgen.h>
++#else
++#include <string.h>
++
++static char *
++basename (char *path)
++{
++  char *end, *slash;
++  if (!path || !*path)
++    return ".";
++  end = path + strlen (path);
++  while (end > path + 1 && end[-1] == '/')
++    *--end = '\0';
++  slash = strrchr (path, '/');
++  return slash && slash[1] ? slash + 1 : path;
++}
++
++static char *
++dirname (char *path)
++{
++  char *end;
++  if (!path || !*path)
++    return ".";
++  end = path + strlen (path);
++  while (end > path + 1 && end[-1] == '/')
++    --end;
++  while (end > path && end[-1] != '/')
++    --end;
++  if (end == path)
++    return ".";
++  while (end > path + 1 && end[-1] == '/')
++    --end;
++  *end = '\0';
++  return path;
++}
++#endif
++#endif
+--- /dev/null
++++ b/lib/openstep.c
+@@ -0,0 +1,78 @@
++/* OPENSTEP libc fallbacks used by nano and its bundled gnulib. */
++#ifdef NeXT
++#include "openstep.h"
++#include <sys/param.h>
++#include <sys/resource.h>
++#include <sys/wait.h>
++#include <dirent.h>
++#include <errno.h>
++#include <limits.h>
++#include <stdlib.h>
++#include <string.h>
++#include <unistd.h>
++
++extern char *getwd (char *);
++extern void seekdir (DIR *, long);
++extern int wait4 (int, union wait *, int, struct rusage *);
++
++char *
++strdup (const char *text)
++{
++  size_t length = strlen (text) + 1;
++  char *copy = malloc (length);
++  if (copy)
++    memcpy (copy, text, length);
++  return copy;
++}
++
++char *
++getcwd (char *buffer, size_t size)
++{
++  char path[MAXPATHLEN + 1];
++  size_t needed;
++  if (!getwd (path))
++    return NULL;
++  needed = strlen (path) + 1;
++  if (!buffer && size == 0)
++    size = needed;
++  if (size < needed)
++    {
++      errno = size ? ERANGE : EINVAL;
++      return NULL;
++    }
++  if (!buffer && !(buffer = malloc (size)))
++    return NULL;
++  memcpy (buffer, path, needed);
++  return buffer;
++}
++
++void
++rewinddir (DIR *directory)
++{
++  seekdir (directory, 0L);
++}
++
++pid_t
++waitpid (pid_t pid, int *status, int options)
++{
++  union wait result;
++  int child = wait4 (pid, &result, options, NULL);
++  if (child > 0 && status)
++    *status = result.w_status;
++  return child;
++}
++
++long
++fpathconf (int fd, int name)
++{
++  if (name == _PC_PIPE_BUF)
++    {
++      struct stat info;
++      if (fstat (fd, &info) < 0)
++        return -1;
++      return PIPE_BUF;
++    }
++  errno = EINVAL;
++  return -1;
++}
++#endif
+--- /dev/null
++++ b/lib/openstep.h
+@@ -0,0 +1,19 @@
++/* Declarations hidden by OPENSTEP's POSIX header mode. */
++#ifndef NANO_OPENSTEP_H
++#define NANO_OPENSTEP_H
++#ifdef NeXT
++#include <sys/types.h>
++#ifndef P_tmpdir
++# define P_tmpdir "/tmp"
++#endif
++struct passwd;
++extern struct passwd *getpwent (void);
++extern void endpwent (void);
++extern char *strdup (const char *);
++extern int gethostname (char *, int);
++extern int mkstemp (char *);
++extern int fchmod (int, int);
++extern int fchown (int, int, int);
++extern int ioctl (int, long, ...);
++#endif
++#endif
+--- a/lib/sigaction.c
++++ b/lib/sigaction.c
+@@ -23,6 +23,76 @@
+ #include <errno.h>
+ #include <stdint.h>
+ #include <stdlib.h>
++
++#ifdef NeXT
++
++/* Use the kernel's BSD signal handling, including its atomic mask changes.  */
++typedef void (*next_handler_t) (int);
++static next_handler_t next_handlers[NSIG];
++
++static void
++next_reset_handler (int sig)
++{
++  struct sigvec action;
++  next_handler_t handler = next_handlers[sig];
++  int saved_errno = errno;
++
++  action.sv_handler = SIG_DFL;
++  action.sv_mask = 0;
++  action.sv_flags = 0;
++  sigvec (sig, &action, NULL);
++  errno = saved_errno;
++  handler (sig);
++}
++
++int
++sigaction (int sig, const struct sigaction *act, struct sigaction *oldact)
++{
++  struct sigvec action, previous;
++  next_handler_t previous_handler;
++  int mask, result, saved_errno;
++
++  if (sig <= 0 || sig >= NSIG
++      || (act && (act->sa_flags & ~(SA_RESETHAND | SA_RESTART))))
++    {
++      errno = EINVAL;
++      return -1;
++    }
++  mask = sigblock (sigmask (sig));
++  previous_handler = next_handlers[sig];
++  if (act)
++    {
++      action.sv_handler = act->sa_handler;
++      action.sv_mask = act->sa_mask;
++      action.sv_flags = (act->sa_flags & SA_RESTART) ? 0 : SV_INTERRUPT;
++      if ((act->sa_flags & SA_RESETHAND)
++          && act->sa_handler != SIG_DFL && act->sa_handler != SIG_IGN)
++        {
++          next_handlers[sig] = act->sa_handler;
++          action.sv_handler = next_reset_handler;
++        }
++    }
++  result = sigvec (sig, act ? &action : NULL, &previous);
++  saved_errno = errno;
++  if (result == 0 && oldact)
++    {
++      oldact->sa_handler = previous.sv_handler;
++      oldact->sa_mask = previous.sv_mask;
++      oldact->sa_flags = (previous.sv_flags & SV_INTERRUPT) ? 0 : SA_RESTART;
++      if (previous.sv_handler == next_reset_handler)
++        {
++          oldact->sa_handler = previous_handler;
++          oldact->sa_flags |= SA_RESETHAND;
++        }
++    }
++  if (result != 0)
++    next_handlers[sig] = previous_handler;
++  sigsetmask (mask);
++  errno = saved_errno;
++  return result;
++}
++
++#else /* !NeXT */
+ 
+ /* This implementation of sigaction is tailored to native Windows behavior:
+    signal() has SysV semantics (ie. the handler is uninstalled before
+@@ -202,3 +272,5 @@
+   errno = saved_errno;
+   return -1;
+ }
++
++#endif /* !NeXT */
+--- a/lib/signal.in.h
++++ b/lib/signal.in.h
+@@ -404,7 +404,13 @@
+ /* We assume that platforms which lack the sigaction() function also lack
+    the 'struct sigaction' type, and vice versa.  */
+ 
+-#  if !GNULIB_defined_struct_sigaction
++/* OPENSTEP declares the POSIX structure but provides only BSD functions.  */
++#  if defined NeXT
++#   define SA_RESETHAND 0x100
++#   define SA_RESTART 0x200
++#  endif
++
++#  if !GNULIB_defined_struct_sigaction && !defined NeXT
+ 
+ struct sigaction
+ {
+--- a/lib/sigprocmask.c
++++ b/lib/sigprocmask.c
+@@ -23,6 +23,88 @@
+ #include <errno.h>
+ #include <stdint.h>
+ #include <stdlib.h>
++
++#ifdef NeXT
++
++/* OPENSTEP uses bit (signal - 1), unlike the Windows emulation below.  */
++static int
++next_valid_signal (int sig)
++{
++  if (sig > 0 && sig < NSIG)
++    return 1;
++  errno = EINVAL;
++  return 0;
++}
++
++int
++sigismember (const sigset_t *set, int sig)
++{
++  return next_valid_signal (sig) ? !!(*set & (1U << (sig - 1))) : -1;
++}
++
++int
++sigemptyset (sigset_t *set)
++{
++  *set = 0;
++  return 0;
++}
++
++int
++sigfillset (sigset_t *set)
++{
++  *set = (1U << (NSIG - 1)) - 1;
++  return 0;
++}
++
++int
++sigaddset (sigset_t *set, int sig)
++{
++  if (!next_valid_signal (sig))
++    return -1;
++  *set |= 1U << (sig - 1);
++  return 0;
++}
++
++int
++sigdelset (sigset_t *set, int sig)
++{
++  if (!next_valid_signal (sig))
++    return -1;
++  *set &= ~(1U << (sig - 1));
++  return 0;
++}
++
++int
++sigprocmask (int how, const sigset_t *set, sigset_t *oldset)
++{
++  int previous;
++  if (!set)
++    previous = sigblock (0);
++  else if (how == SIG_BLOCK)
++    previous = sigblock (*set);
++  else if (how == SIG_SETMASK)
++    previous = sigsetmask (*set);
++  else if (how == SIG_UNBLOCK)
++    previous = sigsetmask (sigblock (0) & ~*set);
++  else
++    {
++      errno = EINVAL;
++      return -1;
++    }
++  if (oldset)
++    *oldset = previous;
++  return 0;
++}
++
++#undef signal
++typedef void (*handler_t) (int);
++handler_t
++rpl_signal (int sig, handler_t handler)
++{
++  return signal (sig, handler);
++}
++
++#else /* !NeXT */
+ 
+ #if HAVE_MSVC_INVALID_PARAMETER_HANDLER
+ # include "msvc-inval.h"
+@@ -347,3 +429,5 @@
+   return 0;
+ }
+ #endif
++
++#endif /* !NeXT */
+--- a/lib/xalloc-oversized.h
++++ b/lib/xalloc-oversized.h
+@@ -44,7 +44,7 @@
+ #if 7 <= __GNUC__
+ # define xalloc_oversized(n, s) \
+    __builtin_mul_overflow_p (n, s, (__xalloc_count_type) 1)
+-#elif 5 <= __GNUC__ && !defined __ICC && !__STRICT_ANSI__
++#elif 5 <= __GNUC__ && !defined __ICC && !defined __STRICT_ANSI__
+ # define xalloc_oversized(n, s) \
+    (__builtin_constant_p (n) && __builtin_constant_p (s) \
+     ? __xalloc_oversized (n, s) \
+--- a/src/nano.c
++++ b/src/nano.c
+@@ -38,6 +38,11 @@
+ #include <termios.h>
+ #endif
+ #include <unistd.h>
++#ifdef NeXT
++/* Keep the small platform implementation in the executable, so that the
++ * bundled portability archive can also use these libc fallbacks. */
++#include "openstep.c"
++#endif
+ #ifdef __linux__
+ #include <sys/vt.h>
+ #endif
+--- a/src/nano.h
++++ b/src/nano.h
+@@ -25,6 +25,8 @@
+ #ifdef HAVE_CONFIG_H
+ #include <config.h>
+ #endif
++
++#include "openstep.h"
+ 
+ #ifdef NEED_XOPEN_SOURCE_EXTENDED
+ #ifndef _XOPEN_SOURCE_EXTENDED
+--- a/src/winio.c
++++ b/src/winio.c
+@@ -191,6 +191,12 @@
+ #ifndef NANO_TINY
+ 		if (the_window_resized) {
+ 			regenerate_screen();
++#ifdef NeXT
++			/* BSD curses can retry an interrupted read until a real key
++			 * arrives.  Preserve that key across the pending redraw. */
++			if (input != ERR && input != KEY_RESIZE && input != KEY_FLUSH)
++				ungetch(input);
++#endif
+ 			input = KEY_WINCH;
+ 		}
+ #endif
