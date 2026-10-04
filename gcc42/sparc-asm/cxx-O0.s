@@ -1,10 +1,10 @@
 .constructor
 	.align	2
-	.word	__GLOBAL__I__Z1gP1A
+	.long	__GLOBAL__I__Z1gP1A
 .reference .constructors_used
 .destructor
 	.align	2
-	.word	__GLOBAL__D__Z1gP1A
+	.long	__GLOBAL__D__Z1gP1A
 .reference .destructors_used
 	.text
 	.align	2
@@ -260,8 +260,8 @@ __GLOBAL__I__Z1gP1A:
 .literal8
 	.align	3
 LC0:
-	.word	1074003968
-	.word	0
+	.long	1074003968
+	.long	0
 	.text
 	.align	2
 	.globl __Z1gP1A
@@ -389,37 +389,37 @@ LLSDA9:
 	.byte	0x1
 	.byte	0x0
 	.align	2
-	.word	__ZTIi
+	.long	__ZTIi
 	.text
 .lcomm __ZL8global_b,8,2
 .const
 	.align	3
 __ZTV1B:
-	.word	0
-	.word	__ZTI1B
-	.word	__ZN1BD1Ev
-	.word	__ZN1BD0Ev
-	.word	__ZN1B1fEv
+	.long	0
+	.long	__ZTI1B
+	.long	__ZN1BD1Ev
+	.long	__ZN1BD0Ev
+	.long	__ZN1B1fEv
 	.align	2
 __ZTI1B:
-	.word	__ZTVN10__cxxabiv120__si_class_type_infoE+8
-	.word	__ZTS1B
-	.word	__ZTI1A
+	.long	__ZTVN10__cxxabiv120__si_class_type_infoE+8
+	.long	__ZTS1B
+	.long	__ZTI1A
 	.align	3
 __ZTS1B:
 	.ascii "1B\0"
 	.align	2
 __ZTI1A:
-	.word	__ZTVN10__cxxabiv117__class_type_infoE+8
-	.word	__ZTS1A
+	.long	__ZTVN10__cxxabiv117__class_type_infoE+8
+	.long	__ZTS1A
 	.align	3
 __ZTS1A:
 	.ascii "1A\0"
 	.align	3
 __ZTV1A:
-	.word	0
-	.word	__ZTI1A
-	.word	__ZN1AD1Ev
-	.word	__ZN1AD0Ev
-	.word	__ZN1A1fEv
+	.long	0
+	.long	__ZTI1A
+	.long	__ZN1AD1Ev
+	.long	__ZN1AD0Ev
+	.long	__ZN1A1fEv
 	.ident	"GCC: (GNU) 4.2.1 (Apple Inc. build 5666) (dot 3)"

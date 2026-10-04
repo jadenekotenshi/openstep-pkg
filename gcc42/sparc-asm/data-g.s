@@ -49,41 +49,41 @@ _buf:
 	.globl _shorts
 	.align	1
 _shorts:
-	.half	1
-	.half	-2
-	.half	3
-	.half	-4
+	.short	1
+	.short	-2
+	.short	3
+	.short	-4
 	.globl _ints
 	.align	2
 _ints:
-	.word	1
-	.word	-2
-	.word	3
-	.word	-4
+	.long	1
+	.long	-2
+	.long	3
+	.long	-4
 	.globl _quads
 	.align	3
 _quads:
-	.word	287454020
-	.word	1432778632
-	.word	-1
-	.word	-1
+	.long	287454020
+	.long	1432778632
+	.long	-1
+	.long	-1
 	.globl _flts
 	.align	2
 _flts:
-	.word	1069547520
-	.word	3222274048
+	.long	1069547520
+	.long	3222274048
 	.globl _dbls
 	.align	3
 _dbls:
-	.word	1074340345
-	.word	4028335726
-	.word	-726513235
-	.word	630506365
+	.long	1074340345
+	.long	4028335726
+	.long	-726513235
+	.long	630506365
 	.globl _ld
 	.align	3
 _ld:
-	.word	1074003968
-	.word	0
+	.long	1074003968
+	.long	0
 	.globl _strs
 .cstring
 	.align	3
@@ -98,9 +98,9 @@ LC2:
 	.data
 	.align	2
 _strs:
-	.word	LC0
-	.word	LC1
-	.word	LC2
+	.long	LC0
+	.long	LC1
+	.long	LC2
 	.globl _msg
 .const
 	.align	3
@@ -110,9 +110,9 @@ _msg:
 	.data
 	.align	2
 _ptrs:
-	.word	_common_int
-	.word	_ints
-	.word	_ints+8
+	.long	_common_int
+	.long	_ints
+	.long	_ints+8
 	.globl _packed_val
 _packed_val:
 	.byte	1
@@ -148,7 +148,7 @@ _bits:
 	.globl _ext_ptr
 	.align	2
 _ext_ptr:
-	.word	_ext_sym
+	.long	_ext_sym
 .lcomm _local_zero,40,2
 .lcomm _local_byte,1,0
 	.comm _common_int,8

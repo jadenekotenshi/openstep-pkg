@@ -13,8 +13,8 @@ L_OBJC_IMAGE_INFO:
 .literal8
 	.align	3
 LC0:
-	.word	1074397184
-	.word	0
+	.long	1074397184
+	.long	0
 	.text
 	.align	2
 "-[Base result:]":
@@ -32,8 +32,8 @@ LC0:
 .literal8
 	.align	3
 LC1:
-	.word	1074397184
-	.word	0
+	.long	1074397184
+	.long	0
 	.text
 	.align	2
 "-[Base dbl]":
@@ -122,12 +122,12 @@ _go:
 .objc_symbols
 	.align	2
 L_OBJC_SYMBOLS:
-	.word	0
-	.word	0
-	.half	2
-	.half	0
-	.word	L_OBJC_CLASS_Kid
-	.word	L_OBJC_CLASS_Base
+	.long	0
+	.long	0
+	.short	2
+	.short	0
+	.long	L_OBJC_CLASS_Kid
+	.long	L_OBJC_CLASS_Base
 .objc_meth_var_names
 L_OBJC_METH_VAR_NAME_0:
 	.ascii "result:\0"
@@ -137,11 +137,11 @@ L_OBJC_METH_VAR_TYPE_0:
 .objc_inst_meth
 	.align	2
 L_OBJC_INSTANCE_METHODS_Kid:
-	.word	0
-	.word	1
-	.word	L_OBJC_METH_VAR_NAME_0
-	.word	L_OBJC_METH_VAR_TYPE_0
-	.word	"-[Kid result:]"
+	.long	0
+	.long	1
+	.long	L_OBJC_METH_VAR_NAME_0
+	.long	L_OBJC_METH_VAR_TYPE_0
+	.long	"-[Kid result:]"
 .objc_class_names
 L_OBJC_CLASS_NAME_0:
 	.ascii "Kid\0"
@@ -150,33 +150,33 @@ L_OBJC_CLASS_NAME_1:
 .objc_meta_class
 	.align	2
 L_OBJC_METACLASS_Kid:
-	.word	L_OBJC_CLASS_NAME_1
-	.word	L_OBJC_CLASS_NAME_1
-	.word	L_OBJC_CLASS_NAME_0
-	.word	0
-	.word	2
-	.word	48
-	.word	0
-	.word	0
-	.word	0
-	.word	0
-	.word	0
-	.word	0
+	.long	L_OBJC_CLASS_NAME_1
+	.long	L_OBJC_CLASS_NAME_1
+	.long	L_OBJC_CLASS_NAME_0
+	.long	0
+	.long	2
+	.long	48
+	.long	0
+	.long	0
+	.long	0
+	.long	0
+	.long	0
+	.long	0
 .objc_class
 	.align	2
 L_OBJC_CLASS_Kid:
-	.word	L_OBJC_METACLASS_Kid
-	.word	L_OBJC_CLASS_NAME_1
-	.word	L_OBJC_CLASS_NAME_0
-	.word	0
-	.word	1
-	.word	4
-	.word	0
-	.word	L_OBJC_INSTANCE_METHODS_Kid
-	.word	0
-	.word	0
-	.word	0
-	.word	0
+	.long	L_OBJC_METACLASS_Kid
+	.long	L_OBJC_CLASS_NAME_1
+	.long	L_OBJC_CLASS_NAME_0
+	.long	0
+	.long	1
+	.long	4
+	.long	0
+	.long	L_OBJC_INSTANCE_METHODS_Kid
+	.long	0
+	.long	0
+	.long	0
+	.long	0
 .objc_meth_var_names
 L_OBJC_METH_VAR_NAME_1:
 	.ascii "isa\0"
@@ -236,43 +236,43 @@ L_OBJC_METH_VAR_TYPE_8:
 .objc_class_vars
 	.align	2
 L_OBJC_CLASS_VARIABLES_Base:
-	.word	12
-	.word	L_OBJC_METH_VAR_NAME_1
-	.word	L_OBJC_METH_VAR_TYPE_1
-	.word	0
-	.word	L_OBJC_METH_VAR_NAME_2
-	.word	L_OBJC_METH_VAR_TYPE_1
-	.word	4
-	.word	L_OBJC_METH_VAR_NAME_3
-	.word	L_OBJC_METH_VAR_TYPE_2
-	.word	8
-	.word	L_OBJC_METH_VAR_NAME_4
-	.word	L_OBJC_METH_VAR_TYPE_3
-	.word	12
-	.word	L_OBJC_METH_VAR_NAME_5
-	.word	L_OBJC_METH_VAR_TYPE_3
-	.word	16
-	.word	L_OBJC_METH_VAR_NAME_6
-	.word	L_OBJC_METH_VAR_TYPE_3
-	.word	20
-	.word	L_OBJC_METH_VAR_NAME_7
-	.word	L_OBJC_METH_VAR_TYPE_4
-	.word	24
-	.word	L_OBJC_METH_VAR_NAME_8
-	.word	L_OBJC_METH_VAR_TYPE_5
-	.word	28
-	.word	L_OBJC_METH_VAR_NAME_9
-	.word	L_OBJC_METH_VAR_TYPE_6
-	.word	32
-	.word	L_OBJC_METH_VAR_NAME_10
-	.word	L_OBJC_METH_VAR_TYPE_7
-	.word	36
-	.word	L_OBJC_METH_VAR_NAME_11
-	.word	L_OBJC_METH_VAR_TYPE_2
-	.word	40
-	.word	L_OBJC_METH_VAR_NAME_12
-	.word	L_OBJC_METH_VAR_TYPE_8
-	.word	44
+	.long	12
+	.long	L_OBJC_METH_VAR_NAME_1
+	.long	L_OBJC_METH_VAR_TYPE_1
+	.long	0
+	.long	L_OBJC_METH_VAR_NAME_2
+	.long	L_OBJC_METH_VAR_TYPE_1
+	.long	4
+	.long	L_OBJC_METH_VAR_NAME_3
+	.long	L_OBJC_METH_VAR_TYPE_2
+	.long	8
+	.long	L_OBJC_METH_VAR_NAME_4
+	.long	L_OBJC_METH_VAR_TYPE_3
+	.long	12
+	.long	L_OBJC_METH_VAR_NAME_5
+	.long	L_OBJC_METH_VAR_TYPE_3
+	.long	16
+	.long	L_OBJC_METH_VAR_NAME_6
+	.long	L_OBJC_METH_VAR_TYPE_3
+	.long	20
+	.long	L_OBJC_METH_VAR_NAME_7
+	.long	L_OBJC_METH_VAR_TYPE_4
+	.long	24
+	.long	L_OBJC_METH_VAR_NAME_8
+	.long	L_OBJC_METH_VAR_TYPE_5
+	.long	28
+	.long	L_OBJC_METH_VAR_NAME_9
+	.long	L_OBJC_METH_VAR_TYPE_6
+	.long	32
+	.long	L_OBJC_METH_VAR_NAME_10
+	.long	L_OBJC_METH_VAR_TYPE_7
+	.long	36
+	.long	L_OBJC_METH_VAR_NAME_11
+	.long	L_OBJC_METH_VAR_TYPE_2
+	.long	40
+	.long	L_OBJC_METH_VAR_NAME_12
+	.long	L_OBJC_METH_VAR_TYPE_8
+	.long	44
 .objc_meth_var_names
 L_OBJC_METH_VAR_NAME_13:
 	.ascii "bias\0"
@@ -282,10 +282,10 @@ L_OBJC_METH_VAR_TYPE_9:
 .objc_instance_vars
 	.align	2
 L_OBJC_INSTANCE_VARIABLES_Base:
-	.word	1
-	.word	L_OBJC_METH_VAR_NAME_13
-	.word	L_OBJC_METH_VAR_TYPE_9
-	.word	0
+	.long	1
+	.long	L_OBJC_METH_VAR_NAME_13
+	.long	L_OBJC_METH_VAR_TYPE_9
+	.long	0
 .objc_meth_var_names
 L_OBJC_METH_VAR_NAME_14:
 	.ascii "make\0"
@@ -295,11 +295,11 @@ L_OBJC_METH_VAR_TYPE_10:
 .objc_cls_meth
 	.align	2
 L_OBJC_CLASS_METHODS_Base:
-	.word	0
-	.word	1
-	.word	L_OBJC_METH_VAR_NAME_14
-	.word	L_OBJC_METH_VAR_TYPE_10
-	.word	"+[Base make]"
+	.long	0
+	.long	1
+	.long	L_OBJC_METH_VAR_NAME_14
+	.long	L_OBJC_METH_VAR_TYPE_10
+	.long	"+[Base make]"
 .objc_meth_var_names
 L_OBJC_METH_VAR_NAME_15:
 	.ascii "dbl\0"
@@ -309,63 +309,63 @@ L_OBJC_METH_VAR_TYPE_11:
 .objc_inst_meth
 	.align	2
 L_OBJC_INSTANCE_METHODS_Base:
-	.word	0
-	.word	2
-	.word	L_OBJC_METH_VAR_NAME_15
-	.word	L_OBJC_METH_VAR_TYPE_11
-	.word	"-[Base dbl]"
-	.word	L_OBJC_METH_VAR_NAME_0
-	.word	L_OBJC_METH_VAR_TYPE_0
-	.word	"-[Base result:]"
+	.long	0
+	.long	2
+	.long	L_OBJC_METH_VAR_NAME_15
+	.long	L_OBJC_METH_VAR_TYPE_11
+	.long	"-[Base dbl]"
+	.long	L_OBJC_METH_VAR_NAME_0
+	.long	L_OBJC_METH_VAR_TYPE_0
+	.long	"-[Base result:]"
 .objc_meta_class
 	.align	2
 L_OBJC_METACLASS_Base:
-	.word	L_OBJC_CLASS_NAME_1
-	.word	0
-	.word	L_OBJC_CLASS_NAME_1
-	.word	0
-	.word	2
-	.word	48
-	.word	L_OBJC_CLASS_VARIABLES_Base
-	.word	L_OBJC_CLASS_METHODS_Base
-	.word	0
-	.word	0
-	.word	0
-	.word	0
+	.long	L_OBJC_CLASS_NAME_1
+	.long	0
+	.long	L_OBJC_CLASS_NAME_1
+	.long	0
+	.long	2
+	.long	48
+	.long	L_OBJC_CLASS_VARIABLES_Base
+	.long	L_OBJC_CLASS_METHODS_Base
+	.long	0
+	.long	0
+	.long	0
+	.long	0
 .objc_class
 	.align	2
 L_OBJC_CLASS_Base:
-	.word	L_OBJC_METACLASS_Base
-	.word	0
-	.word	L_OBJC_CLASS_NAME_1
-	.word	0
-	.word	1
-	.word	4
-	.word	L_OBJC_INSTANCE_VARIABLES_Base
-	.word	L_OBJC_INSTANCE_METHODS_Base
-	.word	0
-	.word	0
-	.word	0
-	.word	0
+	.long	L_OBJC_METACLASS_Base
+	.long	0
+	.long	L_OBJC_CLASS_NAME_1
+	.long	0
+	.long	1
+	.long	4
+	.long	L_OBJC_INSTANCE_VARIABLES_Base
+	.long	L_OBJC_INSTANCE_METHODS_Base
+	.long	0
+	.long	0
+	.long	0
+	.long	0
 .objc_message_refs
 	.align	2
 L_OBJC_SELECTOR_REFERENCES_1:
-	.word	L_OBJC_METH_VAR_NAME_15
+	.long	L_OBJC_METH_VAR_NAME_15
 	.align	2
 L_OBJC_SELECTOR_REFERENCES_0:
-	.word	L_OBJC_METH_VAR_NAME_0
+	.long	L_OBJC_METH_VAR_NAME_0
 .objc_class_names
 L_OBJC_CLASS_NAME_2:
 	.ascii "\0"
 .objc_module_info
 	.align	2
 L_OBJC_MODULES:
-	.word	7
-	.word	16
-	.word	L_OBJC_CLASS_NAME_2
-	.word	L_OBJC_SYMBOLS
+	.long	7
+	.long	16
+	.long	L_OBJC_CLASS_NAME_2
+	.long	L_OBJC_SYMBOLS
 	.data
 	.align	2
 _.objc_class_ref_Base:
-	.word	.objc_class_name_Base
+	.long	.objc_class_name_Base
 	.ident	"GCC: (GNU) 4.2.1 (Apple Inc. build 5666) (dot 3)"

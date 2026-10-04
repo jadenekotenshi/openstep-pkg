@@ -1745,7 +1745,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/gcc/config/sparc/next.h
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,133 @@
 +/* Target definitions for GNU compiler for SPARC running OPENSTEP 4.
 +   Copyright (C) 1993, 1995, 1996, 1999 Free Software Foundation, Inc.
 +
@@ -1848,25 +1848,57 @@ index 0000000..1111111
 +#undef ASM_OUTPUT_ALIGN_WITH_NOP
 +#define ASM_OUTPUT_ALIGN_WITH_NOP(FILE,LOG)
 +
-+/* No Sun .uahalf/.uaword/.uaxword.  */
-+#define SPARC_NO_UNALIGNED_OPS 1
++/* OPENSTEP's assembler spells 16- and 32-bit data .short and .long (not Sun's
++   .half and .word) and has no .uahalf/.uaword/.uaxword.  */
++#define SPARC_NO_SUN_DATA_OPS 1
++#undef TARGET_ASM_ALIGNED_HI_OP
++#define TARGET_ASM_ALIGNED_HI_OP "\t.short\t"
++#undef TARGET_ASM_ALIGNED_SI_OP
++#define TARGET_ASM_ALIGNED_SI_OP "\t.long\t"
++
++/* Case-vector elements: sparc.h hardcodes .word.  */
++#undef ASM_OUTPUT_ADDR_VEC_ELT
++#define ASM_OUTPUT_ADDR_VEC_ELT(FILE, VALUE)  \
++do {									\
++  char label[30];							\
++  ASM_GENERATE_INTERNAL_LABEL (label, "L", VALUE);			\
++  fprintf (FILE, "\t.long\t");					\
++  assemble_name (FILE, label);						\
++  fputc ('\n', FILE);							\
++} while (0)
++
++#undef ASM_OUTPUT_ADDR_DIFF_ELT
++#define ASM_OUTPUT_ADDR_DIFF_ELT(FILE, BODY, VALUE, REL)		\
++do {									\
++  char label[30];							\
++  ASM_GENERATE_INTERNAL_LABEL (label, "L", (VALUE));			\
++  fprintf (FILE, "\t.long\t");					\
++  assemble_name (FILE, label);						\
++  ASM_GENERATE_INTERNAL_LABEL (label, "L", (REL));			\
++  fputc ('-', FILE);							\
++  assemble_name (FILE, label);						\
++  fputc ('\n', FILE);							\
++} while (0)
 diff --git a/gcc/config/sparc/sparc.c b/gcc/config/sparc/sparc.c
 --- a/gcc/config/sparc/sparc.c
 +++ b/gcc/config/sparc/sparc.c
-@@ -433,12 +433,16 @@
- #define TARGET_ASM_ALIGNED_SI_OP "\t.word\t"
- #endif
+@@ -424,6 +424,11 @@
  
-+/* Targets whose assembler lacks the Sun .ua* directives fall back to the
-+   aligned ones.  */
-+#ifndef SPARC_NO_UNALIGNED_OPS
- #undef TARGET_ASM_UNALIGNED_HI_OP
- #define TARGET_ASM_UNALIGNED_HI_OP "\t.uahalf\t"
- #undef TARGET_ASM_UNALIGNED_SI_OP
+ /* Initialize the GCC target structure.  */
+ 
++/* Targets whose assembler does not use Sun's data directive names (such as
++   OPENSTEP, which has .short/.long and no .ua*) define SPARC_NO_SUN_DATA_OPS
++   and provide TARGET_ASM_ALIGNED_{HI,SI}_OP themselves; the unaligned ops
++   then default to the aligned ones.  */
++#ifndef SPARC_NO_SUN_DATA_OPS
+ /* The sparc default is to use .half rather than .short for aligned
+    HI objects.  Use .word instead of .long on non-ELF systems.  */
+ #undef TARGET_ASM_ALIGNED_HI_OP
+@@ -439,6 +444,7 @@
  #define TARGET_ASM_UNALIGNED_SI_OP "\t.uaword\t"
  #undef TARGET_ASM_UNALIGNED_DI_OP
  #define TARGET_ASM_UNALIGNED_DI_OP "\t.uaxword\t"
-+#endif
++#endif /* !SPARC_NO_SUN_DATA_OPS */
  
  /* The target hook has to handle DI-mode values.  */
  #undef TARGET_ASM_INTEGER

@@ -67,14 +67,14 @@ L12:
 	 nop
 	.align	2
 L11:
-	.word	L3
-	.word	L4
-	.word	L5
-	.word	L6
-	.word	L7
-	.word	L8
-	.word	L9
-	.word	L10
+	.long	L3
+	.long	L4
+	.long	L5
+	.long	L6
+	.long	L7
+	.long	L8
+	.long	L9
+	.long	L10
 	.align	2
 	.globl _ll
 _ll:
@@ -359,7 +359,7 @@ L37:
 	.data
 	.align	2
 _fptr:
-	.word	_ext
+	.long	_ext
 	.text
 	.align	2
 	.globl _callptr
@@ -501,7 +501,7 @@ _ctor:
 	 nop
 .constructor
 	.align	2
-	.word	_ctor
+	.long	_ctor
 .reference .constructors_used
 	.text
 	.align	2
@@ -516,7 +516,7 @@ _dtor:
 	 nop
 .destructor
 	.align	2
-	.word	_dtor
+	.long	_dtor
 .reference .destructors_used
 	.text
 	.align	2
