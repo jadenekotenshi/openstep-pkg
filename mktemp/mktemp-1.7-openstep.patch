@@ -1,0 +1,14 @@
+diff --git a/extern.h b/extern.h
+index f83cd3f..2542f40 100644
+--- a/extern.h
++++ b/extern.h
+@@ -21,6 +21,9 @@
+ extern int errno;
+ #endif
+ 
++#ifndef HAVE_STRDUP
++extern char *strdup __P((const char *));
++#endif
+ extern char *MKDTEMP __P((char *));
+ extern int MKSTEMP __P((char *));
+ #ifndef HAVE_ARC4RANDOM

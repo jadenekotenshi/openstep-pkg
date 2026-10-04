@@ -1,0 +1,121 @@
+--- a/man/manlinks.sed
++++ b/man/manlinks.sed
+@@ -99,7 +99,10 @@
+ #	void (*)(FORM *) field_init(const FORM *form);
+ # to
+ #	field_init(const FORM *form);
+-s/^\(([^)]*)\)\(([^)]*)\)*[ ]*//g
++# Old BSD sed cannot repeat a parenthesized subexpression.
++:types
++s/^([^)]*)[ ]*//
++t types
+ # rename marker temporarily
+ s/\.SH_(/.SH_/
+ # kill lines with ");", and trim off beginning of argument list.
+--- a/ncurses/SigAction.h
++++ b/ncurses/SigAction.h
+@@ -101,6 +101,8 @@
+ #define sigdelset   _nc_sigdelset
+ #undef  sigaddset
+ #define sigaddset   _nc_sigaddset
++#undef  sigismember
++#define sigismember(mask, sig) ((*(mask) & sigmask(sig)) != 0)
+ 
+ /* tty/lib_tstp.c is the only user */
+ #include <base/sigaction.c>
+--- a/ncurses/tinfo/getenv_num.c
++++ b/ncurses/tinfo/getenv_num.c
+@@ -69,6 +69,40 @@
+ 	_nc_SPRINTF(buffer, _nc_SLIMIT(sizeof(buffer)) "%s=%d", name, value);
+ 	if ((s = strdup(buffer)) != 0)
+ 	    putenv(s);
++#elif defined(NeXT)
++	/* OPENSTEP has neither setenv nor putenv.  Keep the environment
++	 * strings alive, as the putenv branch above does. */
++	extern char **environ;
++	static char **owned_environment;
++	char **new_environment;
++	char *s;
++	size_t n = strlen(name);
++	size_t count = 0;
++
++	s = malloc(n + 32);
++	if (s == 0)
++	    return;
++	sprintf(s, "%s=%d", name, value);
++	while (environ != 0 && environ[count] != 0) {
++	    if (strncmp(environ[count], name, n) == 0
++		&& environ[count][n] == '=') {
++		environ[count] = s;
++		return;
++	    }
++	    ++count;
++	}
++	new_environment = malloc((count + 2) * sizeof(char *));
++	if (new_environment == 0) {
++	    free(s);
++	    return;
++	}
++	if (count != 0)
++	    memcpy(new_environment, environ, count * sizeof(char *));
++	new_environment[count] = s;
++	new_environment[count + 1] = 0;
++	if (environ == owned_environment)
++	    free(owned_environment);
++	environ = owned_environment = new_environment;
+ #else
+ #error expected setenv/putenv functions
+ #endif
+--- a/progs/reset_cmd.c
++++ b/progs/reset_cmd.c
+@@ -408,7 +408,7 @@
+ void
+ set_control_chars(TTY * tty_settings, int my_erase, int my_intr, int my_kill)
+ {
+-#if defined(EXP_WIN32_DRIVER)
++#if defined(EXP_WIN32_DRIVER) || !defined(TERMIOS)
+     /* noop */
+     (void) tty_settings;
+     (void) my_erase;
+@@ -442,7 +442,7 @@
+ void
+ set_conversions(TTY * tty_settings)
+ {
+-#if defined(EXP_WIN32_DRIVER)
++#if defined(EXP_WIN32_DRIVER) || !defined(TERMIOS)
+     /* FIXME */
+ #else
+     set_flags(tty_settings->c_oflag, ONLCR);
+@@ -605,7 +605,7 @@
+     unsigned older = 0, newer = 0;
+     char *p;
+ 
+-#if defined(EXP_WIN32_DRIVER)
++#if defined(EXP_WIN32_DRIVER) || !defined(TERMIOS)
+     /* noop */
+     (void) old_settings;
+     (void) new_settings;
+@@ -662,7 +662,7 @@
+ void
+ print_tty_chars(TTY * old_settings, TTY * new_settings)
+ {
+-#if defined(EXP_WIN32_DRIVER)
++#if defined(EXP_WIN32_DRIVER) || !defined(TERMIOS)
+     /* noop */
+ #else
+     show_tty_change(old_settings, new_settings, "Erase", VERASE, CERASE);
+--- a/progs/tic.c
++++ b/progs/tic.c
+@@ -396,7 +396,12 @@
+ 	int fd = mkstemp(filename);
+ 	if (fd >= 0)
+ 	    result = fdopen(fd, "w");
++#ifdef NeXT
++	/* The BSD interface takes int and does not declare mode_t. */
++	umask(oldmask);
++#else
+ 	umask((mode_t) oldmask);
++#endif
+     }
+ #else
+     if (tmpnam(filename) != 0)

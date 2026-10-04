@@ -1,0 +1,230 @@
+diff --git a/find/defs.h b/find/defs.h
+index 02d3650..edc69ec 100644
+--- a/find/defs.h
++++ b/find/defs.h
+@@ -59,7 +59,7 @@ extern int errno;
+ # define CHAR_BIT 8
+ #endif
+ 
+-#if HAVE_INTTYPES_H
++#if HAVE_INTTYPES_H || defined NeXT
+ # include <inttypes.h>
+ #endif
+ 
+diff --git a/find/find.c b/find/find.c
+index 7fb06a9..8b03668 100644
+--- a/find/find.c
++++ b/find/find.c
+@@ -359,6 +359,9 @@ get_info (const char *pathname,
+ static boolean 
+ check_nofollow(void)
+ {
++#ifdef NeXT
++  return false; /* O_NOFOLLOW is a gnulib placeholder on OPENSTEP. */
++#else
+   struct utsname uts;
+   float  release;
+ 
+@@ -381,6 +384,7 @@ check_nofollow(void)
+ 
+   /* Well, O_NOFOLLOW was defined, so we'll try to use it. */
+   return true;
++#endif
+ }
+ #endif
+ 
+diff --git a/gnulib/lib/dirent.in.h b/gnulib/lib/dirent.in.h
+index db3de95..1080bd9 100644
+--- a/gnulib/lib/dirent.in.h
++++ b/gnulib/lib/dirent.in.h
+@@ -17,7 +17,18 @@
+ #ifndef _GL_DIRENT_H
+ 
+ /* The include_next requires a split double-inclusion guard.  */
++#ifdef NeXT
++/* OPENSTEP libc returns BSD struct direct, not the SVID struct dirent. */
++# undef _POSIX_SOURCE
++# ifndef _NEXT_SOURCE
++#  define _NEXT_SOURCE 1
++# endif
++# include <sys/dir.h>
++# define _POSIX_SOURCE 1
++# define dirent direct
++#else
+ #@INCLUDE_NEXT@ @NEXT_DIRENT_H@
++#endif
+ 
+ #ifndef _GL_DIRENT_H
+ #define _GL_DIRENT_H
+diff --git a/gnulib/lib/error.h b/gnulib/lib/error.h
+index 8c215a7..e144ab7 100644
+--- a/gnulib/lib/error.h
++++ b/gnulib/lib/error.h
+@@ -20,7 +20,7 @@
+ 
+ #ifndef __attribute__
+ /* This feature is available in gcc versions 2.5 and later.  */
+-# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 5) || __STRICT_ANSI__
++# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 5) || defined(__STRICT_ANSI__)
+ #  define __attribute__(Spec) /* empty */
+ # endif
+ /* The __-protected variants of `format' and `printf' attributes
+diff --git a/gnulib/lib/gettext.h b/gnulib/lib/gettext.h
+index 763dd3c..424e41e 100644
+--- a/gnulib/lib/gettext.h
++++ b/gnulib/lib/gettext.h
+@@ -169,7 +169,7 @@ npgettext_aux (const char *domain,
+ #include <string.h>
+ 
+ #define _LIBGETTEXT_HAVE_VARIABLE_SIZE_ARRAYS \
+-  (((__GNUC__ >= 3 || __GNUG__ >= 2) && !__STRICT_ANSI__) \
++  (((__GNUC__ >= 3 || __GNUG__ >= 2) && !defined(__STRICT_ANSI__)) \
+    /* || __STDC_VERSION__ >= 199901L */ )
+ 
+ #if !_LIBGETTEXT_HAVE_VARIABLE_SIZE_ARRAYS
+diff --git a/gnulib/lib/openat.h b/gnulib/lib/openat.h
+index b5e4f11..64589cc 100644
+--- a/gnulib/lib/openat.h
++++ b/gnulib/lib/openat.h
+@@ -25,7 +25,7 @@
+ #include <stdbool.h>
+ 
+ #ifndef __attribute__
+-# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || __STRICT_ANSI__
++# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || defined(__STRICT_ANSI__)
+ #  define __attribute__(x) /* empty */
+ # endif
+ #endif
+diff --git a/gnulib/lib/regex.h b/gnulib/lib/regex.h
+index a531283..2fd8348 100644
+--- a/gnulib/lib/regex.h
++++ b/gnulib/lib/regex.h
+@@ -644,7 +644,7 @@ extern int re_exec (const char *);
+ #ifndef _Restrict_arr_
+ # if ((199901L <= __STDC_VERSION__					\
+        || ((3 < __GNUC__ || (3 == __GNUC__ && 1 <= __GNUC_MINOR__))	\
+-	   && !__STRICT_ANSI__))					\
++	   && !defined(__STRICT_ANSI__)))					\
+       && !defined __GNUG__)
+ #  define _Restrict_arr_ _Restrict_
+ # else
+diff --git a/gnulib/lib/regex_internal.h b/gnulib/lib/regex_internal.h
+index f96291d..c078cde 100644
+--- a/gnulib/lib/regex_internal.h
++++ b/gnulib/lib/regex_internal.h
+@@ -340,7 +340,7 @@ typedef struct
+     Idx idx;			/* for BACK_REF */
+     re_context_type ctx_type;	/* for ANCHOR */
+   } opr;
+-#if __GNUC__ >= 2 && !__STRICT_ANSI__
++#if __GNUC__ >= 2 && !defined(__STRICT_ANSI__)
+   re_token_type_t type : 8;
+ #else
+   re_token_type_t type;
+diff --git a/gnulib/lib/stdio.in.h b/gnulib/lib/stdio.in.h
+index 8b88626..d293e25 100644
+--- a/gnulib/lib/stdio.in.h
++++ b/gnulib/lib/stdio.in.h
+@@ -45,7 +45,7 @@
+ 
+ #ifndef __attribute__
+ /* This feature is available in gcc versions 2.5 and later.  */
+-# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 5) || __STRICT_ANSI__
++# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 5) || defined(__STRICT_ANSI__)
+ #  define __attribute__(Spec) /* empty */
+ # endif
+ /* The __-protected variants of `format' and `printf' attributes
+diff --git a/gnulib/lib/xalloc.h b/gnulib/lib/xalloc.h
+index 9c40d72..2dc31ed 100644
+--- a/gnulib/lib/xalloc.h
++++ b/gnulib/lib/xalloc.h
+@@ -28,7 +28,7 @@ extern "C" {
+ 
+ 
+ # ifndef __attribute__
+-#  if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || __STRICT_ANSI__
++#  if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || defined(__STRICT_ANSI__)
+ #   define __attribute__(x)
+ #  endif
+ # endif
+diff --git a/gnulib/lib/xstrtol.h b/gnulib/lib/xstrtol.h
+index d96e34a..66211a9 100644
+--- a/gnulib/lib/xstrtol.h
++++ b/gnulib/lib/xstrtol.h
+@@ -47,7 +47,7 @@ _DECLARE_XSTRTOL (xstrtoimax, intmax_t)
+ _DECLARE_XSTRTOL (xstrtoumax, uintmax_t)
+ 
+ #ifndef __attribute__
+-# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || __STRICT_ANSI__
++# if __GNUC__ < 2 || (__GNUC__ == 2 && __GNUC_MINOR__ < 8) || defined(__STRICT_ANSI__)
+ #  define __attribute__(x)
+ # endif
+ #endif
+diff --git a/lib/buildcmd.c b/lib/buildcmd.c
+index 3cc1501..1817ac4 100644
+--- a/lib/buildcmd.c
++++ b/lib/buildcmd.c
+@@ -58,7 +58,7 @@
+ # define N_(String) String
+ #endif
+ 
+-#ifndef _POSIX_SOURCE
++#if !defined(_POSIX_SOURCE) || defined(NeXT)
+ #include <sys/param.h>
+ #endif
+ 
+@@ -76,7 +76,7 @@
+ 
+ /* COMPAT:  SYSV version defaults size (and has a max value of) to 470.
+    We try to make it as large as possible. */
+-#if !defined(ARG_MAX) && defined(_SC_ARG_MAX)
++#if !defined(ARG_MAX) && defined(_SC_ARG_MAX) && !defined(NeXT)
+ #define ARG_MAX sysconf (_SC_ARG_MAX)
+ #endif
+ #ifndef ARG_MAX
+@@ -332,7 +332,7 @@ static size_t
+ get_line_max(void)
+ {
+   long val;
+-#ifdef _SC_LINE_MAX  
++#if defined(_SC_LINE_MAX) && !defined(NeXT)  
+   val = sysconf(_SC_LINE_MAX);
+ #else
+   val = -1;
+@@ -364,7 +364,7 @@ bc_get_arg_max(void)
+   /* XXX: better to do a compile-time check */
+   assert( (~(size_t)0) >= LONG_MAX);
+ 
+-#ifdef _SC_ARG_MAX  
++#if defined(_SC_ARG_MAX) && !defined(NeXT)  
+   val = sysconf(_SC_ARG_MAX);
+ #else
+   val = -1;
+diff --git a/locate/updatedb.sh b/locate/updatedb.sh
+index 59e0371..a180f9c 100644
+--- a/locate/updatedb.sh
++++ b/locate/updatedb.sh
+@@ -1,4 +1,4 @@
+-#! /bin/sh
++#!/usr/local/bin/ksh
+ # updatedb -- build a locate pathname database
+ # Copyright (C) 1994, 1996, 1997, 2000, 2001, 2003, 2004, 2005, 2006
+ # Free Software Foundation, Inc.
+@@ -106,7 +106,7 @@ select_shell() {
+ : ${FINDOPTIONS=}
+ 
+ # What shell shoud we use?  We should use a POSIX-ish sh.
+-: ${SHELL="/bin/sh"}
++: ${SHELL="/usr/local/bin/ksh"}
+ 
+ # Non-network directories to put in the database.
+ : ${SEARCHPATHS="/"}
+@@ -168,7 +168,7 @@ fi
+ : ${code:=${LIBEXECDIR}/@code@}
+ 
+ 
+-PATH=/bin:/usr/bin:${BINDIR}; export PATH
++PATH=${BINDIR}:/bin:/usr/bin; export PATH
+ 
+ : ${PRUNEFS="nfs NFS proc afs proc smbfs autofs iso9660 ncpfs coda devpts ftpfs devfs mfs sysfs shfs"}
+ 

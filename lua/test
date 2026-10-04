@@ -1,0 +1,129 @@
+#!/bin/sh
+
+set -e
+
+LUA="$LOCAL_ROOT/bin/lua"
+LUAC="$LOCAL_ROOT/bin/luac"
+TESTDIR=/tmp/lua-test.$$
+umask 077
+mkdir "$TESTDIR"
+trap 'rm -rf "$TESTDIR"' 0
+trap 'exit 1' 1 2 3 15
+
+"$LUA" -v
+"$LUAC" -v
+
+cat > "$TESTDIR/probe_module.lua" <<'LUA_EOF'
+return {answer = 42}
+LUA_EOF
+
+cat > "$TESTDIR/smoke.lua" <<'LUA_EOF'
+assert(_VERSION == "Lua 5.5")
+assert(math.maxinteger == 2147483647 and math.mininteger == -2147483648)
+assert(string.packsize("j") == 4 and string.packsize("n") == 8)
+assert(math.maxinteger + 1 == math.mininteger)
+assert((0x1234 << 4) == 0x12340 and (-7 // 3) == -3)
+assert(math.abs(math.sqrt(2)^2 - 2) < 1e-14)
+assert(tonumber("0x1.8p+1") == 3)
+for _, s in ipairs({"", "  ", "-", ".", "1e", "1.0e+", "+.e1"}) do
+    assert(tonumber(s) == nil, "invalid number accepted: " .. s)
+end
+assert(string.format("%d", math.mininteger) == "-2147483648")
+assert(string.format("%.2f", 1.25) == "1.25")
+assert(string.unpack("<i4", string.pack("<i4", -123456)) == -123456)
+assert("a\0a" < "a\0b" and "a" < "a\0")
+assert(utf8.len("A\u{20ac}\u{1f600}") == 3)
+assert(require("probe_module").answer == 42)
+assert(package.searchpath("missing_lua_test_module", ";") == nil)
+
+-- Regression: NeXT frexp(infinity) used to hang constant/table hashing.
+local t = {[math.huge] = 1, [-math.huge] = 2}
+assert(t[math.huge] == 1 and t[-math.huge] == 2)
+assert(assert(load("return " .. string.format("%q", math.huge)))() == math.huge)
+local n, e = math.frexp(math.huge)
+assert(n == math.huge and e == 0)
+n = math.frexp(0/0)
+assert(n ~= n)
+assert(assert(load(string.dump(function(a) return a + 1 end)))(41) == 42)
+
+local co = coroutine.create(function() coroutine.yield(21); return 42 end)
+local ok, value = coroutine.resume(co)
+assert(ok and value == 21)
+ok, value = coroutine.resume(co)
+assert(ok and value == 42)
+local closed = false
+do
+    local resource <close> = setmetatable({}, {__close=function() closed=true end})
+end
+assert(closed)
+collectgarbage("collect")
+
+local f = assert(io.tmpfile())
+assert(f:write("hello\n", string.char(0), "lua"))
+assert(f:seek("set", 0) == 0)
+assert(f:read("l") == "hello" and f:read("a") == "\0lua")
+assert(f:close())
+local p = assert(io.popen("echo lua-pipe", "r"))
+assert(p:read("l") == "lua-pipe")
+assert(p:close())
+local status, kind, code = os.execute("exit 7")
+assert(status == nil and kind == "exit" and code == 7)
+p = assert(io.popen("exit 9", "r"))
+status, kind, code = p:close()
+assert(status == nil and kind == "exit" and code == 9)
+assert(os.date("!%Y-%m-%d", 0) == "1970-01-01")
+assert(os.time() > 0 and os.clock() >= 0)
+print("Lua runtime and OPENSTEP regression tests passed")
+LUA_EOF
+
+(
+    cd "$TESTDIR"
+    "$LUA" -E smoke.lua
+    "$LUAC" -p smoke.lua
+    "$LUAC" -s -o smoke.luac smoke.lua
+    "$LUA" -E smoke.luac
+)
+
+cat > "$TESTDIR/embed.c" <<'C_EOF'
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+
+int main(void) {
+    lua_State *L = luaL_newstate();
+    struct rusage before, after;
+    double cpu, elapsed;
+    int status;
+    if (L == NULL || sizeof(lua_Integer) != 4 || sizeof(lua_Number) != 8)
+        return 1;
+    luaL_openlibs(L);
+    getrusage(RUSAGE_SELF, &before);
+    status = luaL_dostring(L,
+        "local start=os.clock(); local n=0; "
+        "for i=1,10000000 do n=n+1 end; "
+        "assert(n==10000000); return os.clock()-start, 6*7");
+    getrusage(RUSAGE_SELF, &after);
+    if (status != LUA_OK) {
+        fprintf(stderr, "%s\n", lua_tostring(L, -1));
+        return 2;
+    }
+    elapsed = lua_tonumber(L, -2);
+    cpu = after.ru_utime.tv_sec - before.ru_utime.tv_sec +
+        (after.ru_utime.tv_usec - before.ru_utime.tv_usec) / 1000000.0 +
+        after.ru_stime.tv_sec - before.ru_stime.tv_sec +
+        (after.ru_stime.tv_usec - before.ru_stime.tv_usec) / 1000000.0;
+    if (lua_tointeger(L, -1) != 42 || elapsed < cpu * 0.5 - 0.05 ||
+        elapsed > cpu * 2.0 + 0.05)
+        return 3;
+    lua_close(L);
+    puts("Lua installed headers, static library, and CPU clock test passed");
+    return 0;
+}
+C_EOF
+
+/usr/local/bin/gcc-4.2 -std=gnu99 -O2 -I"$LOCAL_ROOT/include" \
+    "$TESTDIR/embed.c" "$LOCAL_ROOT/lib/liblua.a" -lm -o "$TESTDIR/embed"
+"$TESTDIR/embed"

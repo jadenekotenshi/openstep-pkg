@@ -1,0 +1,117 @@
+#!/bin/sh
+
+set -e
+
+EMACS="$ROOT_DIR/usr/local/bin/emacs"
+test -x "$EMACS"
+test_dir=${TMPDIR-/tmp}/emacs-pkg-test-$$
+umask 077
+mkdir "$test_dir"
+trap 'rm -rf "$test_dir"' 0
+trap 'exit 1' 1 2 3 15
+HOME=$test_dir
+EMACS_TEST_DIR=$test_dir
+EMACS_TEST_INSTALLED=yes
+export HOME EMACS_TEST_DIR EMACS_TEST_INSTALLED
+unset EMACSLOADPATH EMACSDATA EMACSPATH EMACSDOC INFOPATH || :
+
+cat > "$test_dir/selftest.el" <<'EMACS_SELFTEST'
+;;; Installed Emacs smoke tests.  -*- lexical-binding: t; -*-
+(defun openstep-check (condition description)
+  (unless condition (error "OPENSTEP test failed: %s" description)))
+
+(let* ((dir (getenv "EMACS_TEST_DIR"))
+       (file (expand-file-name "roundtrip.txt" dir))
+       (source (expand-file-name "compiled.el" dir))
+       (text (concat "Emacs OPENSTEP\n" (string #xe9 #x3bb #x65e5) "\n")))
+  (openstep-check (and (= emacs-major-version 31) (= emacs-minor-version 1)) "version")
+  (openstep-check (pdumper-stats) "installed portable dump")
+  (openstep-check (= (+ 20 22) 42) "Lisp evaluation")
+  (openstep-check (= (expt 2 100) 1267650600228229401496703205376) "bignum arithmetic")
+  (openstep-check (= (gethash "answer" (json-parse-string "{\"answer\":42}")) 42) "JSON parser")
+  (openstep-check (not (gnutls-available-p)) "configured without GnuTLS")
+  (openstep-check (member [127 0 0 1 0]
+                         (network-lookup-address-info "127.0.0.1" 'ipv4 'numeric))
+                  "numeric IPv4 resolution")
+  (openstep-check (= (fround 3.5) 4.0) "OPENSTEP rint declaration")
+  (let ((nested (expand-file-name "nested/child/" dir)))
+    (make-directory nested t)
+    (openstep-check (file-directory-p nested) "mkdir with trailing slash")
+    (delete-directory nested)
+    (delete-directory (expand-file-name "nested" dir)))
+  (with-temp-buffer
+    (insert text)
+    (let ((coding-system-for-write 'utf-8-unix)) (write-region (point-min) (point-max) file nil 'silent)))
+  (with-temp-buffer
+    (let ((coding-system-for-read 'utf-8-unix)) (insert-file-contents file))
+    (openstep-check (string= (buffer-string) text) "UTF-8 file round trip")
+    (goto-char (point-min))
+    (openstep-check (re-search-forward "OPEN[A-Z]+" nil t) "regexp search"))
+  (openstep-check (member "roundtrip.txt" (directory-files dir)) "BSD directory layout")
+  (openstep-check (string= (file-name-completion "round" dir) "roundtrip.txt") "filename completion")
+  (with-temp-file source
+    (insert ";;; -*- lexical-binding: t; -*-\n(defun openstep-compiled-probe (x) (+ x 2))\n"))
+  (openstep-check (byte-compile-file source) "byte compilation")
+  (load (concat source "c") nil t t)
+  (openstep-check (= (openstep-compiled-probe 40) 42) "bytecode execution")
+  (dotimes (i 10000) (make-list 100 i))
+  (garbage-collect)
+  (openstep-check (= (openstep-compiled-probe 40) 42) "execution after GC")
+  (require 'info)
+  (require 'dired)
+  (when (getenv "EMACS_TEST_INSTALLED")
+    (Info-find-node "emacs" "Top")
+    (openstep-check (string-match "Emacs" (buffer-string)) "installed Info manual"))
+  (openstep-check (> (length (documentation 'car)) 0) "installed DOC lookup")
+  (openstep-check (file-directory-p data-directory) "installed data directory")
+  (openstep-check (file-executable-p (expand-file-name "hexl" exec-directory)) "installed helper path")
+  (with-temp-buffer
+    (openstep-check (= (call-process "/bin/sh" nil t nil "-c" "printf sync-ok; exit 7") 7) "synchronous exit status")
+    (openstep-check (string= (buffer-string) "sync-ok") "synchronous output"))
+  (dolist (pty '(nil t))
+    (with-temp-buffer
+      (let* ((process-connection-type pty)
+             (proc (start-process "openstep-probe" (current-buffer) "/bin/sh" "-c" "echo async-ok; exit 7"))
+             (limit (+ (float-time) 15)))
+        (set-process-query-on-exit-flag proc nil)
+        (when pty (openstep-check (process-tty-name proc) "PTY allocation"))
+        (while (and (eq (process-status proc) 'run) (< (float-time) limit))
+          (accept-process-output proc 0.1))
+        (openstep-check (eq (process-status proc) 'exit) "asynchronous completion")
+        ;; The child can exit before its last output is dispatched.
+        (while (accept-process-output proc 0.1))
+        (openstep-check (= (process-exit-status proc) 7) "asynchronous exit status")
+        (openstep-check (string-match "async-ok" (buffer-string))
+                        (format "asynchronous output (pty=%s): %S" pty (buffer-string))))))
+  (let ((received "") server client)
+    (unwind-protect
+        (progn
+          (setq server
+                (make-network-process
+                 :name "openstep-listener" :server t :host "127.0.0.1"
+                 :family 'ipv4 :service t :noquery t
+                 :filter (lambda (proc text) (process-send-string proc text))))
+          (setq client
+                (make-network-process
+                 :name "openstep-client" :host "127.0.0.1" :family 'ipv4
+                 :service (process-contact server :service) :noquery t
+                 :filter (lambda (_proc text) (setq received (concat received text)))))
+          (process-send-string client "loopback-ok\n")
+          (let ((limit (+ (float-time) 5)))
+            (while (and (not (string-match "loopback-ok" received))
+                        (< (float-time) limit))
+              (accept-process-output nil 0.1)))
+          (openstep-check (string-match "loopback-ok" received) "TCP loopback"))
+      (dolist (proc (process-list))
+        (when (string-prefix-p "openstep-" (process-name proc))
+          (delete-process proc)))))
+  (let ((fired nil)
+        (start (float-time)))
+    (run-at-time 0.1 nil (lambda () (setq fired t)))
+    (while (and (not fired) (< (- (float-time) start) 5)) (sit-for 0.05))
+    (openstep-check fired "timer delivery")
+    (openstep-check (>= (- (float-time) start) 0.08) "timer delay"))
+  (princ "Emacs OPENSTEP self-test passed\n"))
+EMACS_SELFTEST
+"$EMACS" --version
+"$EMACS" --batch -Q -l "$test_dir/selftest.el"

@@ -1,0 +1,76 @@
+#!/bin/sh
+
+set -e
+
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC=/usr/local/bin/gcc-4.2
+CFLAGS='-O2 -march=i486'
+CPPFLAGS=-DNeXT
+CONFIG_SHELL=/usr/local/bin/ksh
+AWK=/usr/local/bin/gawk
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+SED=/bin/sed
+PKG_CONFIG=/bin/false
+SDL_CFLAGS=`/usr/local/bin/sdl-config --cflags`
+SDL_LIBS=`/usr/local/bin/sdl-config --libs | /bin/sed 's/-framework /-Wl,-framework,/g'`
+FRAMEWORKS='-Wl,-framework,AppKit -Wl,-framework,Foundation -Wl,-framework,SoundKit'
+export PATH CC CFLAGS CPPFLAGS CONFIG_SHELL AWK GREP EGREP SED
+export PKG_CONFIG SDL_CFLAGS SDL_LIBS
+
+. "$PKG_BUILD_HELPERS"
+
+if test -d "mpg123-$VERSION"; then
+    cd "mpg123-$VERSION"
+fi
+patch -p1 < "mpg123-$VERSION-openstep.patch"
+
+# Keep our -O2 flags: upstream's fast-math bundle produces instructions
+# rejected by the OPENSTEP assembler. Use SDL's installed config helper.
+run_configure \
+    --build=i386-next-openstep4 \
+    --prefix="$PREFIX" \
+    --disable-shared \
+    --enable-static \
+    --disable-modules \
+    --disable-dependency-tracking \
+    --with-cpu=generic_fpu \
+    --with-optimization=0 \
+    --with-audio=sdl
+
+# NeXT ar truncates long member names, losing the .o suffix. Libtool then
+# omits the SDL object while combining its convenience archive.
+/bin/sed 's/libdefaultmodule_la-sdl/sdl/g' Makefile > Makefile.openstep
+/bin/mv Makefile.openstep Makefile
+
+# Libtool does not propagate framework dependencies on this host.
+/bin/gnumake SHELL="$CONFIG_SHELL" LDFLAGS="$FRAMEWORKS"
+for app in mpg123 out123 mpg123-id3dump mpg123-strip
+do
+    /bin/csh -f /usr/local/bin/sdl-fix-macho-i486-subtype "src/$app"
+done
+/bin/gnumake SHELL="$CONFIG_SHELL" LDFLAGS="$FRAMEWORKS" install DESTDIR="$DESTDIR"
+
+for lib in mpg123 out123 syn123
+do
+    /bin/ranlib "$DESTDIR$PREFIX/lib/lib$lib.a"
+    # The .pc files provide static link flags; libtool's .la dependency
+    # records omit the native frameworks and are not useful to consumers.
+    /bin/rm -f "$DESTDIR$PREFIX/lib/lib$lib.la"
+done
+/bin/sed "s|^Libs.private:.*|Libs.private: -lm $SDL_LIBS|" \
+    "$DESTDIR$PREFIX/lib/pkgconfig/libout123.pc" > libout123.pc.openstep
+/usr/bin/install -c -m 644 libout123.pc.openstep \
+    "$DESTDIR$PREFIX/lib/pkgconfig/libout123.pc"
+
+DOCDIR=$DESTDIR$PREFIX/share/doc/mpg123
+test -d "$DESTDIR$PREFIX/share/doc" || /bin/mkdir "$DESTDIR$PREFIX/share/doc"
+test -d "$DOCDIR" || /bin/mkdir "$DOCDIR"
+for doc in COPYING AUTHORS NEWS
+do
+    /usr/bin/install -c -m 644 "$doc" "$DOCDIR/$doc"
+done
+/usr/bin/install -c -m 644 src/tests/sweep.mp3 "$DOCDIR/sweep.mp3"

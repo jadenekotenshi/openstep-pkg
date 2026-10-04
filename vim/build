@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:$PATH
+CC=/usr/local/bin/gcc-4.2
+CFLAGS='-O2 -g -std=gnu99'
+CPPFLAGS='-I/usr/local/include/ncurses -I/usr/local/include -I/NextDeveloper/Headers/bsd'
+LDFLAGS=-L/usr/local/lib
+GREP=/usr/local/bin/grep
+EGREP=/usr/local/bin/egrep
+AWK=/usr/local/bin/gawk
+CONFIG_SHELL=/usr/local/bin/ksh
+# The termios header exists without working functions. Use BSD tty handling.
+ac_cv_header_termios_h=no
+# OPENSTEP poll timeouts and strcoll are unusable; select/strcmp work.
+ac_cv_func_poll=no
+ac_cv_func_strcoll=no
+export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK CONFIG_SHELL
+export ac_cv_header_termios_h ac_cv_func_poll ac_cv_func_strcoll
+. "$PKG_BUILD_HELPERS"
+
+# Old gnutar leaves GitHub's pax_global_header beside the source directory.
+if [ ! -d src ]; then
+    cd "vim-$VERSION"
+fi
+patch -p1 < "vim-$VERSION-openstep.patch"
+cd src
+run_configure --prefix=/usr/local --with-features=huge \
+    --enable-gui=no --without-x --disable-nls --with-tlib=ncurses
+/bin/gnumake SHELL="$CONFIG_SHELL"
+/bin/gnumake install SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR"
+
+# vimtutor uses POSIX shell syntax that the stock /bin/sh cannot parse.
+sed '1s|.*|#!/usr/local/bin/ksh|' vimtutor > "$DESTDIR/usr/local/bin/vimtutor"
+chmod 755 "$DESTDIR/usr/local/bin/vimtutor"

@@ -12,6 +12,10 @@ esac
 
 VERSION=$2
 BUILDROOT=`pwd`
+if [ -f "$BUILDROOT/gcc/cp/cp-lang.c" ]; then
+    cd ..
+    BUILDROOT=`pwd`
+fi
 SRCDIR="$BUILDROOT/gcc-gcc-5666.3"
 # Keep redirection paths short: stock-built pdksh mishandles the long
 # expanded absolute filename under the package cache.
@@ -44,6 +48,7 @@ MAKEINFO=/usr/local/bin/makeinfo
 FLEX=/usr/local/bin/flex
 BISON=/usr/local/bin/bison
 BUILD_CFLAGS='-O2 -D_POSIX_SOURCE'
+BOOT_CFLAGS="$BUILD_CFLAGS --param ggc-min-expand=5 --param ggc-min-heapsize=4096"
 SEED_CFLAGS='-O0 -D_POSIX_SOURCE'
 CFLAGS=$BUILD_CFLAGS
 CXXFLAGS=$BUILD_CFLAGS
@@ -106,8 +111,8 @@ cd "$BUILDDIR"
 # Three native compiler stages, followed by GCC's stage-2/stage-3 comparison.
 # Stock cc cannot optimize insn-attrtab.c within this host's resources.
 # Optimize the two self-built stages and runtimes; compare stages 2 and 3.
-"$MAKE" SHELL="$CONFIG_SHELL" STAGE1_CFLAGS="$SEED_CFLAGS" \
-    BOOT_CFLAGS="$BUILD_CFLAGS" bootstrap
+"$MAKE" -j1 SHELL="$CONFIG_SHELL" STAGE1_CFLAGS="$SEED_CFLAGS" \
+    BOOT_CFLAGS="$BOOT_CFLAGS" bootstrap
 
 # Force a fresh comparison rather than accepting the existing comparison stamp.
 /bin/rm -f compare

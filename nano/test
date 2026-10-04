@@ -1,0 +1,210 @@
+#!/bin/sh
+set -e
+work=${TMPDIR-/tmp}/nano-pkg-test-$$
+mkdir "$work"
+trap 'result=$?; if test "$result" -ne 0; then tail -c 4000 "$work/terminal.log" 2>/dev/null; fi; rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+HOME=$work
+TERM=xterm
+TERMINFO="$LOCAL_ROOT/share/terminfo"
+export HOME TERM TERMINFO
+nano="$LOCAL_ROOT/bin/nano"
+"$nano" --version
+"$nano" --help > "$work/help"
+test -s "$work/help"
+test -f "$LOCAL_ROOT/share/man/man1/nano.1"
+test -f "$LOCAL_ROOT/share/nano/c.nanorc"
+echo "include \"$LOCAL_ROOT/share/nano/*.nanorc\"" > "$work/.nanorc"
+cat > "$work/pty-test.c" <<'EOF'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libc.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
+
+static int master, child;
+static FILE *transcript;
+
+static void cleanup(void)
+{
+    if (child > 0) {
+        kill(child, SIGKILL);
+        wait4(child, NULL, 0, NULL);
+        child = 0;
+    }
+}
+
+static void fail(const char *message)
+{
+    fprintf(stderr, "nano PTY test: %s\n", message);
+    cleanup();
+    exit(1);
+}
+
+static void pump(int tenths)
+{
+    char buffer[4096];
+    int i, count;
+    for (i = 0; i < tenths; i++) {
+        while ((count = read(master, buffer, sizeof(buffer))) > 0)
+            fwrite(buffer, 1, count, transcript);
+        fflush(transcript);
+        usleep(100000);
+    }
+}
+
+static void keys(const char *text)
+{
+    int length = strlen(text);
+    if (write(master, text, length) != length)
+        fail("could not send input");
+    pump(4);
+}
+
+static void start(const char *nano, const char *filename, int read_rcfile)
+{
+    char device[] = "/dev/ptyp0";
+    const char *bank, *unit;
+    struct winsize size;
+    int fd, found = 0;
+    for (bank = "pqrs"; *bank && !found; bank++) {
+        for (unit = "0123456789abcdef"; *unit; unit++) {
+            device[8] = *bank;
+            device[9] = *unit;
+            master = open(device, O_RDWR);
+            if (master >= 0) { found = 1; break; }
+        }
+    }
+    if (!found)
+        fail("no free BSD pseudo-terminal");
+    memset(&size, 0, sizeof(size));
+    size.ws_row = 24;
+    size.ws_col = 80;
+    ioctl(master, TIOCSWINSZ, &size);
+    device[5] = 't';
+    child = fork();
+    if (child < 0)
+        fail("fork failed");
+    if (child == 0) {
+        close(master);
+        fd = open("/dev/tty", O_RDWR);
+        if (fd >= 0) {
+            ioctl(fd, TIOCNOTTY, 0);
+            close(fd);
+        }
+        setpgrp(0, getpid());
+        fd = open(device, O_RDWR);
+        if (fd < 0) _exit(126);
+        dup2(fd, 0);
+        dup2(fd, 1);
+        dup2(fd, 2);
+        if (fd > 2) close(fd);
+        if (read_rcfile)
+            execl(nano, nano, "--nowrap", "--suspend", filename, NULL);
+        else
+            execl(nano, nano, "--ignorercfiles", "--nowrap", "--suspend", filename, NULL);
+        _exit(127);
+    }
+    fcntl(master, F_SETFL, FNDELAY);
+    pump(15);
+}
+
+static void finish(int expected)
+{
+    union wait status;
+    int i, result;
+    for (i = 0; i < 100; i++) {
+        pump(1);
+        result = wait4(child, &status, WNOHANG, NULL);
+        if (result == child) {
+            child = 0;
+            close(master);
+            if (!WIFEXITED(status) || status.w_retcode != expected)
+                fail("unexpected editor exit status");
+            return;
+        }
+    }
+    fail("editor did not exit");
+}
+
+static void contents(const char *filename, const char *expected)
+{
+    char buffer[4096];
+    FILE *file = fopen(filename, "rb");
+    size_t count;
+    if (!file) fail("output file missing");
+    count = fread(buffer, 1, sizeof(buffer) - 1, file);
+    buffer[count] = 0;
+    fclose(file);
+    if (strcmp(buffer, expected)) {
+        fprintf(stderr, "Unexpected contents in %s: <%s>\n", filename, buffer);
+        fail("saved text differs");
+    }
+}
+
+int main(int argc, char **argv)
+{
+    char filename[1024], savefile[1030];
+    struct winsize size;
+    union wait status;
+    int i, stopped = 0;
+    if (argc != 3) return 2;
+    transcript = fopen("terminal.log", "w");
+    if (!transcript) return 2;
+    sprintf(filename, "%s/edit.c", argv[2]);
+    start(argv[1], filename, 1);
+    keys("alpha beta\rsecond line");
+    keys("\017");
+    keys("\r");
+    keys("\030");
+    finish(0);
+    contents(filename, "alpha beta\nsecond line\n");
+
+    start(argv[1], filename, 0);
+    /* Search, append, undo, redo, and resize the actual editor. */
+    keys("\027beta\r");
+    keys("\005!");
+    keys("\033u");
+    keys("\033e");
+    memset(&size, 0, sizeof(size));
+    size.ws_row = 30; size.ws_col = 100;
+    ioctl(master, TIOCSWINSZ, &size);
+    kill(child, SIGWINCH);
+    pump(15);
+    keys("\032");
+    for (i = 0; i < 30; i++) {
+        if (wait4(child, &status, WNOHANG | WUNTRACED, NULL) == child) {
+            if (WIFSTOPPED(status)) { stopped = 1; break; }
+            child = 0;
+            fail("editor exited while suspending");
+        }
+        pump(1);
+    }
+    if (!stopped) fail("suspend did not stop editor");
+    kill(child, SIGCONT);
+    pump(15);
+    keys("\017");
+    keys("\r");
+    keys("\030");
+    finish(0);
+    contents(filename, "alpha beta!\nsecond line\n");
+
+    sprintf(filename, "%s/emergency.txt", argv[2]);
+    start(argv[1], filename, 0);
+    keys("emergency save");
+    kill(child, SIGTERM);
+    finish(1);
+    sprintf(savefile, "%s.save", filename);
+    contents(savefile, "emergency save\n");
+    fclose(transcript);
+    puts("nano PTY editing, search, undo/redo, resize, suspend/resume and emergency save passed");
+    return 0;
+}
+EOF
+"$LOCAL_ROOT/bin/gcc-4.2" -I/NextDeveloper/Headers/bsd \
+    "$work/pty-test.c" -o "$work/pty-test"
+cd "$work"
+./pty-test "$nano" "$work"
