@@ -1,0 +1,2090 @@
+--- a/build-aux/move-if-change
++++ b/build-aux/move-if-change
+@@ -66,12 +66,16 @@
+ 
+ test $# -eq 2 || { echo "$0: $usage" >&2; exit 1; }
+ 
+-if test -r "$2" && $cmpprog -- "$1" "$2" >/dev/null; then
+-  rm -f -- "$1"
++# Old BSD cmp does not recognize --.  Make option-like filenames explicit.
++case $1 in -*) set -- "./$1" "$2" ;; esac
++case $2 in -*) set -- "$1" "./$2" ;; esac
++
++if test -r "$2" && $cmpprog "$1" "$2" >/dev/null; then
++  rm -f "$1"
+ else
+-  if mv -f -- "$1" "$2"; then :; else
++  if mv -f "$1" "$2"; then :; else
+     # Ignore failure due to a concurrent move-if-change.
+-    test -r "$2" && $cmpprog -- "$1" "$2" >/dev/null && rm -f -- "$1"
++    test -r "$2" && $cmpprog "$1" "$2" >/dev/null && rm -f "$1"
+   fi
+ fi
+ 
+--- a/configure
++++ b/configure
+@@ -9099,6 +9099,7 @@
+ 
+ opsys='' unported=no
+ case "${canonical}" in
++  *-openstep* | *-nextstep* ) opsys=nextstep ;;
+ 
+   ## Android
+   *linux-android* )
+@@ -14599,6 +14600,7 @@
+ 
+ LIBS_SYSTEM=
+ case "$opsys" in
++  nextstep) LIBS_SYSTEM="-L/usr/local/lib -lcurl -lssl -lcrypto -lz" ;;
+   ## IBM's X11R5 uses -lIM and -liconv in AIX 3.2.2.
+   aix4-2) LIBS_SYSTEM="-lrts -lIM -liconv" ;;
+ 
+@@ -60277,6 +60279,25 @@
+ 
+ 
+ 
++# OPENSTEP needs the descriptor-to-directory mapping hooks used by
++# gnulib's fchdir emulation.  The matching objects are in lib/Makefile.in.
++if test "$opsys" = nextstep; then
++  GL_GNULIB_FCHDIR=1
++  HAVE_FCHDIR=0
++  HAVE_DECL_FCHDIR=0
++  REPLACE_FCHDIR=1
++  GL_GNULIB_CLOSE=1
++  REPLACE_CLOSE=1
++  GL_GNULIB_DUP=1
++  REPLACE_DUP=1
++  GL_GNULIB_DUP2=1
++  REPLACE_DUP2=1
++  GL_GNULIB_OPENDIR=1
++  REPLACE_OPENDIR=1
++  GL_GNULIB_CLOSEDIR=1
++  REPLACE_CLOSEDIR=1
++fi
++
+ : "${CONFIG_STATUS=./config.status}"
+ ac_write_fail=0
+ ac_clean_files_save=$ac_clean_files
+--- a/configure.ac
++++ b/configure.ac
+@@ -1413,6 +1413,7 @@
+ 
+ opsys='' unported=no
+ case "${canonical}" in
++  *-openstep* | *-nextstep* ) opsys=nextstep ;;
+ 
+   ## Android
+   *linux-android* )
+@@ -2278,6 +2279,7 @@
+ 
+ LIBS_SYSTEM=
+ case "$opsys" in
++  nextstep) LIBS_SYSTEM="-L/usr/local/lib -lcurl -lssl -lcrypto -lz" ;;
+   ## IBM's X11R5 uses -lIM and -liconv in AIX 3.2.2.
+   aix4-2) LIBS_SYSTEM="-lrts -lIM -liconv" ;;
+ 
+@@ -7939,6 +7941,25 @@
+ # configure.
+ ndk_CONFIG_FILES
+ 
++# OPENSTEP needs the descriptor-to-directory mapping hooks used by
++# gnulib's fchdir emulation.  The matching objects are in lib/Makefile.in.
++if test "$opsys" = nextstep; then
++  GL_GNULIB_FCHDIR=1
++  HAVE_FCHDIR=0
++  HAVE_DECL_FCHDIR=0
++  REPLACE_FCHDIR=1
++  GL_GNULIB_CLOSE=1
++  REPLACE_CLOSE=1
++  GL_GNULIB_DUP=1
++  REPLACE_DUP=1
++  GL_GNULIB_DUP2=1
++  REPLACE_DUP2=1
++  GL_GNULIB_OPENDIR=1
++  REPLACE_OPENDIR=1
++  GL_GNULIB_CLOSEDIR=1
++  REPLACE_CLOSEDIR=1
++fi
++
+ AC_OUTPUT
+ 
+ if test ! "$with_mailutils"; then
+--- a/lib/Makefile.in
++++ b/lib/Makefile.in
+@@ -57,6 +57,9 @@
+   include $(srcdir)/../nt/gnulib-cfg.mk
+ endif
+ include gnulib.mk
++ifeq ($(SYSTEM_TYPE),nextstep)
++  libgnu_a_SOURCES += openstep.c fchdir.c strtoull.c getaddrinfo.c
++endif
+ ifneq ($(SYSTEM_TYPE),windows-nt)
+   libgnu_a_SOURCES += openat-die.c save-cwd.c
+ endif
+--- a/lib/dirent.in.h
++++ b/lib/dirent.in.h
+@@ -22,7 +22,9 @@
+ @PRAGMA_COLUMNS@
+ 
+ /* The include_next requires a split double-inclusion guard.  */
+-#if @HAVE_DIRENT_H@
++#if defined NeXT
++# include "openstep-dirent.h"
++#elif @HAVE_DIRENT_H@
+ # @INCLUDE_NEXT@ @NEXT_DIRENT_H@
+ #endif
+ 
+--- /dev/null
++++ b/lib/fchdir.c
+@@ -0,0 +1,205 @@
++/* fchdir replacement.
++   Copyright (C) 2006-2026 Free Software Foundation, Inc.
++
++   This file is free software: you can redistribute it and/or modify
++   it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation, either version 3 of the
++   License, or (at your option) any later version.
++
++   This file is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public License
++   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
++
++#include <config.h>
++
++/* Specification.  */
++#include <unistd.h>
++
++#include <dirent.h>
++#include <errno.h>
++#include <fcntl.h>
++#include <stdlib.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/stat.h>
++
++#include <assert.h>
++#include "filename.h"
++
++
++#ifndef REPLACE_OPEN_DIRECTORY
++# define REPLACE_OPEN_DIRECTORY 0
++#endif
++
++/* This replacement assumes that a directory is not renamed while opened
++   through a file descriptor.
++
++   FIXME: On mingw, this would be possible to enforce if we were to
++   also open a HANDLE to each directory currently visited by a file
++   descriptor, since mingw refuses to rename any in-use file system
++   object.  */
++
++/* Array of file descriptors opened.  If REPLACE_OPEN_DIRECTORY or if it points
++   to a directory, it stores info about this directory.  */
++typedef struct
++{
++  char *name;       /* Absolute name of the directory, or NULL.  */
++} dir_info_t;
++static dir_info_t *dirs;
++static size_t dirs_allocated;
++
++/* Try to ensure dirs has enough room for a slot at index fd; free any
++   contents already in that slot.  Return false and set errno to
++   ENOMEM on allocation failure.  */
++static bool
++ensure_dirs_slot (size_t fd)
++{
++  if (fd < dirs_allocated)
++    free (dirs[fd].name);
++  else
++    {
++      size_t new_allocated = 2 * dirs_allocated + 1;
++      if (new_allocated <= fd)
++        new_allocated = fd + 1;
++      dir_info_t *new_dirs =
++        (dirs != NULL
++         ? (dir_info_t *) realloc (dirs, new_allocated * sizeof *dirs)
++         : (dir_info_t *) malloc (new_allocated * sizeof *dirs));
++      if (new_dirs == NULL)
++        return false;
++      memset (new_dirs + dirs_allocated, 0,
++              (new_allocated - dirs_allocated) * sizeof *dirs);
++      dirs = new_dirs;
++      dirs_allocated = new_allocated;
++    }
++  return true;
++}
++
++/* Return an absolute name of DIR in malloc'd storage.
++   Upon failure, return NULL with errno set.  */
++static char *
++get_name (char const *dir)
++{
++  if (IS_ABSOLUTE_FILE_NAME (dir))
++    return strdup (dir);
++
++  /* We often encounter "."; treat it as a special case.  */
++  char *cwd = getcwd (NULL, 0);
++  if (!cwd || (dir[0] == '.' && dir[1] == '\0'))
++    return cwd;
++
++  size_t a = strlen (cwd), b = strlen (dir);
++  char *result = malloc (a + b + 2);
++  if (result)
++    {
++      memcpy (result, cwd, a);
++      result[a] = '/';
++      memcpy (result + a + 1, dir, b + 1);
++    }
++  free (cwd);
++  return result;
++}
++
++/* Hook into the gnulib replacements for open() and close() to keep track
++   of the open file descriptors.  */
++
++/* Close FD, cleaning up any fd to name mapping if fd was visiting a
++   directory.  */
++void
++_gl_unregister_fd (int fd)
++{
++  if (fd >= 0 && fd < dirs_allocated)
++    {
++      free (dirs[fd].name);
++      dirs[fd].name = NULL;
++    }
++}
++
++/* Mark FD as visiting FILENAME.  FD must be non-negative, and refer
++   to an open file descriptor.  If REPLACE_OPEN_DIRECTORY is non-zero,
++   this should only be called if FD is visiting a directory.  Close FD
++   and return -1 with errno set if there is insufficient memory to track
++   the directory name; otherwise return FD.  */
++int
++_gl_register_fd (int fd, const char *filename)
++{
++  assert (0 <= fd);
++
++  struct stat statbuf;
++  if (REPLACE_OPEN_DIRECTORY
++      || (fstat (fd, &statbuf) == 0 && S_ISDIR (statbuf.st_mode)))
++    {
++      if (!ensure_dirs_slot (fd)
++          || (dirs[fd].name = get_name (filename)) == NULL)
++        {
++          int saved_errno = errno;
++          close (fd);
++          errno = saved_errno;
++          return -1;
++        }
++    }
++  return fd;
++}
++
++/* Mark NEWFD as a duplicate of OLDFD; useful from dup, dup2, dup3,
++   and fcntl.  Both arguments must be valid and distinct file
++   descriptors.  Close NEWFD and return -1 if OLDFD is tracking a
++   directory, but there is insufficient memory to track the same
++   directory in NEWFD; otherwise return NEWFD.  */
++int
++_gl_register_dup (int oldfd, int newfd)
++{
++  assert (0 <= oldfd && 0 <= newfd && oldfd != newfd);
++  if (oldfd < dirs_allocated && dirs[oldfd].name)
++    {
++      /* Duplicated a directory; must ensure newfd is allocated.  */
++      if (!ensure_dirs_slot (newfd)
++          || (dirs[newfd].name = strdup (dirs[oldfd].name)) == NULL)
++        {
++          int saved_errno = errno;
++          close (newfd);
++          errno = saved_errno;
++          newfd = -1;
++        }
++    }
++  else if (newfd < dirs_allocated)
++    {
++      /* Duplicated a non-directory; ensure newfd is cleared.  */
++      free (dirs[newfd].name);
++      dirs[newfd].name = NULL;
++    }
++  return newfd;
++}
++
++/* If FD is currently visiting a directory, then return the name of
++   that directory.  Otherwise, return NULL and set errno.  */
++const char *
++_gl_directory_name (int fd)
++{
++  if (0 <= fd && fd < dirs_allocated && dirs[fd].name != NULL)
++    return dirs[fd].name;
++  /* At this point, fd is either invalid, or open but not a directory.
++     If dup2 fails, errno is correctly EBADF.  */
++  if (0 <= fd)
++    {
++      if (dup2 (fd, fd) == fd)
++        errno = ENOTDIR;
++    }
++  else
++    errno = EBADF;
++  return NULL;
++}
++
++
++/* Implement fchdir() in terms of chdir().  */
++
++int
++fchdir (int fd)
++{
++  const char *name = _gl_directory_name (fd);
++  return name ? chdir (name) : -1;
++}
+--- /dev/null
++++ b/lib/getaddrinfo.c
+@@ -0,0 +1,578 @@
++/* Get address information (partial implementation).
++   Copyright (C) 1997, 2001-2002, 2004-2026 Free Software Foundation, Inc.
++   Contributed by Simon Josefsson <simon@josefsson.org>.
++
++   This file is free software: you can redistribute it and/or modify
++   it under the terms of the GNU Lesser General Public License as
++   published by the Free Software Foundation; either version 2.1 of the
++   License, or (at your option) any later version.
++
++   This file is distributed in the hope that it will be useful,
++   but WITHOUT ANY WARRANTY; without even the implied warranty of
++   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++   GNU Lesser General Public License for more details.
++
++   You should have received a copy of the GNU Lesser General Public License
++   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
++
++/* Don't use __attribute__ __nonnull__ in this compilation unit.  Otherwise gcc
++   optimizes away the sa == NULL test below.  */
++#define _GL_ARG_NONNULL(params)
++
++#include <config.h>
++#ifdef NeXT
++# define HAVE_IPV4 1
++# define HAVE_NETINET_IN_H 1
++#endif
++
++#include <netdb.h>
++
++#if HAVE_NETINET_IN_H
++# include <netinet/in.h>
++#endif
++
++/* Get inet_ntop.  */
++#include <arpa/inet.h>
++
++/* Get calloc. */
++#include <stdlib.h>
++
++/* Get memcpy, strdup. */
++#include <string.h>
++
++/* Get snprintf. */
++#include <stdio.h>
++
++/* BeOS has AF_INET, but not PF_INET.  */
++#ifndef PF_INET
++# define PF_INET AF_INET
++#endif
++/* BeOS also lacks PF_UNSPEC.  */
++#ifndef PF_UNSPEC
++# define PF_UNSPEC 0
++#endif
++
++#if defined __sun || !HAVE_GETADDRINFO
++
++static bool
++is_numeric_host (const char *host, int family)
++{
++# if HAVE_IPV4
++  if (family == PF_INET || family == PF_UNSPEC)
++    {
++      /* glibc supports IPv4 addresses in numbers-and-dots notation, that is,
++         also hexadecimal and octal number formats and formats that don't
++         require all four bytes to be explicitly written, via inet_aton().
++         But POSIX doesn't require support for these legacy formats.  Therefore
++         we are free to use inet_pton() instead of inet_aton().  */
++      struct in_addr addr;
++      if (inet_pton (AF_INET, host, &addr))
++        return true;
++    }
++# endif
++# if HAVE_IPV6
++  if (family == PF_INET6 || family == PF_UNSPEC)
++    {
++      struct in6_addr addr;
++      if (inet_pton (AF_INET6, host, &addr))
++        return true;
++    }
++# endif
++  return false;
++}
++
++#endif
++
++#if HAVE_GETADDRINFO
++
++/* Override with cdecl calling convention and Windows and Solaris 10 fixes.  */
++
++int
++getaddrinfo (const char *restrict nodename,
++             const char *restrict servname,
++             const struct addrinfo *restrict hints,
++             struct addrinfo **restrict res)
++# undef getaddrinfo
++{
++  /* Workaround for native Windows.  */
++  if (hints && (hints->ai_flags & AI_NUMERICSERV) != 0
++      && servname && !(*servname >= '0' && *servname <= '9'))
++    return EAI_NONAME;
++
++# ifdef __sun
++  /* Workaround for Solaris 10.  */
++  if (hints && (hints->ai_flags & AI_NUMERICHOST)
++      && nodename && !is_numeric_host (nodename, hints->ai_family))
++    return EAI_NONAME;
++# endif
++
++  return getaddrinfo (nodename, servname, hints, res);
++}
++
++void
++freeaddrinfo (struct addrinfo *ai)
++# undef freeaddrinfo
++{
++  freeaddrinfo (ai);
++}
++
++#else
++
++# if defined _WIN32 && !defined __CYGWIN__
++#  define WINDOWS_NATIVE
++# endif
++
++/* gl_sockets_startup */
++# ifdef WINDOWS_NATIVE
++#  include "sockets.h"
++# endif
++
++# ifdef WINDOWS_NATIVE
++
++/* Don't assume that UNICODE is not defined.  */
++#  undef GetModuleHandle
++#  define GetModuleHandle GetModuleHandleA
++
++#  if !(_WIN32_WINNT >= _WIN32_WINNT_WINXP)
++
++/* Avoid warnings from gcc -Wcast-function-type.  */
++#   define GetProcAddress \
++     (void *) GetProcAddress
++
++typedef int (WSAAPI *getaddrinfo_func) (const char*, const char*,
++                                        const struct addrinfo*,
++                                        struct addrinfo**);
++typedef void (WSAAPI *freeaddrinfo_func) (struct addrinfo*);
++typedef int (WSAAPI *getnameinfo_func) (const struct sockaddr*,
++                                        socklen_t, char*, DWORD,
++                                        char*, DWORD, int);
++
++static getaddrinfo_func getaddrinfo_ptr = NULL;
++static freeaddrinfo_func freeaddrinfo_ptr = NULL;
++static getnameinfo_func getnameinfo_ptr = NULL;
++
++static int
++use_win32_p (void)
++{
++  static int done = 0;
++
++  if (done)
++    return getaddrinfo_ptr ? 1 : 0;
++
++  done = 1;
++
++  HMODULE h = GetModuleHandle ("ws2_32.dll");
++
++  if (h)
++    {
++      getaddrinfo_ptr = (getaddrinfo_func) GetProcAddress (h, "getaddrinfo");
++      freeaddrinfo_ptr = (freeaddrinfo_func) GetProcAddress (h, "freeaddrinfo");
++      getnameinfo_ptr = (getnameinfo_func) GetProcAddress (h, "getnameinfo");
++    }
++
++  /* If either is missing, something is odd. */
++  if (!getaddrinfo_ptr || !freeaddrinfo_ptr || !getnameinfo_ptr)
++    {
++      getaddrinfo_ptr = NULL;
++      freeaddrinfo_ptr = NULL;
++      getnameinfo_ptr = NULL;
++      return 0;
++    }
++
++  gl_sockets_startup (SOCKETS_1_1);
++
++  return 1;
++}
++
++#  else
++
++static int
++use_win32_p (void)
++{
++  static int done = 0;
++
++  if (!done)
++    {
++      done = 1;
++
++      gl_sockets_startup (SOCKETS_1_1);
++    }
++
++  return 1;
++}
++
++#   define getaddrinfo_ptr getaddrinfo
++#   define freeaddrinfo_ptr freeaddrinfo
++#   define getnameinfo_ptr getnameinfo
++
++#  endif
++# endif
++
++static bool
++validate_family (int family)
++{
++  /* FIXME: Support more families. */
++# if HAVE_IPV4
++   if (family == PF_INET)
++     return true;
++# endif
++# if HAVE_IPV6
++   if (family == PF_INET6)
++     return true;
++# endif
++   if (family == PF_UNSPEC)
++     return true;
++   return false;
++}
++
++/* Translate name of a service location and/or a service name to set of
++   socket addresses. */
++int
++getaddrinfo (const char *restrict nodename,
++             const char *restrict servname,
++             const struct addrinfo *restrict hints,
++             struct addrinfo **restrict res)
++#undef getaddrinfo
++{
++# if HAVE_IPV6
++  struct v6_pair {
++    struct addrinfo addrinfo;
++    struct sockaddr_in6 sockaddr_in6;
++  };
++# endif
++# if HAVE_IPV4
++  struct v4_pair {
++    struct addrinfo addrinfo;
++    struct sockaddr_in sockaddr_in;
++  };
++# endif
++
++# ifdef WINDOWS_NATIVE
++  if (use_win32_p ())
++    {
++      if (hints && (hints->ai_flags & AI_NUMERICSERV) != 0
++          && servname && !(*servname >= '0' && *servname <= '9'))
++        return EAI_NONAME;
++      return getaddrinfo_ptr (nodename, servname, hints, res);
++    }
++# endif
++
++  if (hints
++      && (hints->ai_flags
++          & ~(AI_CANONNAME | AI_PASSIVE | AI_NUMERICHOST | AI_NUMERICSERV)))
++    /* FIXME: Support more flags. */
++    return EAI_BADFLAGS;
++
++  if (hints && !validate_family (hints->ai_family))
++    return EAI_FAMILY;
++
++  if (hints &&
++      hints->ai_socktype != SOCK_STREAM && hints->ai_socktype != SOCK_DGRAM)
++    /* FIXME: Support other socktype. */
++    return EAI_SOCKTYPE; /* FIXME: Better return code? */
++
++  if (nodename != NULL)
++    {
++      if (hints && (hints->ai_flags & AI_NUMERICHOST) != 0
++          && !is_numeric_host (nodename, hints->ai_family))
++        return EAI_NONAME;
++    }
++  else
++    {
++      if (!(hints->ai_flags & AI_PASSIVE))
++        return EAI_NONAME;
++
++# if HAVE_IPV6
++      nodename = (hints->ai_family == AF_INET6) ? "::" : "0.0.0.0";
++# else
++      nodename = "0.0.0.0";
++# endif
++    }
++
++  int port = 0;
++  if (servname)
++    {
++      struct servent *se = NULL;
++      const char *proto =
++        (hints && hints->ai_socktype == SOCK_DGRAM) ? "udp" : "tcp";
++
++      if (hints == NULL || !(hints->ai_flags & AI_NUMERICSERV))
++        /* FIXME: Use getservbyname_r if available. */
++        se = getservbyname (servname, proto);
++
++      if (!se)
++        {
++          char *c;
++          if (!(*servname >= '0' && *servname <= '9'))
++            return EAI_NONAME;
++          port = strtoul (servname, &c, 10);
++          if (*c || port > 0xffff)
++            return EAI_NONAME;
++          port = htons (port);
++        }
++      else
++        port = se->s_port;
++    }
++
++  /* OPENSTEP's resolver does not accept numeric addresses.  Keep numeric
++     requests (especially AI_NUMERICHOST) completely independent of DNS. */
++# ifdef NeXT
++  struct in_addr numeric;
++  struct hostent numeric_host;
++  char *numeric_addresses[2];
++  struct hostent *he;
++  if (inet_pton (AF_INET, nodename, &numeric) == 1)
++    {
++      memset (&numeric_host, 0, sizeof numeric_host);
++      numeric_addresses[0] = (char *) &numeric;
++      numeric_addresses[1] = NULL;
++      numeric_host.h_name = (char *) nodename;
++      numeric_host.h_addrtype = AF_INET;
++      numeric_host.h_length = sizeof numeric;
++      numeric_host.h_addr_list = numeric_addresses;
++      he = &numeric_host;
++    }
++  else
++    he = gethostbyname (nodename);
++# else
++  /* FIXME: Use gethostbyname_r if available. */
++  struct hostent *he = gethostbyname (nodename);
++# endif
++  if (!he || he->h_addr_list[0] == NULL)
++    return EAI_NONAME;
++
++  size_t size;
++  switch (he->h_addrtype)
++    {
++# if HAVE_IPV6
++    case PF_INET6:
++      size = sizeof (struct v6_pair);
++      break;
++# endif
++
++# if HAVE_IPV4
++    case PF_INET:
++      size = sizeof (struct v4_pair);
++      break;
++# endif
++
++    default:
++      return EAI_NODATA;
++    }
++
++  void *storage = calloc (1, size);
++  if (!storage)
++    return EAI_MEMORY;
++
++  struct addrinfo *tmp;
++  switch (he->h_addrtype)
++    {
++# if HAVE_IPV6
++    case PF_INET6:
++      {
++        struct v6_pair *p = storage;
++        struct sockaddr_in6 *sinp = &p->sockaddr_in6;
++        tmp = &p->addrinfo;
++
++        if (port)
++          sinp->sin6_port = port;
++
++        if (he->h_length != sizeof (sinp->sin6_addr))
++          {
++            free (storage);
++            return EAI_SYSTEM; /* FIXME: Better return code?  Set errno? */
++          }
++
++        memcpy (&sinp->sin6_addr, he->h_addr_list[0], sizeof sinp->sin6_addr);
++
++        tmp->ai_addr = (struct sockaddr *) sinp;
++        tmp->ai_addrlen = sizeof *sinp;
++      }
++      break;
++# endif
++
++# if HAVE_IPV4
++    case PF_INET:
++      {
++        struct v4_pair *p = storage;
++        struct sockaddr_in *sinp = &p->sockaddr_in;
++        tmp = &p->addrinfo;
++
++        if (port)
++          sinp->sin_port = port;
++
++        if (he->h_length != sizeof (sinp->sin_addr))
++          {
++            free (storage);
++            return EAI_SYSTEM; /* FIXME: Better return code?  Set errno? */
++          }
++
++        memcpy (&sinp->sin_addr, he->h_addr_list[0], sizeof sinp->sin_addr);
++
++        tmp->ai_addr = (struct sockaddr *) sinp;
++        tmp->ai_addrlen = sizeof *sinp;
++      }
++      break;
++# endif
++
++    default:
++      free (storage);
++      return EAI_NODATA;
++    }
++
++  if (hints && hints->ai_flags & AI_CANONNAME)
++    {
++      const char *cn;
++      if (he->h_name)
++        cn = he->h_name;
++      else
++        cn = nodename;
++
++      tmp->ai_canonname = strdup (cn);
++      if (!tmp->ai_canonname)
++        {
++          free (storage);
++          return EAI_MEMORY;
++        }
++    }
++
++  tmp->ai_protocol = (hints) ? hints->ai_protocol : 0;
++  tmp->ai_socktype = (hints) ? hints->ai_socktype : 0;
++  tmp->ai_addr->sa_family = he->h_addrtype;
++  tmp->ai_family = he->h_addrtype;
++
++# ifdef HAVE_STRUCT_SOCKADDR_SA_LEN
++  switch (he->h_addrtype)
++    {
++#  if HAVE_IPV4
++    case AF_INET:
++      tmp->ai_addr->sa_len = sizeof (struct sockaddr_in);
++      break;
++#  endif
++#  if HAVE_IPV6
++    case AF_INET6:
++      tmp->ai_addr->sa_len = sizeof (struct sockaddr_in6);
++      break;
++#  endif
++    }
++# endif
++
++  /* FIXME: If more than one address, create linked list of addrinfo's. */
++
++  *res = tmp;
++
++  return 0;
++}
++
++/* Free 'addrinfo' structure AI including associated storage.  */
++void
++freeaddrinfo (struct addrinfo *ai)
++#undef freeaddrinfo
++{
++# ifdef WINDOWS_NATIVE
++  if (use_win32_p ())
++    {
++      freeaddrinfo_ptr (ai);
++      return;
++    }
++# endif
++
++  while (ai)
++    {
++      struct addrinfo *cur = ai;
++      ai = ai->ai_next;
++
++      free (cur->ai_canonname);
++      free (cur);
++    }
++}
++
++int
++getnameinfo (const struct sockaddr *restrict sa, socklen_t salen,
++             char *restrict node, socklen_t nodelen,
++             char *restrict service, socklen_t servicelen,
++             int flags)
++#undef getnameinfo
++{
++# ifdef WINDOWS_NATIVE
++  if (use_win32_p ())
++    return getnameinfo_ptr (sa, salen, node, nodelen,
++                            service, servicelen, flags);
++# endif
++
++  /* FIXME: Support other flags. */
++  if ((node && nodelen > 0 && !(flags & NI_NUMERICHOST)) ||
++      (service && servicelen > 0 && !(flags & NI_NUMERICHOST)) ||
++      (flags & ~(NI_NUMERICHOST|NI_NUMERICSERV)))
++    return EAI_BADFLAGS;
++
++  if (sa == NULL || salen < sizeof (sa->sa_family))
++    return EAI_FAMILY;
++
++  switch (sa->sa_family)
++    {
++# if HAVE_IPV4
++    case AF_INET:
++      if (salen < sizeof (struct sockaddr_in))
++        return EAI_FAMILY;
++      break;
++# endif
++# if HAVE_IPV6
++    case AF_INET6:
++      if (salen < sizeof (struct sockaddr_in6))
++        return EAI_FAMILY;
++      break;
++# endif
++    default:
++      return EAI_FAMILY;
++    }
++
++  if (node && nodelen > 0 && flags & NI_NUMERICHOST)
++    {
++      switch (sa->sa_family)
++        {
++# if HAVE_IPV4
++        case AF_INET:
++          if (!inet_ntop (AF_INET,
++                          &(((const struct sockaddr_in *) sa)->sin_addr),
++                          node, nodelen))
++            return EAI_SYSTEM;
++          break;
++# endif
++
++# if HAVE_IPV6
++        case AF_INET6:
++          if (!inet_ntop (AF_INET6,
++                          &(((const struct sockaddr_in6 *) sa)->sin6_addr),
++                          node, nodelen))
++            return EAI_SYSTEM;
++          break;
++# endif
++
++        default:
++          return EAI_FAMILY;
++        }
++    }
++
++  if (service && servicelen > 0 && flags & NI_NUMERICSERV)
++    switch (sa->sa_family)
++      {
++# if HAVE_IPV4
++      case AF_INET:
++# endif
++# if HAVE_IPV6
++      case AF_INET6:
++# endif
++        {
++          unsigned short int port
++            = ntohs (((const struct sockaddr_in *) sa)->sin_port);
++          if (servicelen <= snprintf (service, servicelen, "%u", port))
++            return EAI_OVERFLOW;
++        }
++        break;
++      }
++
++  return 0;
++}
++
++#endif
+--- a/lib/inttypes.in.h
++++ b/lib/inttypes.in.h
+@@ -477,6 +477,10 @@
+ # else
+ #  define PRIXMAX "lX"
+ # endif
++#endif
++
++#ifdef NeXT
++extern uintmax_t strtoumax (const char *, char **, int);
+ #endif
+ 
+ #if !defined PRIdPTR
+--- a/lib/nproc.c
++++ b/lib/nproc.c
+@@ -22,6 +22,7 @@
+ 
+ #include <errno.h>
+ #include <limits.h>
++#include <stdio.h>
+ #if HAVE_SETMNTENT
+ # include <mntent.h>
+ #endif
+--- /dev/null
++++ b/lib/openstep-dirent.h
+@@ -0,0 +1,13 @@
++#ifndef EMACS_OPENSTEP_DIRENT_H
++#define EMACS_OPENSTEP_DIRENT_H
++/* libsys returns BSD directory entries even when the POSIX declaration
++   advertises a different layout.  Keep the native DIR stream type. */
++#define readdir openstep_posix_readdir_declaration
++#include <sys/dir.h>
++#undef readdir
++#define dirent direct
++extern struct direct *readdir (DIR *);
++/* Let gnulib supply the function, using the BSD DIR layout. */
++#undef DIR_TO_FD
++#define DIR_TO_FD(d) ((d)->dd_fd)
++#endif
+--- /dev/null
++++ b/lib/openstep-stdio.h
+@@ -0,0 +1,18 @@
++/* C99 formatting for OPENSTEP.  Included after gnulib's stdio declarations. */
++extern int snprintf (char *, size_t, const char *, ...);
++extern int vsnprintf (char *, size_t, const char *, va_list);
++extern int fseeko (FILE *, off_t, int);
++extern off_t ftello (FILE *);
++extern int openstep_printf (const char *, ...);
++extern int openstep_fprintf (FILE *, const char *, ...);
++extern int openstep_sprintf (char *, const char *, ...);
++extern int openstep_vprintf (const char *, va_list);
++extern int openstep_vfprintf (FILE *, const char *, va_list);
++extern int openstep_vsprintf (char *, const char *, va_list);
++/* The native formatter does not understand C99's j, z and t lengths. */
++#define printf openstep_printf
++#define fprintf openstep_fprintf
++#define sprintf openstep_sprintf
++#define vprintf openstep_vprintf
++#define vfprintf openstep_vfprintf
++#define vsprintf openstep_vsprintf
+--- /dev/null
++++ b/lib/openstep.c
+@@ -0,0 +1,453 @@
++/* OPENSTEP libc compatibility for Emacs and its helper programs.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++   This file is part of GNU Emacs, distributed under GPL version 3 or later. */
++#include <config.h>
++#ifdef NeXT
++#include <stdio.h>
++#include <stdarg.h>
++#include <stdlib.h>
++#include <string.h>
++#include <errno.h>
++#include <limits.h>
++#include <sys/param.h>
++#include <curl/mprintf.h>
++#include <unistd.h>
++#include <dirent.h>
++#include <stdint.h>
++#include <sys/wait.h>
++#include <sys/ioctl.h>
++#include <termios.h>
++#include <netdb.h>
++#include <signal.h>
++#include <fcntl.h>
++
++char *strdup (const char *s)
++{
++  size_t n = strlen (s) + 1;
++  char *copy = malloc (n);
++  if (copy) memcpy (copy, s, n);
++  return copy;
++}
++/* Preserve putenv's ownership contract: the caller owns the string. */
++extern char **environ;
++int putenv (char *entry)
++{
++  static char **owned;
++  char *equals = strchr (entry, '=');
++  size_t length = equals ? equals - entry : strlen (entry);
++  size_t count = 0, i;
++  char **replacement;
++  if (!length) { errno = EINVAL; return -1; }
++  while (environ && environ[count])
++    {
++      if (!strncmp (environ[count], entry, length) && environ[count][length] == '=')
++        {
++          if (equals) environ[count] = entry;
++          else do environ[count] = environ[count + 1]; while (environ[count++]);
++          return 0;
++        }
++      count++;
++    }
++  if (!equals) return 0;
++  if (count > SIZE_MAX / sizeof (char *) - 2) { errno = ENOMEM; return -1; }
++  replacement = malloc ((count + 2) * sizeof (char *));
++  if (!replacement) { errno = ENOMEM; return -1; }
++  for (i = 0; i < count; ++i) replacement[i] = environ[i];
++  replacement[count] = entry;
++  replacement[count + 1] = NULL;
++  if (environ == owned) free (owned);
++  owned = environ = replacement;
++  return 0;
++}
++
++/* POSIX signal masks use the same 32-bit representation as BSD masks. */
++int sigemptyset (sigset_t *set) { *set = 0; return 0; }
++int sigfillset (sigset_t *set) { *set = 0x7fffffff; return 0; }
++static int openstep_signal_valid (int sig)
++{ if (sig > 0 && sig < 32) return 1; errno = EINVAL; return 0; }
++int sigaddset (sigset_t *set, int sig)
++{ if (!openstep_signal_valid (sig)) return -1; *set |= 1U << (sig - 1); return 0; }
++int sigdelset (sigset_t *set, int sig)
++{ if (!openstep_signal_valid (sig)) return -1; *set &= ~(1U << (sig - 1)); return 0; }
++int sigismember (const sigset_t *set, int sig)
++{ return openstep_signal_valid (sig) ? !!(*set & (1U << (sig - 1))) : -1; }
++int sigprocmask (int how, const sigset_t *set, sigset_t *old)
++{
++  int previous;
++  if (!set) previous = sigblock (0);
++  else switch (how)
++    {
++    case SIG_BLOCK: previous = sigblock (*set); break;
++    case SIG_UNBLOCK: previous = sigsetmask (sigblock (0) & ~*set); break;
++    case SIG_SETMASK: previous = sigsetmask (*set); break;
++    default: errno = EINVAL; return -1;
++    }
++  if (old) *old = previous;
++  return 0;
++}
++int sigsuspend (const sigset_t *set) { return sigpause (*set); }
++int sigaction (int sig, const struct sigaction *action, struct sigaction *old)
++{
++  struct sigvec vector, previous;
++  int result;
++  if (action)
++    {
++      if (action->sa_flags & ~SA_RESTART) { errno = EINVAL; return -1; }
++      vector.sv_handler = action->sa_handler;
++      vector.sv_mask = action->sa_mask;
++      vector.sv_flags = action->sa_flags & SA_RESTART ? 0 : SV_INTERRUPT;
++    }
++  result = sigvec (sig, action ? &vector : NULL, old ? &previous : NULL);
++  if (!result && old)
++    {
++      old->sa_handler = previous.sv_handler;
++      old->sa_mask = previous.sv_mask;
++      old->sa_flags = previous.sv_flags & SV_INTERRUPT ? 0 : SA_RESTART;
++    }
++  return result;
++}
++extern int setpgrp (int, int);
++int setpgid (pid_t pid, pid_t group)
++{
++  if (pid < 0 || group < 0) { errno = EINVAL; return -1; }
++  if (!pid) pid = getpid ();
++  return setpgrp (pid, group ? group : pid);
++}
++pid_t setsid (void)
++{
++  pid_t pid = getpid ();
++  int fd;
++  if (getpgrp () == pid) { errno = EPERM; return -1; }
++  if (setpgrp (0, pid) < 0) return -1;
++  fd = open ("/dev/tty", O_RDWR);
++  if (fd >= 0) { ioctl (fd, TIOCNOTTY, 0); close (fd); }
++  return pid;
++}
++extern unsigned long long strtoull (const char *, char **, int);
++uintmax_t strtoumax (const char *s, char **end, int base)
++{ return strtoull (s, end, base); }
++
++/* Numeric IPv4 conversion for gnulib's resolver adapter.  Parsing never
++   consults DNS, and copies bytes only after the entire address is valid. */
++int inet_pton (int family, const char *text, void *address)
++{
++  unsigned char bytes[4];
++  int i;
++  if (family != AF_INET) { errno = EAFNOSUPPORT; return -1; }
++  for (i = 0; i < 4; ++i)
++    {
++      unsigned int value = 0, digits = 0;
++      while (*text >= '0' && *text <= '9')
++        {
++          value = value * 10 + *text++ - '0';
++          if (++digits > 3 || value > 255) return 0;
++        }
++      if (!digits) return 0;
++      bytes[i] = value;
++      if (i != 3) { if (*text++ != '.') return 0; }
++      else if (*text) return 0;
++    }
++  memcpy (address, bytes, 4);
++  return 1;
++}
++const char *inet_ntop (int family, const void *address, char *text, socklen_t size)
++{
++  const unsigned char *bytes = address;
++  char buffer[16];
++  int length;
++  if (family != AF_INET) { errno = EAFNOSUPPORT; return NULL; }
++  length = snprintf (buffer, sizeof buffer, "%u.%u.%u.%u",
++                     bytes[0], bytes[1], bytes[2], bytes[3]);
++  if (size <= length) { errno = ENOSPC; return NULL; }
++  memcpy (text, buffer, length + 1);
++  return text;
++}
++const char *gai_strerror (int code)
++{
++  switch (code)
++    {
++    case 0: return "Success";
++    case EAI_BADFLAGS: return "Invalid resolver flags";
++    case EAI_NONAME: return "Unknown host or service";
++    case EAI_AGAIN: return "Temporary name resolution failure";
++    case EAI_FAIL: return "Name resolution failed";
++    case EAI_NODATA: return "No address for host";
++    case EAI_FAMILY: case EAI_ADDRFAMILY: return "Unsupported address family";
++    case EAI_SOCKTYPE: return "Unsupported socket type";
++    case EAI_SERVICE: return "Unsupported service";
++    case EAI_MEMORY: return "Out of memory";
++    case EAI_SYSTEM: return "System error";
++    case EAI_OVERFLOW: return "Resolver buffer too small";
++    default: return "Unknown resolver error";
++    }
++}
++
++pid_t waitpid (pid_t pid, int *status, int options)
++{ return wait4 (pid, (union wait *) status, options, NULL); }
++/* Queries used by Emacs; other sysconf selectors remain unsupported. */
++long sysconf (int name)
++{
++  switch (name)
++    {
++    case _SC_ARG_MAX: return ARG_MAX;
++    case _SC_OPEN_MAX: return getdtablesize ();
++    default: errno = EINVAL; return -1;
++    }
++}
++/* OPENSTEP off_t and the native stdio offsets are both signed long. */
++typedef char openstep_off_t_fits_long[sizeof (off_t) == sizeof (long) ? 1 : -1];
++int fseeko (FILE *stream, off_t offset, int whence)
++{ return fseek (stream, offset, whence); }
++off_t ftello (FILE *stream)
++{ return ftell (stream); }
++pid_t tcgetpgrp (int fd)
++{
++  int group;
++  return ioctl (fd, TIOCGPGRP, &group) < 0 ? -1 : group;
++}
++int tcsetpgrp (int fd, pid_t group)
++{ return ioctl (fd, TIOCSPGRP, &group); }
++
++/* The kernel implements termios ioctls, but libsys omits these interfaces. */
++int tcgetattr (int fd, struct termios *attributes)
++{ return ioctl (fd, TIOCGETA, attributes); }
++int tcsetattr (int fd, int action, const struct termios *attributes)
++{
++  struct termios copy = *attributes;
++  unsigned long request;
++  if (action & TCSASOFT)
++    { copy.c_cflag |= CIGNORE; action &= ~TCSASOFT; }
++  switch (action)
++    {
++    case TCSANOW: request = TIOCSETA; break;
++    case TCSADRAIN: request = TIOCSETAW; break;
++    case TCSAFLUSH: request = TIOCSETAF; break;
++    default: errno = EINVAL; return -1;
++    }
++  return ioctl (fd, request, &copy);
++}
++speed_t cfgetispeed (const struct termios *attributes)
++{ return attributes->c_ispeed; }
++speed_t cfgetospeed (const struct termios *attributes)
++{ return attributes->c_ospeed; }
++int cfsetispeed (struct termios *attributes, int speed)
++{
++  if (speed < B0 || speed > B57600) { errno = EINVAL; return -1; }
++  attributes->c_ispeed = speed ? speed : attributes->c_ospeed;
++  return 0;
++}
++int cfsetospeed (struct termios *attributes, int speed)
++{
++  if (speed < B0 || speed > B57600) { errno = EINVAL; return -1; }
++  attributes->c_ospeed = speed;
++  return 0;
++}
++void cfmakeraw (struct termios *attributes)
++{
++  attributes->c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP | INLCR
++                           | IGNCR | ICRNL | IXON);
++  attributes->c_oflag &= ~OPOST;
++  attributes->c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
++  attributes->c_cflag = (attributes->c_cflag & ~(CSIZE | PARENB)) | CS8;
++  attributes->c_cc[VMIN] = 1;
++  attributes->c_cc[VTIME] = 0;
++}
++int tcdrain (int fd) { return ioctl (fd, TIOCDRAIN, 0); }
++int tcflush (int fd, int queue)
++{
++  int mask;
++  switch (queue)
++    {
++    case TCIFLUSH: mask = 1; break; /* FREAD */
++    case TCOFLUSH: mask = 2; break; /* FWRITE */
++    case TCIOFLUSH: mask = 3; break;
++    default: errno = EINVAL; return -1;
++    }
++  return ioctl (fd, TIOCFLUSH, &mask);
++}
++int tcflow (int fd, int action)
++{
++  struct termios attributes;
++  unsigned char byte;
++  ssize_t result;
++  if (action == TCOOFF) return ioctl (fd, TIOCSTOP, 0);
++  if (action == TCOON) return ioctl (fd, TIOCSTART, 0);
++  if (action != TCIOFF && action != TCION) { errno = EINVAL; return -1; }
++  if (tcgetattr (fd, &attributes) < 0) return -1;
++  byte = attributes.c_cc[action == TCIOFF ? VSTOP : VSTART];
++  if (byte == (unsigned char) -1) return 0;
++  do result = write (fd, &byte, 1); while (result < 0 && errno == EINTR);
++  return result == 1 ? 0 : -1;
++}
++
++/* Keep gnulib's directory descriptor metadata in step with libc. */
++#undef close
++#undef dup
++#undef opendir
++#undef closedir
++int rpl_close (int fd)
++{
++  int result = close (fd);
++  if (result >= 0) _gl_unregister_fd (fd);
++  return result;
++}
++int rpl_dup (int fd)
++{
++  int result = dup (fd);
++  return result < 0 ? result : _gl_register_dup (fd, result);
++}
++DIR *rpl_opendir (const char *name)
++{
++  DIR *dir = opendir (name);
++  if (dir && _gl_register_fd (dirfd (dir), name) < 0)
++    { closedir (dir); return NULL; }
++  return dir;
++}
++int rpl_closedir (DIR *dir)
++{
++  int fd = dirfd (dir);
++  int result = closedir (dir);
++  if (!result) _gl_unregister_fd (fd);
++  return result;
++}
++
++/* libcurl accepts ll and z, but not C99 j and t length modifiers.
++   On this 32-bit ABI intmax_t is long long and ptrdiff_t fits long. */
++static char *
++openstep_format (const char *format)
++{
++  size_t length = strlen (format);
++  char *result, *out;
++  int conversion = 0;
++  if (length > (size_t) INT_MAX / 2) { errno = EOVERFLOW; return NULL; }
++  result = malloc (2 * length + 1);
++  if (!result) { errno = ENOMEM; return NULL; }
++  out = result;
++  for (; *format; ++format)
++    {
++      int c = (unsigned char) *format;
++      if (!conversion) conversion = c == '%';
++      else if (c == 'j') { *out++ = 'l'; c = 'l'; }
++      else if (c == 't') c = 'l';
++      else if (strchr ("diouxXfFeEgGaAcspn%", c)) conversion = 0;
++      *out++ = c;
++    }
++  *out = 0;
++  return result;
++}
++
++int
++openstep_vfprintf (FILE *stream, const char *format, va_list ap)
++{
++  char *converted = openstep_format (format);
++  int count;
++  if (!converted) return -1;
++  count = curl_mvfprintf (stream, converted, ap);
++  free (converted);
++  return count;
++}
++
++int openstep_vprintf (const char *format, va_list ap)
++{ return openstep_vfprintf (stdout, format, ap); }
++
++int openstep_vsprintf (char *dst, const char *format, va_list ap)
++{
++  char *converted = openstep_format (format);
++  int count;
++  if (!converted) return -1;
++  count = curl_mvsprintf (dst, converted, ap);
++  free (converted);
++  return count;
++}
++
++int openstep_printf (const char *format, ...)
++{
++  va_list ap; int count;
++  va_start (ap, format);
++  count = openstep_vprintf (format, ap);
++  va_end (ap); return count;
++}
++int openstep_fprintf (FILE *stream, const char *format, ...)
++{
++  va_list ap; int count;
++  va_start (ap, format);
++  count = openstep_vfprintf (stream, format, ap);
++  va_end (ap); return count;
++}
++int openstep_sprintf (char *dst, const char *format, ...)
++{
++  va_list ap; int count;
++  va_start (ap, format);
++  count = openstep_vsprintf (dst, format, ap);
++  va_end (ap); return count;
++}
++
++/* libcurl's formatter returns the bytes stored, so retry in a growing
++   buffer to implement C99's untruncated result count.  Use that count,
++   rather than strlen, to preserve embedded NUL characters. */
++int
++vsnprintf (char *dst, size_t size, const char *format, va_list ap)
++{
++  size_t capacity = 128;
++  char *buffer;
++  int count, saved_errno = errno;
++  char *converted = openstep_format (format);
++  if (!converted) return -1;
++  for (;;)
++    {
++      va_list copy;
++      buffer = malloc (capacity);
++      if (!buffer) { free (converted); errno = ENOMEM; return -1; }
++      __builtin_va_copy (copy, ap);
++      count = curl_mvsnprintf (buffer, capacity, converted, copy);
++      va_end (copy);
++      if (count < 0) { free (buffer); free (converted); return -1; }
++      if ((size_t) count < capacity - 1) break;
++      free (buffer);
++      if (capacity > INT_MAX / 2)
++        { free (converted); errno = EOVERFLOW; return -1; }
++      capacity *= 2;
++    }
++  if (size)
++    {
++      size_t n = (size_t) count < size - 1 ? count : size - 1;
++      memcpy (dst, buffer, n);
++      dst[n] = 0;
++    }
++  free (buffer);
++  free (converted);
++  errno = saved_errno;
++  return count;
++}
++
++int
++snprintf (char *dst, size_t size, const char *format, ...)
++{
++  va_list ap;
++  int count;
++  va_start (ap, format);
++  count = vsnprintf (dst, size, format, ap);
++  va_end (ap);
++  return count;
++}
++
++extern char *getwd (char *);
++char *
++getcwd (char *buffer, size_t size)
++{
++  char path[MAXPATHLEN + 1];
++  size_t length;
++  if (!getwd (path)) return NULL;
++  length = strlen (path) + 1;
++  if (!buffer)
++    {
++      if (!size) size = length;
++      if (size < length) { errno = ERANGE; return NULL; }
++      buffer = malloc (size);
++      if (!buffer) { errno = ENOMEM; return NULL; }
++    }
++  else if (size < length) { errno = size ? ERANGE : EINVAL; return NULL; }
++  memcpy (buffer, path, length);
++  return buffer;
++}
++#endif
+--- a/lib/signal.in.h
++++ b/lib/signal.in.h
+@@ -523,6 +523,11 @@
+ # define SA_NODEFER 0
+ #endif
+ 
++#if defined NeXT && !defined SA_RESTART
++/* Private flag translated to the inverse of BSD SV_INTERRUPT. */
++# define SA_RESTART 0x1000
++#endif
++
+ 
+ #endif /* _@GUARD_PREFIX@_SIGNAL_H */
+ #endif /* _@GUARD_PREFIX@_SIGNAL_H */
+--- a/lib/stdio.in.h
++++ b/lib/stdio.in.h
+@@ -2141,6 +2141,9 @@
+                       "POSIX compliance");
+ #endif
+ 
++#ifdef NeXT
++# include "openstep-stdio.h"
++#endif
+ #endif /* _@GUARD_PREFIX@_STDIO_H */
+ #endif /* _@GUARD_PREFIX@_STDIO_H */
+ #endif
+--- a/lib/stdlib.in.h
++++ b/lib/stdlib.in.h
+@@ -1980,6 +1980,10 @@
+ 
+ /* MirBSD 10 defines WEXITSTATUS in <sys/wait.h>, not in <stdlib.h>.
+    glibc 2.41 defines WCOREDUMP in <sys/wait.h>, not in <stdlib.h>.  */
++#ifdef NeXT
++extern int putenv (char *);
++#endif
++
+ #if @GNULIB_SYSTEM_POSIX@ && !(defined WEXITSTATUS && defined WCOREDUMP)
+ # include <sys/wait.h>
+ #endif
+--- a/lib/string.in.h
++++ b/lib/string.in.h
+@@ -1823,6 +1823,9 @@
+ 
+ _GL_INLINE_HEADER_END
+ 
++#ifdef NeXT
++extern char *strdup (const char *);
++#endif
+ #endif /* _@GUARD_PREFIX@_STRING_H */
+ #endif /* _@GUARD_PREFIX@_STRING_H */
+ #endif
+--- /dev/null
++++ b/lib/strtoull.c
+@@ -0,0 +1,4 @@
++/* Instantiate the bundled gnulib integer parser for unsigned long long. */
++#define QUAD 1
++#define UNSIGNED 1
++#include "strtol.c"
+--- /dev/null
++++ b/openstep/langinfo.h
+@@ -0,0 +1,7 @@
++#ifndef EMACS_OPENSTEP_LANGINFO_H
++#define EMACS_OPENSTEP_LANGINFO_H
++typedef int nl_item;
++#define CODESET 1
++static __inline__ char *nl_langinfo (nl_item item)
++{ return item == CODESET ? "US-ASCII" : ""; }
++#endif
+--- /dev/null
++++ b/openstep/math.h
+@@ -0,0 +1,84 @@
++#ifndef EMACS_OPENSTEP_MATH_H
++#define EMACS_OPENSTEP_MATH_H
++
++#include_next <math.h>
++#ifndef INFINITY
++#if defined __GNUC__ && __GNUC__ >= 4
++#define INFINITY (__builtin_inff ())
++#else
++#define INFINITY ((float) HUGE_VAL)
++#endif
++#endif
++#include <limits.h>
++#include <float.h>
++
++#ifndef isnan
++static __inline__ int openstep_isnan (double x) { return x != x; }
++#define isnan openstep_isnan
++#endif
++#ifndef isfinite
++static __inline__ int openstep_isfinite (double x)
++{ return -DBL_MAX <= x && x <= DBL_MAX; }
++#define isfinite openstep_isfinite
++#endif
++#ifndef isinf
++static __inline__ int openstep_isinf (double x)
++{ return x < -DBL_MAX || x > DBL_MAX; }
++#define isinf openstep_isinf
++#endif
++
++/* OPENSTEP libsys provides these BSD entry points, but hides their
++   declarations when _POSIX_SOURCE is defined. */
++extern double rint (double);
++extern double copysign (double, double);
++
++static __inline__ double
++openstep_scalbn (double x, int n)
++{
++  return ldexp (x, n);
++}
++
++static __inline__ double
++openstep_trunc (double x)
++{
++  return copysign (floor (fabs (x)), x);
++}
++
++static __inline__ long
++openstep_lrint (double x)
++{
++  return (long) rint (x);
++}
++
++static __inline__ long
++openstep_lround (double x)
++{
++  return (long) (x < 0 ? ceil (x - 0.5) : floor (x + 0.5));
++}
++
++static __inline__ int
++openstep_ilogb (double x)
++{
++  int exponent;
++  if (x == 0 || x != x)
++    return INT_MIN;
++  if (x > DBL_MAX || x < -DBL_MAX)
++    return INT_MAX;
++  frexp (x, &exponent);
++  return exponent - 1;
++}
++
++static __inline__ float
++openstep_powf (float x, float y)
++{
++  return (float) pow (x, y);
++}
++
++#define scalbn openstep_scalbn
++#define trunc openstep_trunc
++#define lrint openstep_lrint
++#define lround openstep_lround
++#define ilogb openstep_ilogb
++#define powf openstep_powf
++
++#endif
+--- /dev/null
++++ b/openstep/netdb.h
+@@ -0,0 +1,43 @@
++#ifndef EMACS_OPENSTEP_NETDB_H
++#define EMACS_OPENSTEP_NETDB_H
++#include <sys/types.h>
++#include <sys/socket.h>
++#include <netinet/in.h>
++#include_next <netdb.h>
++/* Definitions used by gnulib's IPv4 getaddrinfo fallback. */
++struct addrinfo
++{
++  int ai_flags, ai_family, ai_socktype, ai_protocol;
++  socklen_t ai_addrlen;
++  struct sockaddr *ai_addr;
++  char *ai_canonname;
++  struct addrinfo *ai_next;
++};
++#define AI_PASSIVE 1
++#define AI_CANONNAME 2
++#define AI_NUMERICHOST 4
++#define AI_NUMERICSERV 0x400
++#define AI_ADDRCONFIG 0
++#define EAI_BADFLAGS -1
++#define EAI_NONAME -2
++#define EAI_AGAIN -3
++#define EAI_FAIL -4
++#define EAI_NODATA -5
++#define EAI_FAMILY -6
++#define EAI_SOCKTYPE -7
++#define EAI_SERVICE -8
++#define EAI_ADDRFAMILY -9
++#define EAI_MEMORY -10
++#define EAI_SYSTEM -11
++#define EAI_OVERFLOW -12
++#define NI_NUMERICHOST 1
++#define NI_NUMERICSERV 2
++extern int getaddrinfo (const char *, const char *, const struct addrinfo *,
++                        struct addrinfo **);
++extern void freeaddrinfo (struct addrinfo *);
++extern const char *gai_strerror (int);
++extern int getnameinfo (const struct sockaddr *, socklen_t, char *, socklen_t,
++                        char *, socklen_t, int);
++extern int inet_pton (int, const char *, void *);
++extern const char *inet_ntop (int, const void *, char *, socklen_t);
++#endif
+--- /dev/null
++++ b/openstep/netinet/in.h
+@@ -0,0 +1,18 @@
++#ifndef EMACS_OPENSTEP_NETINET_IN_H
++#define EMACS_OPENSTEP_NETINET_IN_H
++#include_next <netinet/in.h>
++/* Native tcp.h needs these, but the user headers do not define them. */
++#ifndef BYTE_ORDER
++#define LITTLE_ENDIAN 1234
++#define BIG_ENDIAN 4321
++#if defined __i386__
++#define BYTE_ORDER LITTLE_ENDIAN
++#else
++#error This compatibility layer currently targets OPENSTEP i386.
++#endif
++#endif
++extern unsigned short htons (unsigned short);
++extern unsigned short ntohs (unsigned short);
++extern unsigned long htonl (unsigned long);
++extern unsigned long ntohl (unsigned long);
++#endif
+--- /dev/null
++++ b/openstep/stdint.h
+@@ -0,0 +1,129 @@
++#ifndef EMACS_OPENSTEP_STDINT_H
++#define EMACS_OPENSTEP_STDINT_H
++/* Integer types for the OPENSTEP i386 ABI, including configure probes. */
++#include <limits.h>
++typedef signed char int8_t;
++typedef unsigned char uint8_t;
++typedef short int16_t;
++typedef unsigned short uint16_t;
++typedef int int32_t;
++typedef unsigned int uint32_t;
++typedef long long int64_t;
++typedef unsigned long long uint64_t;
++typedef long intptr_t;
++typedef unsigned long uintptr_t;
++typedef long long intmax_t;
++typedef unsigned long long uintmax_t;
++typedef int8_t int_least8_t;
++typedef uint8_t uint_least8_t;
++typedef int16_t int_least16_t;
++typedef uint16_t uint_least16_t;
++typedef int32_t int_least32_t;
++typedef uint32_t uint_least32_t;
++typedef int64_t int_least64_t;
++typedef uint64_t uint_least64_t;
++typedef int8_t int_fast8_t;
++typedef uint8_t uint_fast8_t;
++typedef int int_fast16_t;
++typedef unsigned int uint_fast16_t;
++typedef int int_fast32_t;
++typedef unsigned int uint_fast32_t;
++typedef int64_t int_fast64_t;
++typedef uint64_t uint_fast64_t;
++#define INT8_MIN (-127-1)
++#define INT8_MAX 127
++#define UINT8_MAX 255U
++#define INT16_MIN (-32767-1)
++#define INT16_MAX 32767
++#define UINT16_MAX 65535U
++#define INT32_MIN (-2147483647-1)
++#define INT32_MAX 2147483647
++#define UINT32_MAX 4294967295U
++#define INT64_MIN (-9223372036854775807LL-1)
++#define INT64_MAX 9223372036854775807LL
++#define UINT64_MAX 18446744073709551615ULL
++#define INTPTR_MIN LONG_MIN
++#define INTPTR_MAX LONG_MAX
++#define UINTPTR_MAX ULONG_MAX
++#define INTMAX_MIN INT64_MIN
++#define INTMAX_MAX INT64_MAX
++#define UINTMAX_MAX UINT64_MAX
++#define PTRDIFF_MIN INT32_MIN
++#define PTRDIFF_MAX INT32_MAX
++#define SIZE_MAX UINT32_MAX
++#define INT_LEAST8_MIN INT8_MIN
++#define INT_LEAST8_MAX INT8_MAX
++#define UINT_LEAST8_MAX UINT8_MAX
++#define INT_LEAST16_MIN INT16_MIN
++#define INT_LEAST16_MAX INT16_MAX
++#define UINT_LEAST16_MAX UINT16_MAX
++#define INT_LEAST32_MIN INT32_MIN
++#define INT_LEAST32_MAX INT32_MAX
++#define UINT_LEAST32_MAX UINT32_MAX
++#define INT_LEAST64_MIN INT64_MIN
++#define INT_LEAST64_MAX INT64_MAX
++#define UINT_LEAST64_MAX UINT64_MAX
++#define INT_FAST8_MIN INT8_MIN
++#define INT_FAST8_MAX INT8_MAX
++#define UINT_FAST8_MAX UINT8_MAX
++#define INT_FAST16_MIN INT32_MIN
++#define INT_FAST16_MAX INT32_MAX
++#define UINT_FAST16_MAX UINT32_MAX
++#define INT_FAST32_MIN INT32_MIN
++#define INT_FAST32_MAX INT32_MAX
++#define UINT_FAST32_MAX UINT32_MAX
++#define INT_FAST64_MIN INT64_MIN
++#define INT_FAST64_MAX INT64_MAX
++#define UINT_FAST64_MAX UINT64_MAX
++#define INT8_C(x) x
++#define UINT8_C(x) x
++#define INT16_C(x) x
++#define UINT16_C(x) x
++#define INT32_C(x) x
++#define UINT32_C(x) x##U
++#define INT64_C(x) x##LL
++#define UINT64_C(x) x##ULL
++#define INTMAX_C(x) x##LL
++#define UINTMAX_C(x) x##ULL
++#ifndef WCHAR_MIN
++#define WCHAR_MIN 0
++#define WCHAR_MAX 65535U
++#endif
++#define WINT_MIN 0U
++#define WINT_MAX UINT32_MAX
++#define SIG_ATOMIC_MIN SCHAR_MIN
++#define SIG_ATOMIC_MAX SCHAR_MAX
++#define INT8_WIDTH 8
++#define UINT8_WIDTH 8
++#define INT16_WIDTH 16
++#define UINT16_WIDTH 16
++#define INT32_WIDTH 32
++#define UINT32_WIDTH 32
++#define INT64_WIDTH 64
++#define UINT64_WIDTH 64
++#define INT_LEAST8_WIDTH 8
++#define UINT_LEAST8_WIDTH 8
++#define INT_LEAST16_WIDTH 16
++#define UINT_LEAST16_WIDTH 16
++#define INT_LEAST32_WIDTH 32
++#define UINT_LEAST32_WIDTH 32
++#define INT_LEAST64_WIDTH 64
++#define UINT_LEAST64_WIDTH 64
++#define INT_FAST8_WIDTH 8
++#define UINT_FAST8_WIDTH 8
++#define INT_FAST16_WIDTH 32
++#define UINT_FAST16_WIDTH 32
++#define INT_FAST32_WIDTH 32
++#define UINT_FAST32_WIDTH 32
++#define INT_FAST64_WIDTH 64
++#define UINT_FAST64_WIDTH 64
++#define INTPTR_WIDTH 32
++#define UINTPTR_WIDTH 32
++#define INTMAX_WIDTH 64
++#define UINTMAX_WIDTH 64
++#define PTRDIFF_WIDTH 32
++#define SIZE_WIDTH 32
++#define WCHAR_WIDTH 16
++#define WINT_WIDTH 32
++#define SIG_ATOMIC_WIDTH 8
++#endif
+--- /dev/null
++++ b/openstep/sys/resource.h
+@@ -0,0 +1,5 @@
++#ifndef EMACS_OPENSTEP_RESOURCE_H
++#define EMACS_OPENSTEP_RESOURCE_H
++#include_next <sys/resource.h>
++typedef int rlim_t;
++#endif
+--- /dev/null
++++ b/openstep/sys/socket.h
+@@ -0,0 +1,11 @@
++#ifndef EMACS_OPENSTEP_SOCKET_H
++#define EMACS_OPENSTEP_SOCKET_H
++#include_next <sys/socket.h>
++/* Large and aligned enough for OPENSTEP IPv4 and Unix socket addresses. */
++struct sockaddr_storage
++{
++  unsigned short ss_family;
++  char padding[122];
++  unsigned long alignment;
++};
++#endif
+--- /dev/null
++++ b/openstep/termios.h
+@@ -0,0 +1,15 @@
++#ifndef EMACS_OPENSTEP_TERMIOS_H
++#define EMACS_OPENSTEP_TERMIOS_H
++#include_next <termios.h>
++#ifndef TAB3
++#define TAB3 XTABS
++#endif
++/* The native cfsetspeed returns void.  Use the checked POSIX setters. */
++static inline int
++openstep_cfsetspeed (struct termios *attributes, speed_t speed)
++{
++  int result = cfsetispeed (attributes, speed);
++  return result ? result : cfsetospeed (attributes, speed);
++}
++#define cfsetspeed openstep_cfsetspeed
++#endif
+--- /dev/null
++++ b/openstep/unistd.h
+@@ -0,0 +1,17 @@
++#ifndef EMACS_OPENSTEP_UNISTD_H
++/* The POSIX declaration disagrees with libsys's BSD getpgrp(pid) ABI. */
++#define getpgrp openstep_posix_getpgrp_declaration
++#endif
++/* Gnulib deliberately includes this twice while bypassing its own wrapper. */
++#include_next <unistd.h>
++#ifndef EMACS_OPENSTEP_UNISTD_H
++#define EMACS_OPENSTEP_UNISTD_H
++#undef getpgrp
++extern int getpgrp (int);
++static inline int openstep_getpgrp (void) { return getpgrp (0); }
++#define getpgrp openstep_getpgrp
++
++/* libsys exports these BSD interfaces, but the POSIX headers omit them. */
++extern int getdtablesize (void);
++extern int getpagesize (void);
++#endif
+--- /dev/null
++++ b/openstep/wchar.h
+@@ -0,0 +1,42 @@
++#ifndef EMACS_OPENSTEP_WCHAR_H
++#define EMACS_OPENSTEP_WCHAR_H
++/* OPENSTEP has a single-byte C locale.  Emacs performs its own Unicode
++   conversion; these interfaces serve the bundled POSIX regex library. */
++#include <stddef.h>
++#include <limits.h>
++#include <errno.h>
++#include <stdio.h>
++typedef unsigned int wint_t;
++#ifndef mbstate_t
++typedef int mbstate_t;
++#endif
++#define WEOF ((wint_t) -1)
++#ifndef WCHAR_MIN
++#define WCHAR_MIN 0
++#define WCHAR_MAX 65535U
++#endif
++#ifndef WINT_MIN
++#define WINT_MIN 0U
++#define WINT_MAX UINT_MAX
++#endif
++
++static __inline__ int mbsinit (const mbstate_t *s) { return 1; }
++static __inline__ wint_t btowc (int c)
++{ return c == EOF || (unsigned int) c > UCHAR_MAX ? WEOF : c; }
++static __inline__ size_t
++mbrtowc (wchar_t *wc, const char *s, size_t n, mbstate_t *state)
++{
++  if (!s) return 0;
++  if (!n) return (size_t) -2;
++  if (wc) *wc = (unsigned char) *s;
++  return *s ? 1 : 0;
++}
++static __inline__ size_t
++wcrtomb (char *s, wchar_t wc, mbstate_t *state)
++{
++  if (!s) return 1;
++  if ((unsigned int) wc > UCHAR_MAX) { errno = EILSEQ; return (size_t) -1; }
++  *s = (char) wc;
++  return 1;
++}
++#endif
+--- /dev/null
++++ b/openstep/wctype.h
+@@ -0,0 +1,44 @@
++#ifndef EMACS_OPENSTEP_WCTYPE_H
++#define EMACS_OPENSTEP_WCTYPE_H
++#include <wchar.h>
++#include <ctype.h>
++#include <string.h>
++typedef unsigned int wctype_t;
++static __inline__ wctype_t wctype (const char *name)
++{
++  static const char *const names[] = {
++    "alnum", "alpha", "blank", "cntrl", "digit", "graph",
++    "lower", "print", "punct", "space", "upper", "xdigit"
++  };
++  unsigned int i;
++  for (i = 0; i < sizeof names / sizeof names[0]; ++i)
++    if (!strcmp (name, names[i])) return i + 1;
++  return 0;
++}
++static __inline__ int iswctype (wint_t wc, wctype_t type)
++{
++  int c;
++  if (wc > UCHAR_MAX) return 0;
++  c = (unsigned char) wc;
++  switch (type) {
++  case 1: return isalnum (c);
++  case 2: return isalpha (c);
++  case 3: return c == ' ' || c == '\t';
++  case 4: return iscntrl (c);
++  case 5: return isdigit (c);
++  case 6: return isgraph (c);
++  case 7: return islower (c);
++  case 8: return isprint (c);
++  case 9: return ispunct (c);
++  case 10: return isspace (c);
++  case 11: return isupper (c);
++  case 12: return isxdigit (c);
++  default: return 0;
++  }
++}
++static __inline__ int iswalnum (wint_t c) { return iswctype (c, 1); }
++static __inline__ wint_t towlower (wint_t c)
++{ return c <= UCHAR_MAX ? tolower ((unsigned char) c) : c; }
++static __inline__ wint_t towupper (wint_t c)
++{ return c <= UCHAR_MAX ? toupper ((unsigned char) c) : c; }
++#endif
+--- a/src/conf_post.h
++++ b/src/conf_post.h
+@@ -27,6 +27,18 @@
+    include file other than assert.h.  */
+ #if !defined ENABLE_CHECKING && !defined NDEBUG
+ # define NDEBUG
++#endif
++
++/* The gnulib stdint.h fallback uses long for intptr_t.  Its partial
++   inttypes module expects this prefix from the system's C library. */
++#if defined NeXT && !defined __PRIPTR_PREFIX
++# define __PRIPTR_PREFIX "l"
++#endif
++#ifdef NeXT
++# define REPLACE_FCHDIR 1
++# define FIRST_PTY_LETTER 'p'
++# define HAVE_SNPRINTF 1
++# undef HAVE_SYS_UTSNAME_H
+ #endif
+ 
+ /* To help make dependencies clearer elsewhere, this file typically
+@@ -225,7 +237,7 @@
+ #define DECLARE_POINTER_ALIAS(name, type, addr) \
+   type _GL_ATTRIBUTE_MAY_ALIAS *name = (type *) (addr)
+ 
+-#if 3 <= __GNUC__
++#if 3 <= __GNUC__ && !defined NeXT
+ # define ATTRIBUTE_SECTION(name) __attribute__ ((section (name)))
+ #else
+ # define ATTRIBUTE_SECTION(name)
+--- a/src/floatfns.c
++++ b/src/floatfns.c
+@@ -510,7 +510,7 @@
+ }
+ #endif
+ 
+-#ifndef HAVE_TRUNC
++#if !defined HAVE_TRUNC && !defined trunc
+ double
+ trunc (double d)
+ {
+--- a/src/process.c
++++ b/src/process.c
+@@ -52,7 +52,9 @@
+ /* If NOFILE_LIMIT.rlim_cur is greater than FD_SETSIZE, then
+    NOFILE_LIMIT is the initial limit on the number of open files,
+    which should be restored in child processes.  */
++#ifdef RLIMIT_NOFILE
+ static struct rlimit nofile_limit;
++#endif
+ #endif
+ 
+ #ifdef subprocesses
+@@ -2106,6 +2108,14 @@
+ 
+ /* If *FD_ADDR is nonnegative, close it, and mark it as closed.  */
+ 
++#ifdef NeXT
++static void
++openstep_pty_close_wakeup (struct atimer *timer)
++{
++  /* The signal itself releases OPENSTEP's blocked tty close.  */
++}
++#endif
++
+ static void
+ close_process_fd (int *fd_addr)
+ {
+@@ -2310,8 +2320,26 @@
+       /* vfork succeeded.  */
+ 
+       /* Close the pipe ends that the child uses, or the child's pty.  */
++#ifdef NeXT
++      /* OPENSTEP can wait indefinitely when closing a slave after its
++         child has exited.  Restore the timer workaround used by Emacs 23. */
++      struct atimer *close_timer = NULL;
++      if (p->pty_in || p->pty_out)
++        {
++          stop_polling ();
++          close_timer = start_atimer (ATIMER_RELATIVE, make_timespec (1, 0),
++                                     openstep_pty_close_wakeup, NULL);
++        }
++#endif
+       close_process_fd (&p->open_fd[SUBPROCESS_STDIN]);
+       close_process_fd (&p->open_fd[SUBPROCESS_STDOUT]);
++#ifdef NeXT
++      if (close_timer)
++        {
++          cancel_atimer (close_timer);
++          start_polling ();
++        }
++#endif
+ 
+ #ifdef WINDOWSNT
+       register_child (pid, inchannel);
+@@ -8666,7 +8694,7 @@
+ void
+ restore_nofile_limit (void)
+ {
+-#ifdef HAVE_SETRLIMIT
++#if defined HAVE_SETRLIMIT && defined RLIMIT_NOFILE
+   if (FD_SETSIZE < nofile_limit.rlim_cur)
+     setrlimit (RLIMIT_NOFILE, &nofile_limit);
+ #endif
+@@ -8734,7 +8762,7 @@
+   catch_child_signal ();
+ #endif
+ 
+-#ifdef HAVE_SETRLIMIT
++#if defined HAVE_SETRLIMIT && defined RLIMIT_NOFILE
+   /* Don't allocate more than FD_SETSIZE file descriptors for Emacs itself.  */
+   if (getrlimit (RLIMIT_NOFILE, &nofile_limit) != 0)
+     nofile_limit.rlim_cur = 0;
+--- a/src/sysdep.c
++++ b/src/sysdep.c
+@@ -3017,7 +3017,7 @@
+ 
+ struct speed_struct
+ {
+-  speed_t value;
++  int value;
+   speed_t internal;
+ };
+ 
+@@ -3135,7 +3135,7 @@
+ /* Convert a numerical speed (e.g., 9600) to a Bnnn constant (e.g.,
+    B9600); see bug#49524.  */
+ static speed_t
+-convert_speed (speed_t speed)
++convert_speed (EMACS_INT speed)
+ {
+   for (size_t i = 0; i < ARRAYELTS (speeds); i++)
+     {
+@@ -3144,6 +3144,9 @@
+       else if (speed == speeds[i].value)
+ 	return speeds[i].internal;
+     }
++#ifdef NeXT
++  error ("Unsupported serial speed");
++#endif
+   return speed;
+ }
+ 
