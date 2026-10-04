@@ -45,10 +45,8 @@ whether `long double` should be 128-bit.
 - Hardware V8 `smul/umul/rd %y` is used natively, so V8 is the right default.
 - Native spells the directive `.globl`; `sparc/next.h` now does too.
 - Struct return is the standard SPARC one (pointer at `[%sp+64]`, return to `%o7+12`).
-- **Open: PIC stubs.** Native calls to library routines go through Darwin-style
-  stubs (`call L__divdi3$stub`, `.picsymbol_stub`, `.lazy_symbol_pointer`,
-  `.indirect_symbol`).  The i386 port, and so far this one, emit direct calls
-  (`call ___divdi3`) and rely on `ld -read_only_relocs suppress`.  Whether NeXT's
-  SPARC `ld`/`dyld` accepts direct calls into shared libraries is untested.
-  Test: take `/bin/cc -S` output of a hello-world, replace the `call L_printf$stub`
-  with `call _printf`, drop the stub sections, assemble with `/bin/cc`, link and run.
+- **PIC stubs are not needed.** Native calls to library routines go through
+  Darwin-style stubs (`call L__divdi3$stub`, `.picsymbol_stub`, `.indirect_symbol`),
+  but a hand-edited hello-world with a direct `call _printf` and no stub sections
+  assembled, linked and ran on OPENSTEP/SPARC.  This port therefore emits direct
+  calls, as the i386 port does.
