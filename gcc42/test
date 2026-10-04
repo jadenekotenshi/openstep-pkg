@@ -212,3 +212,166 @@ done
 
 /bin/rm -f "$TMP.c" "$TMP.cc" "$TMP.m" "$TMP.mm" "$TMP.s" \
     "$TMP-c" "$TMP-cxx" "$TMP-objc" "$TMP-objcpp" "$TMP.log"
+
+# PR33887 regression: optimized C++ bit-field wraparound and dispatch.
+cat > "$TMP-pr33887.cc" <<'EOF'
+/* { dg-do run } */
+
+extern "C" void abort (void);
+struct S { unsigned int i : 24; } x;
+void __attribute__((noinline)) test1()
+{
+  if (--x.i != 0x00ffffff)
+    abort ();
+  if (x.i != 0x00ffffff)
+    abort ();
+}
+void __attribute__((noinline)) test2()
+{
+  if (x.i-- != 0)
+    abort ();
+  if (x.i != 0x00ffffff)
+    abort ();
+}
+void __attribute__((noinline)) test3()
+{
+  if (++x.i != 0)
+    abort ();
+  if (x.i != 0)
+    abort ();
+}
+void __attribute__((noinline)) test4()
+{
+  if (x.i++ != 0x00ffffff)
+    abort ();
+  if (x.i != 0)
+    abort ();
+}
+int main()
+{
+  x.i = 0;
+  test1();
+  x.i = 0;
+  test2();
+  x.i = 0x00ffffff;
+  test3();
+  x.i = 0x00ffffff;
+  test4();
+  return 0;
+}
+EOF
+for level in 0 1 2 3 s; do
+    "$CXX" -O$level "$TMP-pr33887.cc" -o "$TMP-pr33887"
+    "$TMP-pr33887"
+    "$CXX" -O$level -x objective-c++ "$TMP-pr33887.cc" -o "$TMP-pr33887"
+    "$TMP-pr33887"
+done
+cat > "$TMP-pr33887.cc" <<'EOF'
+/* { dg-do run } */
+
+extern "C" void abort() __attribute__ ((noreturn));
+
+struct s
+{
+  unsigned long long f1 : 40;
+  unsigned int f2 : 24;
+} sv;
+
+int main()
+{
+  int f2;
+  sv.f2 = (1 << 24) - 1;
+  __asm__ volatile ("" : : : "memory");
+  ++sv.f2;
+  f2 = sv.f2;
+  if (f2 != 0)
+    abort();
+  return 0;
+}
+EOF
+for level in 0 1 2 3 s; do
+    "$CXX" -O$level "$TMP-pr33887.cc" -o "$TMP-pr33887"
+    "$TMP-pr33887"
+    "$CXX" -O$level -x objective-c++ "$TMP-pr33887.cc" -o "$TMP-pr33887"
+    "$TMP-pr33887"
+done
+cat > "$TMP-pr33887.cc" <<'EOF'
+/* { dg-do run } */
+
+extern "C" void abort (void);
+
+struct s
+{
+  unsigned long long f1 : 40;
+  unsigned int f2 : 24;
+};
+
+s sv;
+
+void __attribute__((noinline)) foo(unsigned int i)
+{
+  unsigned int tmp;
+  sv.f2 = i;
+  tmp = sv.f2;
+  if (tmp != 0)
+    abort ();
+}
+
+int main()
+{
+  foo (0xff000000u);
+  return 0;
+}
+EOF
+for level in 0 1 2 3 s; do
+    "$CXX" -O$level "$TMP-pr33887.cc" -o "$TMP-pr33887"
+    "$TMP-pr33887"
+    "$CXX" -O$level -x objective-c++ "$TMP-pr33887.cc" -o "$TMP-pr33887"
+    "$TMP-pr33887"
+done
+/bin/rm -f "$TMP-pr33887.cc" "$TMP-pr33887"
+# DOSBox descriptor switch with its production -fwrapv flag.
+cat > "$TMP-bitfield.cc" <<'EOF'
+/* Standalone compiler diagnostic, intentionally fails on Apple GCC 4.2.1
+ * build 5666.3. Compile with -fwrapv and -O0, -O1 or -O2, matching
+ * the OPENSTEP port's arithmetic flags, to check a toolchain fix.
+ * Unlike descriptor_test.cpp, this does not include the DOSBox workaround. */
+#include <stdio.h>
+struct Descriptor {
+    unsigned padding : 8;
+    unsigned type : 5;
+    unsigned Type() const { return type; }
+};
+static int __attribute__((noinline)) dispatch(const Descriptor &d) {
+    switch (d.Type()) {
+    case 4: case 5: case 12: return 1;
+    case 9: return 2;
+    case 24: case 25: case 26: case 27: return 3;
+    case 28: case 29: case 30: case 31: return 4;
+    default: return 0;
+    }
+}
+int main() {
+    int failures = 0;
+    for (unsigned i=0; i<32; ++i) {
+        Descriptor d = {0, i};
+        int expected = i>=28 ? 4 : i>=24 ? 3 : i==9 ? 2 :
+                       i==4 || i==5 || i==12 ? 1 : 0;
+        int actual=dispatch(d);
+        if(actual!=expected) {
+            printf("type=%u actual=%d expected=%d\n",i,actual,expected);
+            ++failures;
+        }
+    }
+    printf("failures=%d\n",failures);
+    return failures ? 1 : 0;
+}
+EOF
+for language in c++ objective-c++; do
+    for level in 0 1 2 3 s; do
+        "$CXX" -x "$language" -O$level -fwrapv "$TMP-bitfield.cc" -o "$TMP-bitfield"
+        "$TMP-bitfield"
+    done
+done
+/bin/rm -f "$TMP-bitfield.cc" "$TMP-bitfield"
+echo "gcc42 package regressions passed"

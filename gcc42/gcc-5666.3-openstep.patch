@@ -11349,3 +11349,25 @@ index b649e9b..3e00047 100644
    // This union is not declared in system headers.  Instead, it must
    // be defined by user programs.
    union semun 
+--- a/gcc/cp/cp-lang.c
++++ b/gcc/cp/cp-lang.c
+@@ -50,6 +50,8 @@
+ #define LANG_HOOKS_FOLD_OBJ_TYPE_REF cp_fold_obj_type_ref
+ #undef LANG_HOOKS_INIT_TS
+ #define LANG_HOOKS_INIT_TS cp_init_ts
++#undef LANG_HOOKS_REDUCE_BIT_FIELD_OPERATIONS
++#define LANG_HOOKS_REDUCE_BIT_FIELD_OPERATIONS true
+ 
+ /* Each front end provides its own lang hook initializer.  */
+ const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
+--- a/gcc/objcp/objcp-lang.c
++++ b/gcc/objcp/objcp-lang.c
+@@ -58,6 +58,8 @@
+ #define LANG_HOOKS_GET_CALLEE_FNDECL	objc_get_callee_fndecl
+ #undef LANG_HOOKS_INIT_TS
+ #define LANG_HOOKS_INIT_TS objcxx_init_ts
++#undef LANG_HOOKS_REDUCE_BIT_FIELD_OPERATIONS
++#define LANG_HOOKS_REDUCE_BIT_FIELD_OPERATIONS true
+ /* APPLE LOCAL begin radar 3904178 */
+ #undef LANG_HOOKS_FOLD_OBJ_TYPE_REF
+ #define LANG_HOOKS_FOLD_OBJ_TYPE_REF objc_fold_obj_type_ref
