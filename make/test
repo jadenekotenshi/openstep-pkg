@@ -24,4 +24,23 @@ EOF
 value=`/bin/cat "$RESULT"`
 [ "$value" = ok ]
 
+# Exercise the alternate readdir callback used by glob, including d_namlen
+# on OPENSTEP.  An uninitialized length used to truncate wildcard results.
+/bin/mkdir "$TMPDIR/m4"
+for name in a.m4 00gnulib.m4 quite-a-long-prerequisite-name.m4
+do
+    /bin/echo input > "$TMPDIR/m4/$name"
+done
+cat > "$MAKEFILE" <<'EOF'
+names := $(sort $(wildcard m4/*.m4))
+all: $(names)
+	@echo $(names) > result
+EOF
+(
+    cd "$TMPDIR"
+    "$MAKE" -f "$MAKEFILE"
+)
+value=`/bin/cat "$RESULT"`
+[ "$value" = 'm4/00gnulib.m4 m4/a.m4 m4/quite-a-long-prerequisite-name.m4' ]
+
 /bin/rm -rf "$TMPDIR"
