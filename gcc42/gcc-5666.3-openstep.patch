@@ -1728,10 +1728,10 @@ index 0000000..87de807
 +#endif
 diff --git a/gcc/config/sparc/next.h b/gcc/config/sparc/next.h
 new file mode 100644
-index 0000000..bfc8b58
+index 0000000..97a7fca
 --- /dev/null
 +++ b/gcc/config/sparc/next.h
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,85 @@
 +/* Target definitions for GNU compiler for SPARC running OPENSTEP 4.
 +   Copyright (C) 1993, 1995, 1996, 1999 Free Software Foundation, Inc.
 +
@@ -1774,6 +1774,10 @@ index 0000000..bfc8b58
 +
 +#undef DATA_SECTION_ASM_OP
 +#define DATA_SECTION_ASM_OP "\t.data"
++
++/* The native compiler spells it .globl.  */
++#undef GLOBAL_ASM_OP
++#define GLOBAL_ASM_OP "\t.globl "
 +
 +#undef LINKER_NAME
 +#define LINKER_NAME "ld"
