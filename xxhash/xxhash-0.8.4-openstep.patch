@@ -1,0 +1,90 @@
+--- a/build/make/multiconf.make
++++ b/build/make/multiconf.make
+@@ -119,7 +119,7 @@
+ .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
+ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.S) $(2) | $$(CACHE_ROOT)/%/.
+ 	@echo AS $$@
+-	$$(CC) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
++	$$(CC) $$(CPPFLAGS) $$(CXXFLAGS) $$(if $$(DEPFLAGS),$$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d)) -c $$< -o $$@
+ 
+ endef # addTargetAsmObject
+ 
+@@ -129,7 +129,7 @@
+ .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
+ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.c) $(2) | $$(CACHE_ROOT)/%/.
+ 	@echo CC $$@
+-	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
++	$$(CC) $$(CPPFLAGS) $$(CFLAGS) $$(if $$(DEPFLAGS),$$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d)) -c $$< -o $$@
+ 
+ endef # addTargetCObject
+ 
+@@ -139,7 +139,7 @@
+ .PRECIOUS: $$(CACHE_ROOT)/%/$(1)
+ $$(CACHE_ROOT)/%/$(1) : $(1:.o=.$(2)) $(3) | $$(CACHE_ROOT)/%/.
+ 	@echo CXX $$@
+-	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d) -c $$< -o $$@
++	$$(CXX) $$(CPPFLAGS) $$(CXXFLAGS) $$(if $$(DEPFLAGS),$$(DEPFLAGS) $$(CACHE_ROOT)/$$*/$(1:.o=.d)) -c $$< -o $$@
+ 
+ endef # addTargetCxxObject
+ 
+--- a/cli/xsum_config.h
++++ b/cli/xsum_config.h
+@@ -96,6 +96,9 @@
+ 
+ #if !defined(S_ISREG)
+ #  define S_ISREG(x) (((x) & S_IFMT) == S_IFREG)
++#endif
++#if !defined(S_ISDIR)
++#  define S_ISDIR(x) (((x) & S_IFMT) == S_IFDIR)
+ #endif
+ 
+ 
+--- a/Makefile
++++ b/Makefile
+@@ -595,7 +595,7 @@
+ # =========================================================
+ # make install is validated only for the following targets
+ # =========================================================
+-ifneq (,$(filter Linux Darwin GNU/kFreeBSD GNU Haiku OpenBSD FreeBSD NetBSD DragonFly SunOS CYGWIN% , $(UNAME)))
++ifneq (,$(filter OPENSTEP Linux Darwin GNU/kFreeBSD GNU Haiku OpenBSD FreeBSD NetBSD DragonFly SunOS CYGWIN% , $(UNAME)))
+ 
+ DESTDIR     ?=
+ # directory variables: GNU conventions prefer lowercase
+--- a/xxhash.h
++++ b/xxhash.h
+@@ -587,7 +587,7 @@
+  */
+ typedef uint32_t XXH32_hash_t;
+ 
+-#elif !defined (__VMS) \
++#elif !defined (__VMS) && !defined(NeXT) \
+   && (defined (__cplusplus) \
+   || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+ #   ifdef _AIX
+@@ -856,7 +856,7 @@
+  * Not necessarily defined to `uint64_t` but functionally equivalent.
+  */
+ typedef uint64_t XXH64_hash_t;
+-#elif !defined (__VMS) \
++#elif !defined (__VMS) && !defined(NeXT) \
+   && (defined (__cplusplus) \
+   || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+ #   ifdef _AIX
+@@ -2558,7 +2558,7 @@
+ /* *************************************
+ *  Basic Types
+ ***************************************/
+-#if !defined (__VMS) \
++#if !defined (__VMS) && !defined(NeXT) \
+  && (defined (__cplusplus) \
+  || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+ #   ifdef _AIX
+@@ -4995,7 +4995,7 @@
+  * However, several environments do not define __int64 type,
+  * requiring a workaround.
+  */
+-#if !defined (__VMS) \
++#if !defined (__VMS) && !defined(NeXT) \
+   && (defined (__cplusplus) \
+   || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */) )
+     typedef int64_t xxh_i64;
