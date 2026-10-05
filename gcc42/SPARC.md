@@ -59,3 +59,8 @@ whether `long double` should be 128-bit.
   `ASM_OUTPUT_ALIGNED_BSS` so such data goes in `.data` with `.space`, as on i386.
 - **Resuming.**  `GCC42_RESUME=1` continues an interrupted build in place;
   `GCC42_BOOT_EXTRA_CFLAGS` adds flags to the stage 2/3 compiles only.
+- **No `objc_msgSend_stret` on SPARC.**  The OPENSTEP runtime has no stret/fpret
+  messengers (undefined `_objc_msgSend_stret`).  On SPARC the hidden struct pointer is
+  in the stack slot `[%sp+64]`, not an argument register, so plain `objc_msgSend`
+  already works; `objc-act.c` now skips the stret/fpret selection whenever the target
+  defines `STRUCT_VALUE_OFFSET` (as i386 does with `NEXTSTEP_STRUCT_VALUE_REGNUM`).

@@ -68,7 +68,7 @@ _str:
 	st	%l0, [%sp+64]
 	st	%g2, [%fp-12]
 	add	%fp, -16, %o0
-	call	_objc_msgSendSuper_stret, 0
+	call	_objc_msgSendSuper, 0
 	 nop
 	unimp	24
 	ld	[%l0+8], %g1
@@ -96,7 +96,7 @@ _go:
 	ld	[%fp+64], %i0
 	mov	11, %o2
 	st	%i0, [%sp+64]
-	call	_objc_msgSend_stret, 0
+	call	_objc_msgSend, 0
 	 nop
 	unimp	24
 	jmp	%i7+12

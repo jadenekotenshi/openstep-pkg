@@ -86,7 +86,7 @@ LC1:
 	mov	%g3, %o0
 	mov	%g2, %o1
 	ld	[%fp+76], %o2
-	call	_objc_msgSendSuper_stret, 0
+	call	_objc_msgSendSuper, 0
 	 nop
 	unimp	24
 	ld	[%fp-24], %g1
@@ -116,7 +116,7 @@ _go:
 	mov	%g2, %o0
 	mov	%g1, %o1
 	mov	11, %o2
-	call	_objc_msgSend_stret, 0
+	call	_objc_msgSend, 0
 	 nop
 	unimp	24
 	mov	%l0, %i0
