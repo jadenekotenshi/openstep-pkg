@@ -13,6 +13,10 @@ export DESTDIR VERSION PATH CC CFLAGS SED GREP EGREP AWK
 if test -d "bash-$VERSION"; then cd "bash-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 
+# configure finds no waitpid() or tcgetattr() in libc; the patch supplies them
+# (lib/sh/openstep.c) from wait4() and the TIOCGETA/TIOCSETA ioctls.
+patch -p1 < "bash-$VERSION-openstep.patch"
+
 # bash's own malloc is off for this host by configure.ac; no NLS; the bundled
 # readline is used.  Installs as /usr/local/bin/bash and never touches /bin.
 run_configure --disable-nls --without-bash-malloc --prefix=/usr/local \

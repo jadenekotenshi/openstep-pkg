@@ -1,0 +1,85 @@
+diff -ruN -x '*.o' a/x/lib/sh/Makefile.in b/lib/sh/Makefile.in
+--- a/lib/sh/Makefile.in	2024-11-13 20:37:41.000000000 +0000
++++ b/lib/sh/Makefile.in	2026-10-05 22:43:00.014848978 +0000
+@@ -92,7 +92,7 @@
+ 	   vprint.c itos.c rename.c zread.c zwrite.c shtty.c \
+ 	   inet_aton.c netconn.c netopen.c strpbrk.c timeval.c makepath.c \
+ 	   pathcanon.c pathphys.c tmpfile.c stringlist.c stringvec.c spell.c \
+-	   shquote.c strtrans.c strcasestr.c snprintf.c mailstat.c \
++	   shquote.c strtrans.c strcasestr.c snprintf.c mailstat.c openstep.c \
+ 	   fmtulong.c fmtullong.c fmtumax.c shmatch.c strnlen.c \
+ 	   strtoll.c strtoull.c strtoimax.c strtoumax.c memset.c strstr.c \
+ 	   mktime.c strftime.c mbschr.c zcatfd.c zmapfd.c winsize.c eaccess.c \
+@@ -112,7 +112,7 @@
+ 	  itos.o zread.o zwrite.o shtty.o shmatch.o eaccess.o \
+ 	  netconn.o netopen.o timeval.o makepath.o pathcanon.o \
+ 	  pathphys.o tmpfile.o stringlist.o stringvec.o spell.o shquote.o \
+-	  strtrans.o snprintf.o mailstat.o fmtulong.o \
++	  strtrans.o snprintf.o mailstat.o openstep.o fmtulong.o \
+ 	  fmtullong.o fmtumax.o zcatfd.o zmapfd.o winsize.o wcsdup.o \
+ 	  fpurge.o zgetline.o mbscmp.o mbsncmp.o uconvert.o ufuncs.o casemod.o \
+ 	  input_avail.o mbscasecmp.o fnxform.o unicode.o shmbchar.o strvis.o \
+@@ -212,6 +212,8 @@
+ strtoull.o: strtoull.c
+ strtoumax.o: strtoumax.c
+ strtrans.o: strtrans.c
++openstep.o: openstep.c
++openstep.o: ${BUILD_DIR}/config.h
+ strvis.o: strvis.c
+ strlcpy.o: strlcpy.c
+ strscpy.o: strscpy.c
+diff -ruN -x '*.o' a/x/lib/sh/openstep.c b/lib/sh/openstep.c
+--- a/lib/sh/openstep.c	1970-01-01 00:00:00.000000000 +0000
++++ b/lib/sh/openstep.c	2026-10-05 22:42:59.960120859 +0000
+@@ -0,0 +1,51 @@
++/* openstep.c -- POSIX functions that OPENSTEP's libc does not provide as
++   separate symbols, built on the BSD calls underneath.  Each one is compiled
++   only when configure did not find the real function. */
++
++#include <config.h>
++
++#include <sys/types.h>
++#include <sys/ioctl.h>
++#include <termios.h>
++
++#if !defined (HAVE_WAITPID)
++extern int wait4 ();
++
++/* waitpid (pid, status, options): wait4 without the rusage. */
++int
++waitpid (pid, statusp, options)
++     int pid;
++     int *statusp;
++     int options;
++{
++  return (wait4 (pid, (void *)statusp, options, (void *)0));
++}
++#endif /* !HAVE_WAITPID */
++
++#if !defined (HAVE_TCGETATTR) && defined (TIOCGETA) && defined (TIOCSETA)
++int
++tcgetattr (fd, t)
++     int fd;
++     struct termios *t;
++{
++  return (ioctl (fd, TIOCGETA, (char *)t));
++}
++
++int
++tcsetattr (fd, actions, t)
++     int fd;
++     int actions;
++     struct termios *t;
++{
++  switch (actions)
++    {
++    case 0:	/* TCSANOW */
++      return (ioctl (fd, TIOCSETA, (char *)t));
++    case 1:	/* TCSADRAIN */
++      return (ioctl (fd, TIOCSETAW, (char *)t));
++    case 2:	/* TCSAFLUSH */
++      return (ioctl (fd, TIOCSETAF, (char *)t));
++    }
++  return (-1);
++}
++#endif /* !HAVE_TCGETATTR */
