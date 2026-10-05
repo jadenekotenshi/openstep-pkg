@@ -83,3 +83,18 @@ diff -ruN -x '*.o' a/x/lib/sh/openstep.c b/lib/sh/openstep.c
 +  return (-1);
 +}
 +#endif /* !HAVE_TCGETATTR */
+diff -ruN -x '*.o' a/x/y.tab.c b/y.tab.c
+--- a/y.tab.c	2025-06-30 13:56:25.000000000 +0000
++++ b/y.tab.c	2026-10-05 22:50:44.520250837 +0000
+@@ -725,10 +725,7 @@
+ 
+ #ifndef __PTRDIFF_MAX__
+ # include <limits.h> /* INFRINGES ON USER NAME SPACE */
+-# if defined __STDC_VERSION__ && 199901 <= __STDC_VERSION__
+-#  include <stdint.h> /* INFRINGES ON USER NAME SPACE */
+-#  define YY_STDINT_H
+-# endif
++/* OPENSTEP has no <stdint.h>: use the plain C types below. */
+ #endif
+ 
+ /* Narrow types that promote to a signed type and that can represent a
