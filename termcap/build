@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -DNeXT'
+export PATH CC CFLAGS
+if test -d "termcap-$VERSION"; then cd "termcap-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+# This 2002-era configure ships no config.sub, so no --build/--host triple.
+run_configure --prefix=/usr/local
+/bin/gnumake
+# The Makefile ignores DESTDIR: override the install directories, and blank
+# oldincludedir so termcap.h is not also copied into /usr/include.
+/bin/gnumake install \
+    prefix="$DESTDIR/usr/local" exec_prefix="$DESTDIR/usr/local" \
+    oldincludedir=
+/bin/ranlib "$DESTDIR/usr/local/lib/libtermcap.a"
