@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+PREFIX="$LOCAL_ROOT"
+PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-zip.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+printf 'OPENSTEP zip round trip\n' > input
+mkdir nested
+cp input 'nested/space name'
+ln -s input link
+for method in deflate bzip2; do
+    "$PREFIX/bin/zip" -q -r -y -Z "$method" "$method.zip" input nested link
+    "$PREFIX/bin/unzip" -t "$method.zip"
+    "$PREFIX/bin/unzip" -p "$method.zip" 'nested/space name' > output
+    cmp input output
+    "$PREFIX/bin/zip" -T "$method.zip"
+done
+"$PREFIX/bin/zipnote" deflate.zip > notes
+grep input notes >/dev/null
+"$PREFIX/bin/zip" -q -P port-test encrypted.zip input
+"$PREFIX/bin/unzip" -P port-test -p encrypted.zip > output
+cmp input output
+"$PREFIX/bin/zip" -d deflate.zip input >/dev/null
+if "$PREFIX/bin/unzip" -p deflate.zip input > output 2>/dev/null; then exit 1; fi

@@ -1,0 +1,41 @@
+diff --git a/fileio.c b/fileio.c
+index 1847e62..2ad5527 100644
+--- a/fileio.c
++++ b/fileio.c
+@@ -45,6 +45,20 @@ extern int errno;
+    ----------------------- */
+ #include <ctype.h>
+ 
++#ifdef NeXT
++/* NeXT fseek can succeed before offset zero; all archive readers need
++   an error here so that their seek-from-end fallback starts at zero. */
++int zip_openstep_fseek(FILE *stream, long offset, int whence)
++{
++    int result = fseek(stream, offset, whence);
++    if (result == 0 && ftell(stream) < 0) {
++        errno = EINVAL;
++        return -1;
++    }
++    return result;
++}
++#endif
++
+ 
+ #if defined(VMS) || defined(TOPS20)
+ #  define PAD 5
+diff --git a/zip.h b/zip.h
+index ba03160..3d4af85 100644
+--- a/zip.h
++++ b/zip.h
+@@ -86,6 +86,11 @@ typedef unsigned long ulg;      /* unsigned 32-bit value */
+ 
+ /* Set up portability */
+ #include "tailor.h"
++#ifdef NeXT
++int zip_openstep_fseek(FILE *, long, int);
++#undef zfseeko
++#define zfseeko zip_openstep_fseek
++#endif
+ 
+ #ifdef USE_ZLIB
+ #  include "zlib.h"
