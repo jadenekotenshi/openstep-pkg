@@ -230,7 +230,11 @@ requires_pdksh_sh() {
 }
 
 build_shell_path() {
-    if requires_pdksh_sh "$1"; then
+    # PKG_BUILD_SHELL overrides the shell for every build and test script, for
+    # when pdksh trips over a package (e.g. PKG_BUILD_SHELL=/usr/local/bin/bash).
+    if [ -n "${PKG_BUILD_SHELL-}" ]; then
+        echo "$PKG_BUILD_SHELL"
+    elif requires_pdksh_sh "$1"; then
         echo /usr/local/bin/ksh
     else
         echo /bin/sh

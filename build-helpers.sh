@@ -2,7 +2,17 @@
 
 CONFIG_SHELL=${CONFIG_SHELL-/usr/local/bin/ksh}
 
+# run_configure ARGS...
+# Runs ./configure under $CONFIG_SHELL (default /usr/local/bin/ksh).  A build
+# that needs a different shell can set CONFIG_SHELL itself (and depend on the
+# package that provides it, e.g. bash), and setting PKG_CONFIG_SHELL in the
+# environment overrides it for every package:
+#   PKG_CONFIG_SHELL=/usr/local/bin/bash pkg build sudo
 run_configure() {
+    if [ -n "${PKG_CONFIG_SHELL-}" ]; then
+        CONFIG_SHELL=$PKG_CONFIG_SHELL
+    fi
+
     if [ ! -x "$CONFIG_SHELL" ]; then
         echo "error: CONFIG_SHELL not executable: $CONFIG_SHELL" >&2
         exit 1

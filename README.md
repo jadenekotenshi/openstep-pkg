@@ -148,6 +148,12 @@ Behavior:
 - `PKG_BUILD_HELPERS` exported as the path to `build-helpers.sh`
 - `/usr/local/bin/ksh` used as the build shell for normal packages when
   available; the bootstrap `pdksh` package is built with `/bin/sh`
+- `PKG_BUILD_SHELL` in the environment replaces that build/test shell for every
+  package, and `PKG_CONFIG_SHELL` replaces the shell `run_configure` runs
+  `./configure` under (default ksh).  For a package that misbehaves under
+  pdksh, either run e.g. `PKG_CONFIG_SHELL=/usr/local/bin/bash pkg build sudo`
+  or set `CONFIG_SHELL` in its `build` and add the shell's package to `depends`.
+  The overriding shell must already be installed; pkg does not build it first.
 
 `pkg test` uses the same shell selection and propagates test failures explicitly.
 This avoids stock OPENSTEP `/bin/sh` masking a failure with a successful cleanup
