@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+export PATH CC
+if test -d "diffutils-$VERSION"; then cd "diffutils-$VERSION"; fi
+patch -p1 < "diffutils-$VERSION-openstep.patch"
+. "$PKG_BUILD_HELPERS"
+run_configure --prefix=/usr/local --disable-nls --disable-dependency-tracking
+/bin/gnumake
+/bin/gnumake install DESTDIR="$DESTDIR"

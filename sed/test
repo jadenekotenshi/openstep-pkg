@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+SED=$LOCAL_ROOT/bin/sed
+TMP=/usr/tmp/sed-test.$$
+trap '/bin/rm -f "$TMP" "$TMP.bak"' 0
+trap 'exit 1' 1 2 15
+"$SED" --version | grep '4\.0\.9' >/dev/null
+test "`echo '--disable-ffplay' | "$SED" 's/--/action=/;s/-/ option=/;s/-/_/g'`" = 'action=disable option=ffplay'
+test "`echo 'REGISTER_DECODER(AASC, aasc);' | "$SED" -n 's/^[^#]*DEC.*([^,]*, *\([^,]*\)\(,.*\)*).*/\1_decoder/p'`" = 'aasc_decoder'
+echo 'one two' > "$TMP"
+"$SED" -i.bak 's/one/three/' "$TMP"
+test "`cat "$TMP"`" = 'three two'
+test "`cat "$TMP.bak"`" = 'one two'
+echo 'sed installed-package tests passed'

@@ -1,0 +1,61 @@
+#!/bin/sh
+set -e
+PREFIX="$LOCAL_ROOT"
+PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-xz.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+printf 'OPENSTEP XZ round trip\n' > input
+xz -k input
+xz -t input.xz
+xz -dc input.xz > output
+cmp input output
+xzdec input.xz > output
+cmp input output
+# Exercise the select-based input wait and flush timeout between pipe writes.
+(cat input; /usr/bin/sleep 1; cat input) | xz --flush-timeout=100 -c > stream.xz
+xz -dc stream.xz > output
+cat input input > expected
+cmp expected output
+xz --format=lzma -k input
+lzmadec input.lzma > output
+cmp input output
+xzcmp input input.xz
+xzdiff input input.xz
+cp input ./-input
+xzdiff -- -input input.xz
+xzgrep 'XZ round trip' input.xz >/dev/null
+xz -lv input.xz > listing
+grep '23 B' listing >/dev/null
+printf 'invalid\n' > invalid.xz
+if xz -t invalid.xz 2>/dev/null; then exit 1; fi
+cat > api.c <<'EOF'
+#include <lzma.h>
+#include <assert.h>
+#include <string.h>
+extern int xz_snprintf(char *, size_t, const char *, ...);
+int main(void) {
+    const unsigned char input[] = "liblzma OPENSTEP round trip";
+    unsigned char compressed[256], output[128];
+    size_t size=0, inpos=0, outpos=0;
+    uint64_t limit=UINT64_MAX;
+    char formatted[80];
+    assert(lzma_easy_buffer_encode(6, LZMA_CHECK_CRC64, NULL,
+        input, sizeof input, compressed, &size, sizeof compressed)==LZMA_OK);
+    assert(lzma_stream_buffer_decode(&limit, 0, NULL, compressed,
+        &inpos, size, output, &outpos, sizeof output)==LZMA_OK);
+    assert(inpos==size && outpos==sizeof input && !memcmp(input,output,outpos));
+    assert(xz_snprintf(formatted,sizeof formatted,"%llu %lld %.2f",
+        ~0ULL,(-9223372036854775807LL-1),1.25)==46);
+    assert(!strcmp(formatted,"18446744073709551615 -9223372036854775808 1.25"));
+    assert(xz_snprintf(formatted,4,"%llu",~0ULL)==20 && !strcmp(formatted,"184"));
+    assert(xz_snprintf(formatted,sizeof formatted,"%u %lu %llx %llo",
+        ~0U,~0UL,0x123456789abcdef0ULL,~0ULL)==61);
+    assert(!strcmp(formatted,"4294967295 4294967295 123456789abcdef0 1777777777777777777777"));
+    return 0;
+}
+EOF
+"$PREFIX/bin/gcc-4.2" -I"$PREFIX/include" api.c -L"$PREFIX/lib" -llzma -o api
+./api

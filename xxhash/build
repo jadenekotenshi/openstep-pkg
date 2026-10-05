@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
+export PATH
+if test -d "xxHash-$VERSION"; then cd "xxHash-$VERSION"; fi
+patch -p1 < "xxhash-$VERSION-openstep.patch"
+make_xxhash() {
+    /usr/local/bin/gnumake CC=/usr/local/bin/gcc-4.2 SHELL=/usr/local/bin/ksh \
+        CFLAGS='-O2 -march=i486 -DCLOCKS_PER_SEC=CLK_TCK -I/NextDeveloper/Headers/bsd' \
+        DEBUGFLAGS= DISPATCH=0 UNAME=OPENSTEP DEPFLAGS= ARFLAGS=rc \
+        SED_ERE_OPT=-r INSTALL=/usr/local/bin/install "$@"
+}
+make_xxhash libxxhash.a xxhsum
+/bin/ranlib libxxhash.a
+make_xxhash install_libxxhash.a install_libxxhash.includes install_libxxhash.pc \
+    install_xxhsum install_man DESTDIR="$DESTDIR" PREFIX=/usr/local
+/bin/ranlib "$DESTDIR/usr/local/lib/libxxhash.a"

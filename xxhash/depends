@@ -1,0 +1,6 @@
+gcc42
+make
+coreutils
+sed
+grep
+patch

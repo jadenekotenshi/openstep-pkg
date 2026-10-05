@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+work=${TMPDIR-/tmp}/xxhash-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+"$LOCAL_ROOT/bin/xxhsum" --version
+# Upstream's CLI sanity suite exercises all algorithms before benchmarking.
+"$LOCAL_ROOT/bin/xxhsum" -b1 -i0 > "$work/sanity.log" 2>&1
+printf abc > "$work/input"
+"$LOCAL_ROOT/bin/xxhsum" -H0 "$work/input" > "$work/checksums"
+grep '^32d153ff ' "$work/checksums"
+"$LOCAL_ROOT/bin/xxhsum" -c "$work/checksums"
+cat > "$work/test.c" <<'EOF'
+#include <assert.h>
+#include <xxhash.h>
+int main(void)
+{
+    XXH3_state_t *state = XXH3_createState();
+    assert(XXH32("abc", 3, 0) == 0x32d153ffU);
+    assert(XXH64("abc", 3, 0) == 0x44bc2cf5ad770999ULL);
+    assert(XXH3_64bits("abc", 3) == 0x78af5f94892f3950ULL);
+    assert(state && XXH3_128bits_reset(state) == XXH_OK);
+    assert(XXH3_128bits_update(state, "a", 1) == XXH_OK);
+    assert(XXH3_128bits_update(state, "bc", 2) == XXH_OK);
+    assert(XXH128_isEqual(XXH3_128bits_digest(state), XXH3_128bits("abc", 3)));
+    XXH3_freeState(state);
+    return 0;
+}
+EOF
+"$LOCAL_ROOT/bin/gcc-4.2" -std=gnu99 -I"$LOCAL_ROOT/include" "$work/test.c" \
+    -L"$LOCAL_ROOT/lib" -lxxhash -o "$work/test"
+"$work/test"
+echo 'xxHash sanity suite, checksum verification and installed C99 API tests passed'

@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+TMP=/usr/tmp/liba52-test.$$
+trap '/bin/rm -f "$TMP" "$TMP.c"' 0
+trap 'exit 1' 1 2 15
+cat > "$TMP.c" <<'EOF'
+#include <sys/types.h>
+typedef u_int8_t uint8_t;
+typedef u_int32_t uint32_t;
+#include <a52dec/a52.h>
+int main(void)
+{
+    a52_state_t *state = a52_init(0);
+    unsigned char data[8] = {0};
+    int flags, rate, bitrate;
+    if (!state) return 1;
+    if (a52_syncinfo(data, &flags, &rate, &bitrate) != 0) return 2;
+    a52_free(state);
+    return 0;
+}
+EOF
+/usr/local/bin/gcc-4.2 -O2 -march=i486 -DNeXT -I"$LOCAL_ROOT/include" \
+    "$TMP.c" -L"$LOCAL_ROOT/lib" -la52 -lm -o "$TMP"
+"$TMP"
+echo "liba52 installed-package tests passed"

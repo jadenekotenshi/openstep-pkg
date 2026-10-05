@@ -1,0 +1,48 @@
+#!/bin/sh
+set -e
+work=${TMPDIR-/tmp}/lz4-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+lz4="$LOCAL_ROOT/bin/lz4"
+"$lz4" --version
+gawk 'BEGIN {for(i=0;i<16384;i++) printf "12345678"}' > "$work/input"
+"$lz4" -v --content-size "$work/input" "$work/data.lz4" 2> "$work/stats"
+grep 'Compressed 131072 bytes into' "$work/stats"
+"$lz4" -t "$work/data.lz4"
+"$lz4" -dc "$work/data.lz4" > "$work/output"
+cmp "$work/input" "$work/output"
+"$lz4" -v --list "$work/data.lz4" > "$work/list" 2>&1
+grep '131072' "$work/list"
+"$lz4" -l -c "$work/input" > "$work/legacy.lz4"
+"$lz4" -dc "$work/legacy.lz4" > "$work/output"
+cmp "$work/input" "$work/output"
+printf broken > "$work/broken.lz4"
+if "$lz4" -t "$work/broken.lz4" > /dev/null 2>&1; then exit 1; fi
+cat > "$work/test.c" <<'EOF'
+#include <assert.h>
+#include <string.h>
+#include <lz4.h>
+#include <lz4hc.h>
+#include <lz4frame.h>
+int main(void)
+{
+    char source[4096], compressed[LZ4_COMPRESSBOUND(4096)], restored[4096];
+    int n;
+    memset(source, 'x', sizeof(source));
+    n = LZ4_compress_default(source, compressed, sizeof(source), sizeof(compressed));
+    assert(n > 0 && n < sizeof(source));
+    assert(LZ4_decompress_safe(compressed, restored, n, sizeof(restored)) == sizeof(source));
+    assert(!memcmp(source, restored, sizeof(source)));
+    n = LZ4_compress_HC(source, compressed, sizeof(source), sizeof(compressed), 9);
+    assert(n > 0);
+    assert(LZ4_decompress_safe(compressed, restored, n, sizeof(restored)) == sizeof(source));
+    assert(!memcmp(source, restored, sizeof(source)));
+    assert(LZ4F_getVersion() == LZ4F_VERSION);
+    return 0;
+}
+EOF
+"$LOCAL_ROOT/bin/gcc-4.2" -std=gnu99 -I"$LOCAL_ROOT/include" "$work/test.c" \
+    -L"$LOCAL_ROOT/lib" -llz4 -o "$work/test"
+"$work/test"
+echo 'LZ4 frame/legacy round trips, listing, invalid-input and installed API tests passed'

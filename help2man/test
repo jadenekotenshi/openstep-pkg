@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+PATH="$LOCAL_ROOT/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-help2man.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+help2man --version | grep '1.27' >/dev/null
+help2man --no-info --output=help2man.1 "$LOCAL_ROOT/bin/help2man"
+grep '^\.TH HELP2MAN' help2man.1 >/dev/null
+grep '^\.SH NAME' help2man.1 >/dev/null
+grep '^\.SH SYNOPSIS' help2man.1 >/dev/null

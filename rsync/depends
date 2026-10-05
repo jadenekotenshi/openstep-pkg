@@ -1,0 +1,12 @@
+gcc42
+xxhash
+lz4
+zstd
+openssl
+libiconv
+openssh
+bash
+gawk
+grep
+coreutils
+patch

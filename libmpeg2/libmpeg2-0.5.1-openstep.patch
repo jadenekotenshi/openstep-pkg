@@ -1,0 +1,55 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -61,6 +61,7 @@
+     dnl arch-specific flags
+     arm_conditional=false
+     case "$host" in
++    *-next-openstep* | *-next-nextstep*) ;;
+     i?86-* | k?-* | x86_64-* | amd64-*)
+ 	AC_DEFINE([ARCH_X86],,[x86 architecture])
+ 	case "$host" in
+--- a/configure
++++ b/configure
+@@ -4852,6 +4852,7 @@
+ 
+         arm_conditional=false
+     case "$host" in
++    *-next-openstep* | *-next-nextstep*) ;;
+     i?86-* | k?-* | x86_64-* | amd64-*)
+ 
+ cat >>confdefs.h <<\_ACEOF
+@@ -29023,4 +29024,3 @@
+   # would make configure fail if this is the last instruction.
+   $ac_cs_success || { (exit 1); exit 1; }
+ fi
+-
+--- a/libmpeg2/convert/rgb_mmx.c
++++ b/libmpeg2/convert/rgb_mmx.c
+@@ -24,6 +24,11 @@
+  */
+ 
+ #include "config.h"
++
++#ifdef NeXT
++/* NeXT ranlib rejects an archive containing only empty platform objects. */
++const int mpeg2_openstep_portable_rgb = 1;
++#endif
+ 
+ #ifdef ARCH_X86
+ 
+--- a/libvo/video_out_sdl.c
++++ b/libvo/video_out_sdl.c
+@@ -143,8 +143,11 @@
+     instance->vo.close = NULL; /* sdl_close; */
+     instance->sdlflags = SDL_HWSURFACE | SDL_RESIZABLE;
+ 
+-    putenv((char *)"SDL_VIDEO_YUV_HWACCEL=1");
+-    putenv((char *)"SDL_VIDEO_X11_NODIRECTCOLOR=1");
++#ifndef NeXT
++    /* These X11/hardware-overlay hints do not apply to OPENSTEP's SDL. */
++    putenv ((char *)"SDL_VIDEO_YUV_HWACCEL=1");
++    putenv ((char *)"SDL_VIDEO_X11_NODIRECTCOLOR=1");
++#endif
+ 
+     if (SDL_Init (SDL_INIT_VIDEO)) {
+ 	fprintf (stderr, "sdl video initialization failed.\n");

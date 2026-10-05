@@ -1,0 +1,8 @@
+pdksh
+gcc42
+make
+coreutils
+patch
+grep
+zlib
+xz
