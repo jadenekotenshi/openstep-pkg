@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+PREFIX="$LOCAL_ROOT"
+PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+
+for tool in ntpd ntpq ntpdc ntpdate ntp-keygen ntptime ntptrace; do
+    [ -x "$PREFIX/bin/$tool" ] || { echo "ntp: missing $tool" >&2; exit 1; }
+done
+"$PREFIX/bin/ntpd" --version 2>&1 | grep '4\.2\.8' > /dev/null
+"$PREFIX/bin/ntpq" --version 2>&1 | grep '4\.2\.8' > /dev/null
+"$PREFIX/bin/ntpdc" --version 2>&1 | grep '4\.2\.8' > /dev/null
+
+# ntpd must not have replaced anything outside /usr/local.
+[ ! -e "$PREFIX/etc/ntp.conf" ] || echo "ntp: note: $PREFIX/etc/ntp.conf exists (administrator's)" >&2
