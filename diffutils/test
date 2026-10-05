@@ -1,0 +1,46 @@
+#!/bin/sh
+set -e
+BIN="$LOCAL_ROOT/bin"
+PATH="$BIN:/usr/local/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-diffutils.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+printf 'alpha\nmiddle\nomega\n' > base
+printf 'ALPHA\nmiddle\nomega\n' > left
+printf 'alpha\nmiddle\nOMEGA\n' > right
+printf 'ALPHA\nmiddle\nOMEGA\n' > expected
+cat base | "$BIN/cmp" -- base -
+cat base | "$BIN/cmp" -- - base
+status=0
+"$BIN/cmp" -s base left || status=$?
+test "$status" -eq 1
+status=0
+"$BIN/cmp" missing base 2>/dev/null || status=$?
+test "$status" -eq 2
+cp base ./-base
+"$BIN/diff" -- -base base
+status=0
+"$BIN/diff" -u base left > changes || status=$?
+test "$status" -eq 1
+grep '^+ALPHA' changes >/dev/null
+mkdir dir1 dir2
+cp base 'dir1/space name'
+cp base 'dir2/space name'
+cp left dir1/A
+cp left dir2/A
+"$BIN/diff" -r dir1 dir2
+cp right dir2/A
+status=0
+"$BIN/diff" -r dir1 dir2 > changes || status=$?
+test "$status" -eq 1
+"$BIN/diff3" --diff-program="$BIN/diff" -m left base right > merged
+/bin/cmp expected merged
+"$BIN/sdiff" --diff-program="$BIN/diff" -s base base > same
+test ! -s same
+status=0
+printf 'l\n' | "$BIN/sdiff" --diff-program="$BIN/diff" -o chosen left base > display || status=$?
+test "$status" -eq 1
+/bin/cmp left chosen
+echo 'diffutils comparisons and merges passed'

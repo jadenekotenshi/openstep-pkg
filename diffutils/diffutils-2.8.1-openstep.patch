@@ -1,0 +1,48 @@
+diff --git a/src/dir.c b/src/dir.c
+index 8cc82e6..ea095d8 100644
+--- a/src/dir.c
++++ b/src/dir.c
+@@ -152,6 +152,8 @@ compare_names (char const *name1, char const *name2)
+ 	return r;
+     }
+ 
++  /* OPENSTEP strcoll is unusable; use the bytewise comparison below.  */
++#ifndef NeXT
+   if (locale_specific_sorting)
+     {
+       int r;
+@@ -167,6 +169,7 @@ compare_names (char const *name1, char const *name2)
+ 	return r;
+     }
+ 
++#endif
+   return file_name_cmp (name1, name2);
+ }
+ 
+diff --git a/src/sdiff.c b/src/sdiff.c
+index 45fc52d..e6f5208 100644
+--- a/src/sdiff.c
++++ b/src/sdiff.c
+@@ -114,7 +114,7 @@ static int const sigs[] = {
+ #  define SIG_SETMASK (! SIG_BLOCK)
+ # endif
+ # define sigprocmask(how, n, o) \
+-    ((how) == SIG_BLOCK ? *(o) = sigblock (*(n)) : sigsetmask (*(n)))
++    ((how) == SIG_BLOCK ? *(sigset_t *)(o) = sigblock (*(n)) : sigsetmask (*(n)))
+ #endif
+ 
+ static bool diraccess (char const *);
+@@ -724,7 +724,12 @@ main (int argc, char *argv[])
+ 	if (! interact_ok)
+ 	  exiterr ();
+ 
+-	ck_editor_status (werrno, wstatus);
++	/* Unlike an editor, diff returns 1 for an ordinary difference.  */
++	if (werrno || ! WIFEXITED (wstatus) || WEXITSTATUS (wstatus) > 1)
++	  {
++	    editor_program = diffargv[0];
++	    ck_editor_status (werrno, wstatus);
++	  }
+ 	untrapsig (0);
+ 	checksigs ();
+ 	exit (WEXITSTATUS (wstatus));
