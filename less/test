@@ -1,0 +1,118 @@
+#!/bin/sh
+set -e
+work=${TMPDIR-/tmp}/less-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+HOME=$work
+TERM=xterm
+TERMINFO="$LOCAL_ROOT/share/terminfo"
+export HOME TERM TERMINFO
+less=${LESS_TEST_BINARY-"$LOCAL_ROOT/bin/less"}
+"$less" --version
+echo 'x quit' > "$work/keys"
+awk 'BEGIN {for(i=1;i<=100;i++) {if(i==70) print "needle"; printf "line%03d\n",i}}' > "$work/input"
+"$less" "$work/input" > "$work/output"
+cmp "$work/input" "$work/output"
+cat > "$work/pty.c" <<'EOF'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <libc.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <sys/ioctl.h>
+#include <sys/wait.h>
+
+static int master, child;
+static void fail(const char *message)
+{
+    fprintf(stderr, "less PTY test: %s\n", message);
+    close(master);
+    if (child > 0) { kill(child, SIGKILL); wait4(child, NULL, 0, NULL); }
+    exit(1);
+}
+static void expect(const char *text)
+{
+    char buffer[32768];
+    int used = 0, n, i;
+    for (i = 0; i < 100; i++) {
+        while ((n = read(master, buffer + used, sizeof(buffer)-1-used)) > 0) {
+            used += n;
+            buffer[used] = 0;
+            if (strstr(buffer, text)) return;
+            if (used == sizeof(buffer)-1) fail("excessive output");
+        }
+        usleep(100000);
+    }
+    fail(text);
+}
+static void keys(const char *text)
+{
+    char discard[4096];
+    while (read(master, discard, sizeof(discard)) > 0) {}
+    if (write(master, text, strlen(text)) != strlen(text)) fail("write");
+}
+int main(int argc, char **argv)
+{
+    char device[] = "/dev/ptyp0";
+    const char *bank, *unit;
+    struct winsize size;
+    union wait status;
+    int fd, found = 0, i;
+    if (argc != 4) return 2;
+    for (bank = "pqrs"; *bank && !found; bank++) {
+        for (unit = "0123456789abcdef"; *unit; unit++) {
+            device[8] = *bank; device[9] = *unit;
+            master = open(device, O_RDWR);
+            if (master >= 0) { found = 1; break; }
+        }
+    }
+    if (!found) fail("no PTY");
+    memset(&size, 0, sizeof(size));
+    size.ws_row = 24; size.ws_col = 80;
+    ioctl(master, TIOCSWINSZ, &size);
+    device[5] = 't';
+    child = fork();
+    if (child < 0) fail("fork");
+    if (!child) {
+        close(master);
+        fd = open("/dev/tty", O_RDWR);
+        if (fd >= 0) { ioctl(fd, TIOCNOTTY, 0); close(fd); }
+        setpgrp(0, getpid());
+        fd = open(device, O_RDWR);
+        if (fd < 0) _exit(126);
+        dup2(fd, 0); dup2(fd, 1); dup2(fd, 2);
+        if (fd > 2) close(fd);
+        execl(argv[1], argv[1], "-X", "--lesskey-src", argv[3], argv[2], NULL);
+        _exit(127);
+    }
+    fcntl(master, F_SETFL, FNDELAY);
+    expect("line001");
+    keys("G"); expect("line100");
+    keys("g"); expect("line001");
+    keys("/needle\r"); expect("line070");
+    size.ws_row = 30; size.ws_col = 100;
+    ioctl(master, TIOCSWINSZ, &size); kill(child, SIGWINCH);
+    usleep(300000);
+    keys("g"); expect("line001");
+    keys("x");
+    for (i = 0; i < 100; i++) {
+        char discard[4096];
+        while (read(master, discard, sizeof(discard)) > 0) {}
+        if (wait4(child, &status, WNOHANG, NULL) == child) {
+            child = 0;
+            if (!WIFEXITED(status) || status.w_retcode) fail("exit status");
+            close(master);
+            return 0;
+        }
+        usleep(100000);
+    }
+    fail("quit timed out");
+    return 1;
+}
+EOF
+"$LOCAL_ROOT/bin/gcc-4.2" -I/NextDeveloper/Headers/bsd "$work/pty.c" -o "$work/pty"
+"$work/pty" "$less" "$work/input" "$work/keys"
+"$work/pty" "$less" "$work/input" "$work/keys"
+echo 'less output, paging, regex search, resize, lesskey and history tests passed'

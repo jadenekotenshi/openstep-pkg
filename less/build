@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
+CC=/usr/local/bin/gcc-4.2
+CPPFLAGS='-I/usr/local/include/ncurses -I/usr/local/include -I/NextDeveloper/Headers/bsd'
+LDFLAGS=-L/usr/local/lib
+AWK=/usr/local/bin/gawk
+CONFIG_SHELL=/usr/local/bin/ksh
+# OPENSTEP poll has unreliable timeout behavior.
+ac_cv_func_poll=no
+export PATH CC CPPFLAGS LDFLAGS AWK CONFIG_SHELL ac_cv_func_poll
+. "$PKG_BUILD_HELPERS"
+if test -d "less-$VERSION"; then cd "less-$VERSION"; fi
+patch -p1 < "less-$VERSION-openstep.patch"
+run_configure --prefix=/usr/local
+/bin/gnumake
+/bin/gnumake install DESTDIR="$DESTDIR"
+# The OSC 8 helper uses shell syntax unavailable in the stock /bin/sh.
+sed '1s|.*|#!/usr/local/bin/ksh|' less-osc8-open.sh > "$DESTDIR/usr/local/libexec/less-osc8-open"
+chmod 755 "$DESTDIR/usr/local/libexec/less-osc8-open"

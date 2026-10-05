@@ -1,0 +1,38 @@
+--- a/lang.h
++++ b/lang.h
+@@ -56,5 +56,8 @@
+ #ifdef __BORLANDC__
+ typedef long ssize_t;
+ #endif
++#ifdef NeXT
++typedef int ssize_t;
++#endif
+ 
+ #endif //  LESS_LANG_H_
+--- a/less.h
++++ b/less.h
+@@ -63,6 +63,13 @@
+ #endif
+ #if HAVE_STRING_H
+ #include <string.h>
++#endif
++#ifdef NeXT
++#include <libc.h>
++#include <sys/stat.h>
++#ifndef S_ISREG
++#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
++#endif
+ #endif
+ 
+ #if HAVE_STDCKDINT_H
+--- a/lesskey_parse.c
++++ b/lesskey_parse.c
+@@ -691,7 +691,7 @@
+ 	FILE *desc;
+ 	char line[1024];
+ 
+-	lesskey_file = (infile != NULL) ? strdup(infile) : homefile(DEF_LESSKEYINFILE);
++	lesskey_file = (infile != NULL) ? save(infile) : homefile(DEF_LESSKEYINFILE);
+ 	if (lesskey_file == NULL)
+ 		return (-1);
+ 
