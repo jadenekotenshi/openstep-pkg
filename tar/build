@@ -1,0 +1,37 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -DNeXT -D_POSIX_SOURCE'
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+# tar's configure refuses to run as root without this.
+FORCE_UNSAFE_CONFIGURE=1
+export PATH CC CFLAGS GREP EGREP AWK FORCE_UNSAFE_CONFIGURE
+if test -d "tar-$VERSION"; then cd "tar-$VERSION"; fi
+patch -p1 < "tar-$VERSION-openstep.patch"
+. "$PKG_BUILD_HELPERS"
+# --program-prefix=g installs the program as gtar (and the man page as gtar.1,
+# the remote tape helper as grmt, whose compiled-in default path matches).
+# It must never be installed as "tar" or "gnutar": the system has its own, and
+# tools may expect the BSD or old-GNU behaviour of those names.
+run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
+    --program-prefix=g --disable-nls --disable-dependency-tracking
+/bin/gnumake
+/bin/gnumake install DESTDIR="$DESTDIR"
+
+BINDIR="$DESTDIR/usr/local/bin"
+test -x "$BINDIR/gtar" || { echo "tar: gtar was not installed" >&2; exit 1; }
+for name in tar gnutar; do
+    if test -e "$BINDIR/$name" || test -e "$DESTDIR/usr/local/man/man1/$name.1" ||
+       test -e "$DESTDIR/usr/local/share/man/man1/$name.1"; then
+        echo "tar: the image contains $name; refusing to ship it" >&2
+        exit 1
+    fi
+done
+# Shared files other packages own: libiconv's charset.alias and the info index.
+/bin/rm -f "$DESTDIR/usr/local/lib/charset.alias" "$DESTDIR/usr/local/share/info/dir" \
+    "$DESTDIR/usr/local/info/dir"

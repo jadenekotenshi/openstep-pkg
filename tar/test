@@ -1,0 +1,63 @@
+#!/bin/sh
+set -e
+PREFIX="$LOCAL_ROOT"
+GTAR="$PREFIX/bin/gtar"
+PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-tar.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+
+[ -x "$GTAR" ]
+"$GTAR" --version | grep 'GNU tar' > /dev/null
+
+mkdir src src/sub src/emptydir
+i=0
+: > src/text.txt
+while [ $i -lt 100 ]; do
+    printf 'OPENSTEP gtar test line %d\n' "$i" >> src/text.txt
+    i=`expr $i + 1`
+done
+printf 'second\n' > src/sub/second.txt
+printf 'name with spaces\n' > "src/sub/a file.txt"
+cp /bin/ls src/binary
+ln -s sub/second.txt src/link
+
+# Create, list and extract; directory contents must survive a round trip.
+"$GTAR" -cf archive.tar src
+"$GTAR" -tf archive.tar | grep 'src/sub/second.txt' > /dev/null
+test "`"$GTAR" -tf archive.tar | wc -l | tr -d ' '`" -ge 6
+mkdir out
+"$GTAR" -xf archive.tar -C out
+cmp src/text.txt out/src/text.txt
+cmp src/sub/second.txt out/src/sub/second.txt
+cmp "src/sub/a file.txt" "out/src/sub/a file.txt"
+cmp src/binary out/src/binary
+[ -d out/src/emptydir ]
+[ -h out/src/link ]
+test "`ls -l out/src/link | sed 's/.* -> //'`" = sub/second.txt
+
+# Reading directory entries correctly: names must come out intact.
+"$GTAR" -tf archive.tar | sort > listing
+grep '^src/$' listing > /dev/null
+grep '^src/binary$' listing > /dev/null
+grep '^src/sub/a file.txt$' listing > /dev/null
+
+# gzip filter, --exclude, append and --directory.
+"$GTAR" -czf archive.tgz src
+"$GTAR" -tzf archive.tgz | grep 'src/text.txt' > /dev/null
+mkdir out2
+"$GTAR" -xzf archive.tgz -C out2
+cmp src/text.txt out2/src/text.txt
+"$GTAR" -cf noexcl.tar --exclude='*.txt' src
+"$GTAR" -tf noexcl.tar | grep 'text.txt' > /dev/null && exit 1
+"$GTAR" -tf noexcl.tar | grep 'src/binary' > /dev/null
+printf 'later\n' > later.txt
+"$GTAR" -rf archive.tar later.txt
+"$GTAR" -tf archive.tar | grep '^later.txt$' > /dev/null
+"$GTAR" -cf viadir.tar -C src sub
+"$GTAR" -tf viadir.tar | grep '^sub/second.txt$' > /dev/null
+
+# Archives from stdin/stdout.
+"$GTAR" -cf - src | "$GTAR" -tf - | grep 'src/text.txt' > /dev/null
