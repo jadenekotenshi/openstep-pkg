@@ -1,0 +1,30 @@
+#!/bin/sh
+
+BIN="$ROOT_DIR/usr/local/bin/sudo"
+ETC="$ROOT_DIR/usr/local/etc"
+RUNDIR="$ROOT_DIR/usr/local/var/run/sudo"
+VARDIR="$ROOT_DIR/usr/local/var/db/sudo"
+
+# sudo only works setuid root.
+if [ -f "$BIN" ]; then
+    chown root "$BIN" 2>/dev/null ||
+        echo "sudo: rerun this post-install hook as root to make $BIN setuid root" >&2
+    chgrp wheel "$BIN" 2>/dev/null || :
+    chmod 4755 "$BIN" 2>/dev/null || :
+fi
+
+for dir in "$RUNDIR" "$VARDIR" "$VARDIR/lectured"; do
+    [ -d "$dir" ] || /usr/local/bin/mkdir -p "$dir" 2>/dev/null || :
+done
+chmod 0711 "$RUNDIR" "$VARDIR" 2>/dev/null || :
+chmod 0700 "$VARDIR/lectured" 2>/dev/null || :
+
+# Install the default policy only when there is none: never replace an
+# administrator's sudoers.  sudo refuses a sudoers that is not root-owned 0440.
+if [ ! -f "$ETC/sudoers" ] && [ -f "$ETC/sudoers.dist" ]; then
+    /bin/cp "$ETC/sudoers.dist" "$ETC/sudoers"
+    chown root "$ETC/sudoers" 2>/dev/null || :
+    chgrp wheel "$ETC/sudoers" 2>/dev/null || :
+    chmod 0440 "$ETC/sudoers" 2>/dev/null || :
+fi
+exit 0

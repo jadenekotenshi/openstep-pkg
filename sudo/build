@@ -1,0 +1,50 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -DNeXT -D_POSIX_SOURCE -D_NEXT_SOURCE'
+SED=/bin/sed
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+# configure's own "*-*-nextstep*" case (lockf() is broken there) does not match
+# the openstep4 host name.
+ac_cv_func_lockf=no
+export PATH CC CFLAGS SED GREP EGREP AWK ac_cv_func_lockf
+if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+# No dlopen() here, so link the sudoers policy plugin into sudo and build no
+# shared libraries.  Hardening (-fstack-protector, PIE) needs runtime support
+# this system lacks.
+# sudo defaults sysconfdir to /etc even with a prefix; keep everything under
+# /usr/local (sudoers is then /usr/local/etc/sudoers).
+run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
+    --build=$PKG_TARGET --host=$PKG_TARGET \
+    --disable-shared --disable-shared-libutil --enable-static-sudoers \
+    --disable-hardening --disable-nls --disable-tmpfiles.d --without-sendmail \
+    --with-rundir=/usr/local/var/run/sudo --with-vardir=/usr/local/var/db/sudo
+/bin/gnumake
+# INSTALL_OWNER= keeps the build from needing root; post-install sets ownership.
+/bin/gnumake install INSTALL_OWNER= DESTDIR="$DESTDIR"
+
+# Never ship a sudoers file: a reinstall would replace the administrator's.
+# post-install installs this default only if none exists.
+ETC="$DESTDIR/usr/local/etc"
+if test -f "$ETC/sudoers"; then
+    /bin/mv "$ETC/sudoers" "$ETC/sudoers.dist"
+fi
+if test -e "$ETC/sudoers"; then
+    echo "sudo: the image still contains etc/sudoers; refusing to ship it" >&2
+    exit 1
+fi
+# Everything must live under /usr/local; nothing may land in /etc or /usr/lib.
+for stray in etc usr/lib; do
+    if test -e "$DESTDIR/$stray"; then
+        echo "sudo: the image contains $stray outside /usr/local; refusing to ship it" >&2
+        exit 1
+    fi
+done
+test -x "$DESTDIR/usr/local/bin/sudo"
+chmod 4755 "$DESTDIR/usr/local/bin/sudo" 2>/dev/null || :
