@@ -14,13 +14,37 @@ if test -d "ntp-$VERSION"; then cd "ntp-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 # No sntp (needs libevent), no OpenSSL (MD5 keys still work; SHA-1 keys and
 # Autokey do not), no ntpsnmpd, no ntp-keygen autokey, no kernel PLL tricks.
-# Everything stays under /usr/local; configuration is /usr/local/etc/ntp.conf.
+# Everything stays under /usr/local; configuration is /usr/local/etc/ntpd.conf
+# (start ntpd with -c /usr/local/etc/ntpd.conf).
 run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
     --without-crypto --without-sntp --without-ntpsnmpd --disable-debugging \
     --disable-dependency-tracking
 /bin/gnumake
 /bin/gnumake install DESTDIR="$DESTDIR"
+
+# ntp installs the daemon into bin; it belongs in sbin.
+/usr/local/bin/mkdir -p "$DESTDIR/usr/local/sbin"
+/bin/mv "$DESTDIR/usr/local/bin/ntpd" "$DESTDIR/usr/local/sbin/ntpd"
+
+# Ship the default configuration as ntpd.conf.dist; post-install copies it to
+# ntpd.conf only when there is none, so a reinstall never replaces the
+# administrator's file.
+/usr/local/bin/mkdir -p "$DESTDIR/usr/local/etc" "$DESTDIR/usr/local/var/db"
+/bin/cat > "$DESTDIR/usr/local/etc/ntpd.conf.dist" <<'CEOF'
+# ntpd configuration.  Start with: /usr/local/sbin/ntpd -c /usr/local/etc/ntpd.conf
+server 0.pool.ntp.org iburst
+server 1.pool.ntp.org iburst
+server 2.pool.ntp.org iburst
+server 3.pool.ntp.org iburst
+
+driftfile /usr/local/var/db/ntp.drift
+
+# Answer time queries from this machine only; never let others change or
+# query the daemon.
+restrict default nomodify notrap nopeer noquery
+restrict 127.0.0.1
+CEOF
 
 # Never ship a configuration file: a reinstall would replace the administrator's.
 for stray in etc usr/lib; do
@@ -29,4 +53,6 @@ for stray in etc usr/lib; do
         exit 1
     fi
 done
-test -x "$DESTDIR/usr/local/bin/ntpd"
+test -x "$DESTDIR/usr/local/sbin/ntpd"
+test -f "$DESTDIR/usr/local/etc/ntpd.conf.dist"
+test ! -e "$DESTDIR/usr/local/etc/ntpd.conf"

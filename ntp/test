@@ -1,13 +1,16 @@
 #!/bin/sh
 set -e
 PREFIX="$LOCAL_ROOT"
-PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+PATH="$PREFIX/bin:$PREFIX/sbin:/usr/ucb:/bin:/usr/bin"
 export PATH
 
-for tool in ntpd ntpq ntpdc ntpdate ntp-keygen ntptime ntptrace; do
+[ -x "$PREFIX/sbin/ntpd" ] || { echo "ntp: missing sbin/ntpd" >&2; exit 1; }
+[ ! -e "$PREFIX/bin/ntpd" ] || { echo "ntp: ntpd should live in sbin" >&2; exit 1; }
+[ -f "$PREFIX/etc/ntpd.conf.dist" ] || { echo "ntp: missing ntpd.conf.dist" >&2; exit 1; }
+for tool in ntpq ntpdc ntpdate ntp-keygen ntptime ntptrace; do
     [ -x "$PREFIX/bin/$tool" ] || { echo "ntp: missing $tool" >&2; exit 1; }
 done
-"$PREFIX/bin/ntpd" --version 2>&1 | grep '4\.2\.8' > /dev/null
+"$PREFIX/sbin/ntpd" --version 2>&1 | grep '4\.2\.8' > /dev/null
 "$PREFIX/bin/ntpq" --version 2>&1 | grep '4\.2\.8' > /dev/null
 "$PREFIX/bin/ntpdc" --version 2>&1 | grep '4\.2\.8' > /dev/null
 
