@@ -956,7 +956,9 @@ remove_name() {
 
 ACTION=$1
 
-detect_arch
+# Pass our arguments through: some old Bourne shells do not restore the
+# positional parameters after a function called without any.
+detect_arch "$@"
 
 case $ACTION in
     arch)
