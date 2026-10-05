@@ -1,3 +1,50 @@
+diff -ruN -x '*.o' a/x/include/posixwait.h b/include/posixwait.h
+--- a/include/posixwait.h	2019-03-29 17:25:52.000000000 +0000
++++ b/include/posixwait.h	2026-10-05 23:09:36.342595352 +0000
+@@ -104,4 +104,9 @@
+ 
+ #endif /* !_POSIX_VERSION */
+ 
++/* Systems without WCONTINUED (OPENSTEP) never report a continued child. */
++#if !defined (WIFCONTINUED)
++#  define WIFCONTINUED(s)	(0)
++#endif
++
+ #endif /* !_POSIXWAIT_H_ */
+diff -ruN -x '*.o' a/x/jobs.c b/jobs.c
+--- a/jobs.c	2025-03-07 23:48:44.000000000 +0000
++++ b/jobs.c	2026-10-05 23:09:36.342140354 +0000
+@@ -998,9 +998,11 @@
+ save_proc_status (pid_t pid, int status)
+ {
+   sigset_t set, oset;
++  WAIT wstatus;
+ 
++  WSTATUS (wstatus) = status;
+   BLOCK_CHILD (set, oset);
+-  bgp_add (pid, process_exit_status (status));
++  bgp_add (pid, process_exit_status (wstatus));
+   UNBLOCK_CHILD (oset);  
+ }
+ 
+@@ -1137,7 +1139,7 @@
+   if (p == 0)
+     return -1;
+   if (p->running == PS_DONE)
+-    return (p->status);
++    return (WSTATUS (p->status));
+   r = wait_for (p->pid, 0);
+   return (r);			/* defer removing until later */
+ }
+@@ -1649,7 +1651,7 @@
+   t = alloc_process (name, pid);
+ 
+   /* set process exit status using offset discovered by configure */
+-  t->status = (status & 0xff) << WEXITSTATUS_OFFSET;
++  WSTATUS (t->status) = (status & 0xff) << WEXITSTATUS_OFFSET;
+   t->running = PS_DONE;
+ 
+   js.c_reaped++;	/* XXX */
 diff -ruN -x '*.o' a/x/lib/sh/Makefile.in b/lib/sh/Makefile.in
 --- a/lib/sh/Makefile.in	2024-11-13 20:37:41.000000000 +0000
 +++ b/lib/sh/Makefile.in	2026-10-05 22:43:00.014848978 +0000
