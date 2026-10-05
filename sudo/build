@@ -24,8 +24,11 @@ if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 patch -p1 < "sudo-$VERSION-openstep.patch"
 # pdksh leaves the quotes in `echo \"$var\"` inside backticks, so configure's
 # library searches end up with -l"-lsocket" and die with "bad substitution" or
-# hang waiting for an unbalanced quote.
-/bin/sed -e 's/echo \\"\$\([A-Za-z_]*\)\\"|/echo $\1|/' configure > configure.new
+# hang waiting for an unbalanced quote.  This system has no libsocket, libinet,
+# libnsl or libresolv (the socket calls are in libc), so the loops that search
+# for them are emptied rather than run under pdksh.
+/bin/sed -e 's/echo \\"\$\([A-Za-z_]*\)\\"|/echo $\1|/' \
+    -e 's/^\([ 	]*for _*libs in\) "-lsocket".*; do$/\1 ; do/' configure > configure.new
 /bin/mv configure.new configure
 /bin/chmod 755 configure
 # No dlopen() here, so link the sudoers policy plugin into sudo and build no
