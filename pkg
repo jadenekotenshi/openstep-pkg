@@ -954,15 +954,23 @@ remove_name() {
     rm -rf "$INST_DIR"
 }
 
+# Some old Bourne shells do not restore the positional parameters after a
+# function call, so take what we need from them before calling anything.
 ACTION=$1
+ARGC=$#
+ARG2=$2
+if [ $# -gt 1 ]; then
+    shift
+    PKG_ARGS="$*"
+else
+    PKG_ARGS=
+fi
 
-# Pass our arguments through: some old Bourne shells do not restore the
-# positional parameters after a function called without any.
-detect_arch "$@"
+detect_arch
 
 case $ACTION in
     arch)
-        [ $# -eq 1 ] || die "arch takes no arguments"
+        [ "$ARGC" -eq 1 ] || die "arch takes no arguments"
         echo "PKG_ARCH=$PKG_ARCH"
         echo "PKG_TARGET=$PKG_TARGET"
         echo "PKG_SYSCC_ARCH_FLAGS=$PKG_SYSCC_ARCH_FLAGS"
@@ -970,35 +978,33 @@ case $ACTION in
     ;;
 
     download)
-        [ $# -eq 2 ] || die "download requires <package-dir>"
-        load_pkg "$2"
+        [ "$ARGC" -eq 2 ] || die "download requires <package-dir>"
+        load_pkg "$ARG2"
         download_pkg
     ;;
 
     build)
-        [ $# -eq 2 ] || die "build requires <package-dir>"
-        load_pkg "$2"
+        [ "$ARGC" -eq 2 ] || die "build requires <package-dir>"
+        load_pkg "$ARG2"
         run_build
     ;;
 
     install)
-        shift
-        install_pkgs "$@"
+        install_pkgs $PKG_ARGS
     ;;
 
     list)
-        [ $# -eq 1 ] || die "list takes no arguments"
+        [ "$ARGC" -eq 1 ] || die "list takes no arguments"
         list_pkgs
     ;;
 
     remove)
-        [ $# -eq 2 ] || die "remove requires <name>"
-        remove_name "$2"
+        [ "$ARGC" -eq 2 ] || die "remove requires <name>"
+        remove_name "$ARG2"
     ;;
 
     test)
-        shift
-        test_pkgs "$@"
+        test_pkgs $PKG_ARGS
     ;;
 
     ""|-h|--help|help)
