@@ -8,7 +8,7 @@ PREFIX=/usr/local
 PATCHFILE="expat-$VERSION-openstep.patch"
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC=/usr/local/bin/gcc-4.2
-CFLAGS="-O2 -DNeXT -std=gnu99"
+CFLAGS="$PKG_GCC42_ARCH_FLAGS -O2 -DNeXT -std=gnu99"
 GREP=/usr/local/bin/grep
 EGREP="/usr/local/bin/grep -E"
 SED=/bin/sed

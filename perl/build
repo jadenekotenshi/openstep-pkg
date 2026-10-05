@@ -9,6 +9,7 @@ patch -p1 < "perl-$VERSION-openstep.patch"
 # GCC 4.2 cannot emit usable PIC for this target; link the bundled XS modules.
 /usr/local/bin/ksh ./Configure -des -O -Dprefix=/usr/local \
     -Dcc=/usr/local/bin/gcc-4.2 -Dld=/usr/local/bin/gcc-4.2 \
+    -Accflags="$PKG_GCC42_ARCH_FLAGS" \
     -Dhintfile=next_4 -Dosname=next -Dosvers=4.2 \
     -Dmake=/bin/gnumake -Dsh=/usr/local/bin/ksh -Duseposix=true \
     -Uusedl -Duseshrplib=false -Dd_mmap=undef \

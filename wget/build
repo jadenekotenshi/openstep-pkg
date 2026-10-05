@@ -5,7 +5,7 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:$PATH
-CC=/bin/cc
+CC="/bin/cc $PKG_SYSCC_ARCH_FLAGS"
 export DESTDIR VERSION PATH CC
 . "$PKG_BUILD_HELPERS"
 

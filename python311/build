@@ -12,7 +12,7 @@ PATCHFILE="python-$VERSION-openstep.patch"
 
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC=/usr/local/bin/gcc-4.2
-CFLAGS="-O3 -DNeXT"
+CFLAGS="$PKG_GCC42_ARCH_FLAGS -O3 -DNeXT"
 # GCC42 exhausts memory or crashes optimizing the generated deepfreeze unit.
 # Keep the interpreter optimized; only frozen-object initialization uses -O0.
 DEEPFREEZE_CFLAGS="-O0 -g0"

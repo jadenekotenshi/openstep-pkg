@@ -4,7 +4,7 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:$PATH
-CC=/usr/local/bin/gcc-4.2
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
 CPPFLAGS=-I/NextDeveloper/Headers/bsd
 GREP=/usr/local/bin/grep
 EGREP=/usr/local/bin/egrep

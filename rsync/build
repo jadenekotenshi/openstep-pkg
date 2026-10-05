@@ -4,7 +4,7 @@ DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
 CC=/usr/local/bin/gcc-4.2
-CXX=/usr/local/bin/g++-4.2
+CXX="/usr/local/bin/g++-4.2 $PKG_GCC42_ARCH_FLAGS"
 CFLAGS='-O2 '"$PKG_GCC42_ARCH_FLAGS"
 CPPFLAGS='-D_POSIX_SOURCE -I./openstep -I/usr/local/include -I/NextDeveloper/Headers/bsd'
 # Eager binding prevents dyld re-entry from child-exit signal handlers.

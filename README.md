@@ -33,6 +33,11 @@ for configure, `CFLAGS="-O2 $PKG_GCC42_ARCH_FLAGS"` with `gcc-4.2` or
 `pkg_arch_flags COMPILER`, which picks the right set from the compiler's name.  Either
 `*_FLAGS` variable can be overridden, even to empty.  `sh ./pkg arch` prints the values.
 
+Every package's `build` script applies the flags for the compiler it uses: in `CFLAGS` where
+the package sets one, otherwise on `CC` (so autoconf's own `-g -O2` default survives), or on
+`CPPFLAGS` where the script calls a quoted `"$CC"`.  The `test` hooks compile small probe
+programs and are left at the compiler's defaults.
+
 ## Compiler selection
 
 Packages that need the newer compiler depend on `gcc42` and explicitly use

@@ -3,7 +3,7 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
-CC=/usr/local/bin/gcc-4.2
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
 CPPFLAGS='-I/usr/local/include/ncurses -I/usr/local/include -I/NextDeveloper/Headers/bsd'
 LDFLAGS=-L/usr/local/lib
 AWK=/usr/local/bin/gawk

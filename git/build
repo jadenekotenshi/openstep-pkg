@@ -5,7 +5,7 @@ VERSION=$2
 test -f Makefile || cd git-$VERSION
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
 CC=/usr/local/bin/gcc-4.2
-CFLAGS='-O2 -std=gnu99 -I/usr/local/include -Icompat/openstep'
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -std=gnu99 -I/usr/local/include -Icompat/openstep'
 LDFLAGS='-L/usr/local/lib'
 CONFIG_SHELL=/usr/local/bin/ksh
 SHELL_PATH=/usr/local/bin/ksh
@@ -33,7 +33,7 @@ make_git() {
 /usr/local/bin/gnumake -j2 \
     SHELL="$CONFIG_SHELL" \
     CC="$CC" \
-    CFLAGS="$CFLAGS" \
+    CFLAGS="$PKG_GCC42_ARCH_FLAGS $CFLAGS" \
     LDFLAGS="$LDFLAGS" \
     SHELL_PATH="$SHELL_PATH" \
     CURL_CONFIG=/usr/local/bin/curl-config \
@@ -55,7 +55,7 @@ make_git() {
 
 make_git
 # Exercise the platform behavior that repository storage and child processes need.
-"$CC" -O2 -Icompat/openstep -I/usr/local/include \
+"$CC" $PKG_GCC42_ARCH_FLAGS -O2 -Icompat/openstep -I/usr/local/include \
     compat/openstep-test.c compat/openstep.o compat/snprintf.o \
     compat/poll/poll.o ctype.o hex-ll.o \
     -L/usr/local/lib -lcurl -lssl -lcrypto -lz -o openstep-test

@@ -3,7 +3,7 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
-CC=/usr/local/bin/gcc-4.2
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
 export PATH CC
 if test -d "diffutils-$VERSION"; then cd "diffutils-$VERSION"; fi
 patch -p1 < "diffutils-$VERSION-openstep.patch"

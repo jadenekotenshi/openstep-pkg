@@ -20,7 +20,7 @@ patch -p1 < "ffmpeg-$VERSION-openstep.patch"
 
 # The upstream makefiles use eval, which the stock gnumake 3.74 lacks.
 /usr/local/bin/gnumake SHELL="$CONFIG_SHELL"
-/usr/local/bin/gcc-4.2 -std=gnu99 -DNeXT -I. -Ilibavutil -I/usr/local/include \
+/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS -std=gnu99 -DNeXT -I. -Ilibavutil -I/usr/local/include \
     tests/openstep.c libavutil/openstep.c -L/usr/local/lib \
     -lcurl -lssl -lcrypto -lz -lm -o openstep-test
 ./openstep-test
