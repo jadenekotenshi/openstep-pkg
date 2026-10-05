@@ -49,6 +49,13 @@ FLEX=/usr/local/bin/flex
 BISON=/usr/local/bin/bison
 BUILD_CFLAGS='-O2 -D_POSIX_SOURCE'
 BOOT_CFLAGS="$BUILD_CFLAGS --param ggc-min-expand=5 --param ggc-min-heapsize=4096"
+# Stage 2 and 3 link with direct calls, so ld pulls libiberty's getopt.o, whose
+# data symbols System also defines.  OPENSTEP/SPARC ld rejects that unless
+# multiple definitions are allowed (-m, the first definition wins).
+BOOT_LDFLAGS=
+if [ "$ARCH" = sparc ]; then
+    BOOT_LDFLAGS="-Wl,-m"
+fi
 SEED_CFLAGS='-O0 -D_POSIX_SOURCE'
 CFLAGS=$BUILD_CFLAGS
 CXXFLAGS=$BUILD_CFLAGS
@@ -72,17 +79,23 @@ if [ "`"$AWK" 'BEGIN { printf "%d", -1 }'`" != -1 ]; then
     exit 1
 fi
 
+# GCC42_RESUME=1 continues an interrupted build in place: it skips the patch,
+# the mtime reset and configure, and goes straight back to make.  Run this
+# script from inside the extracted source directory, as pkg does.
 cd "$SRCDIR"
+if [ -z "$GCC42_RESUME" ]; then
 patch -p1 < "$PATCHFILE"
 
 # The source inputs are assembled on a modern host.  Normalize their mtimes
 # after extraction so Automake's clock-sanity check and make dependencies do
 # not inherit UTC/local-time skew from the transported archives.
 /usr/bin/find . -type f -exec /usr/bin/touch {} \;
+fi
 
 test -d "$BUILDDIR" || mkdir "$BUILDDIR"
 cd "$BUILDDIR"
 
+if [ -z "$GCC42_RESUME" ]; then
 "$CONFIG_SHELL" ../configure \
     --build="$TARGET" \
     --host="$TARGET" \
@@ -107,12 +120,13 @@ cd "$BUILDDIR"
     --disable-symvers \
     --disable-tls \
     --disable-visibility
+fi
 
 # Three native compiler stages, followed by GCC's stage-2/stage-3 comparison.
 # Stock cc cannot optimize insn-attrtab.c within this host's resources.
 # Optimize the two self-built stages and runtimes; compare stages 2 and 3.
 "$MAKE" -j1 SHELL="$CONFIG_SHELL" STAGE1_CFLAGS="$SEED_CFLAGS" \
-    BOOT_CFLAGS="$BOOT_CFLAGS" bootstrap
+    BOOT_CFLAGS="$BOOT_CFLAGS" BOOT_LDFLAGS="$BOOT_LDFLAGS" bootstrap
 
 # Force a fresh comparison rather than accepting the existing comparison stamp.
 /bin/rm -f compare
