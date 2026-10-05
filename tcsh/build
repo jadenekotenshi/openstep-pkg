@@ -1,0 +1,22 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -DNeXT'
+CPPFLAGS=-I/usr/local/include
+LDFLAGS=-L/usr/local/lib
+# Use the GNU termcap package for tgetent(); it still reads /etc/termcap.
+LIBS=-ltermcap
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+export PATH CC CFLAGS CPPFLAGS LDFLAGS LIBS GREP EGREP AWK
+if test -d "tcsh-$VERSION"; then cd "tcsh-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
+    --disable-nls --disable-nls-catalogs --disable-rpath
+/bin/gnumake
+/usr/local/bin/mkdir -p "$DESTDIR/usr/local/bin" "$DESTDIR/usr/local/man/man1"
+/bin/gnumake install DESTDIR="$DESTDIR"
