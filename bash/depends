@@ -1,2 +1,5 @@
-patch
-texinfo
+pdksh
+gcc42
+coreutils
+grep
+gawk

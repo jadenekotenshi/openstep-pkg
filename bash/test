@@ -1,8 +1,32 @@
 #!/bin/sh
-
 set -e
-
 BASH="$ROOT_DIR/usr/local/bin/bash"
+WORK=/tmp/pkg-bash.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
 
 [ -x "$BASH" ]
+"$BASH" --version | grep 'version 5\.3' > /dev/null
 "$BASH" -c 'test -n "$BASH_VERSION"; test "`echo ok`" = ok'
+
+# Arrays, associative arrays, pipelines, pipefail, here-documents, traps.
+"$BASH" -c '
+set -e
+a=(one two three); test ${#a[@]} -eq 3; test "${a[1]}" = two
+declare -A m; m[k]=v; test "${m[k]}" = v
+set -o pipefail
+if false | true; then echo "pipefail ignored" >&2; exit 1; fi
+test "$(printf "a\nb\n" | wc -l | tr -d " ")" = 2
+test "$(cat <<X
+here $((6*7))
+X
+)" = "here 42"
+trap "echo trapped" EXIT
+' > "$WORK/out"
+grep trapped "$WORK/out" > /dev/null
+
+# Exit statuses, including from signals and background jobs.
+"$BASH" -c 'sh -c "exit 7"; test $? -eq 7'
+"$BASH" -c 'sh -c "kill -TERM \$\$"; test $? -eq 143' 2>/dev/null
+"$BASH" -c 'sleep 1 & wait $!; test $? -eq 0'
+"$BASH" -c '(exit 3); test $? -eq 3'
