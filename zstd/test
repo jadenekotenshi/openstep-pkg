@@ -1,0 +1,58 @@
+#!/bin/sh
+set -e
+PREFIX="$LOCAL_ROOT"
+PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-zstd.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+printf 'OPENSTEP zstd round trip\n' > input
+zstd -q -k input
+zstd -q -t input.zst
+zstd -q -dc input.zst > output
+cmp input output
+zstdgrep 'zstd round trip' input.zst >/dev/null
+zstd -lv input.zst > listing 2>&1
+grep '25 B' listing >/dev/null
+mkdir nested
+cp input 'nested/space name'
+zstd -q -r nested
+zstd -q -t 'nested/space name.zst'
+for format in gzip xz lzma; do
+    zstd -q --format="$format" -c input > compressed
+    zstd -q -dc compressed > output
+    cmp input output
+done
+cp input reference
+zstd -q --patch-from=reference -c input > patch.zst
+zstd -q -dc --patch-from=reference patch.zst > output
+cmp input output
+printf 'invalid\n' > invalid.zst
+if zstd -q -t invalid.zst 2>/dev/null; then exit 1; fi
+cat > api.c <<'EOF'
+#include <zstd.h>
+#include <assert.h>
+#include <string.h>
+extern int zstd_snprintf(char *, size_t, const char *, ...);
+int main(void) {
+    const char input[] = "OPENSTEP zstd public library round trip";
+    char compressed[256], output[128], formatted[80];
+    size_t size = ZSTD_compress(compressed,sizeof compressed,input,sizeof input,3);
+    size_t decoded;
+    assert(!ZSTD_isError(size));
+    decoded=ZSTD_decompress(output,sizeof output,compressed,size);
+    assert(decoded==sizeof input && !memcmp(input,output,decoded));
+    assert(ZSTD_isError(ZSTD_decompress(output,1,compressed,size)));
+    assert(zstd_snprintf(formatted,sizeof formatted,"%llu %lld %.2f",
+        ~0ULL,(-9223372036854775807LL-1),1.25)==46);
+    assert(!strcmp(formatted,"18446744073709551615 -9223372036854775808 1.25"));
+    assert(zstd_snprintf(formatted,4,"%llu",~0ULL)==20 && !strcmp(formatted,"184"));
+    assert(zstd_snprintf(formatted,sizeof formatted,"%u %lu %llx %llo",
+        ~0U,~0UL,0x123456789abcdef0ULL,~0ULL)==61);
+    assert(!strcmp(formatted,"4294967295 4294967295 123456789abcdef0 1777777777777777777777"));
+    return 0;
+}
+EOF
+"$PREFIX/bin/gcc-4.2" -I"$PREFIX/include" api.c -L"$PREFIX/lib" -lzstd -o api
+./api

@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+if test -d "zstd-$VERSION"; then cd "zstd-$VERSION"; fi
+patch -p1 < "zstd-$VERSION-openstep.patch"
+make_zstd() {
+    /usr/local/bin/gnumake CC=/usr/local/bin/gcc-4.2 SHELL=/usr/local/bin/ksh \
+        CFLAGS='-O2 -march=i486 -DCLOCKS_PER_SEC=CLK_TCK -D_POSIX_SOURCE -I/usr/local/include' \
+        LDFLAGS=-L/usr/local/lib DEBUGFLAGS= DEPFLAGS= ZSTD_NO_ASM=1 ARFLAGS=rc \
+        BUILD_DIR=obj/openstep UNAME=OPENSTEP LIBVER="$VERSION" \
+        LIBVER_MAJOR=1 LIBVER_MINOR=5 LIBVER_PATCH=7 ZSTD_VERSION="$VERSION" \
+        LDFLAGS_DYNLIB= HAVE_ZLIB=1 HAVE_LZMA=1 INSTALL='/usr/bin/install -c' "$@"
+}
+cd lib
+make_zstd libzstd.a
+/bin/ranlib libzstd.a
+cd ../programs
+make_zstd zstd
+cd ..
+for dir in usr usr/local usr/local/bin usr/local/lib usr/local/lib/pkgconfig \
+    usr/local/include usr/local/share usr/local/share/man usr/local/share/man/man1; do
+    test -d "$DESTDIR/$dir" || mkdir "$DESTDIR/$dir"
+done
+cd lib
+make_zstd install-static install-includes install-pc DESTDIR="$DESTDIR" PREFIX=/usr/local
+/bin/ranlib "$DESTDIR/usr/local/lib/libzstd.a"
+cd ../programs
+make_zstd install DESTDIR="$DESTDIR" PREFIX=/usr/local
