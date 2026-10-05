@@ -1,0 +1,171 @@
+diff --git a/doio.c b/doio.c
+index fc249e6..2a2b46b 100644
+--- a/doio.c
++++ b/doio.c
+@@ -1789,7 +1789,12 @@ nothing in the core.
+             * "current time". */
+ 
+            if ( accessed == &PL_sv_undef && modified == &PL_sv_undef )
++#if defined(NeXT) && !defined(HAS_FUTIMES)
++                /* OPENSTEP's utime dereferences a NULL time buffer. */
++                utbuf.actime = utbuf.modtime = time(NULL);
++#else
+                 utbufp = NULL;
++#endif
+            else {
+                 Zero(&utbuf, sizeof utbuf, char);
+ #ifdef HAS_FUTIMES
+diff --git a/ext/Cwd/Cwd.xs b/ext/Cwd/Cwd.xs
+index 949b94c..9bc0d70 100644
+--- a/ext/Cwd/Cwd.xs
++++ b/ext/Cwd/Cwd.xs
+@@ -86,7 +86,11 @@ bsd_realpath(const char *path, char resolved[MAXPATHLEN])
+ 		resolved_len = 1;
+ 		left_len = my_strlcpy(left, path + 1, sizeof(left));
+ 	} else {
++#ifdef NeXT
++		if (getwd(resolved) == NULL) {
++#else
+ 		if (getcwd(resolved, MAXPATHLEN) == NULL) {
++#endif
+ 			my_strlcpy(resolved, ".", MAXPATHLEN);
+ 		return (NULL);
+ 	}
+diff --git a/ext/POSIX/POSIX.xs b/ext/POSIX/POSIX.xs
+index ee00e9f..d9b2fa7 100644
+--- a/ext/POSIX/POSIX.xs
++++ b/ext/POSIX/POSIX.xs
+@@ -1,5 +1,9 @@
+ #define PERL_EXT_POSIX
+ 
++#ifdef NeXT
++#define _POSIX_SOURCE 1
++#endif
++
+ #ifdef NETWARE
+ 	#define _POSIX_
+ 	/*
+@@ -226,6 +230,63 @@ char *tzname[] = { "" , "" };
+ 
+ typedef int SysRet;
+ typedef long SysRetLong;
++#ifdef NeXT
++/* OPENSTEP declares POSIX signals but only implements the BSD interface. */
++#define SA_RESTART 0x10000000
++static int next_sigvalid(int sig)
++{ if (sig > 0 && sig < NSIG) return 1; errno = EINVAL; return 0; }
++static int next_sigemptyset(sigset_t *set) { *set = 0; return 0; }
++static int next_sigfillset(sigset_t *set) { *set = 0x7fffffff; return 0; }
++static int next_sigaddset(sigset_t *set, int sig)
++{ if (!next_sigvalid(sig)) return -1; *set |= 1U << (sig - 1); return 0; }
++static int next_sigdelset(sigset_t *set, int sig)
++{ if (!next_sigvalid(sig)) return -1; *set &= ~(1U << (sig - 1)); return 0; }
++static int next_sigismember(const sigset_t *set, int sig)
++{ if (!next_sigvalid(sig)) return -1; return !!(*set & (1U << (sig - 1))); }
++static int next_sigprocmask(int how, const sigset_t *set, sigset_t *old)
++{
++    int previous;
++    if (!set) previous = sigblock(0);
++    else switch (how) {
++    case SIG_BLOCK: previous = sigblock(*set); break;
++    case SIG_UNBLOCK: previous = sigsetmask(sigblock(0) & ~*set); break;
++    case SIG_SETMASK: previous = sigsetmask(*set); break;
++    default: errno = EINVAL; return -1;
++    }
++    if (old) *old = previous;
++    return 0;
++}
++static int next_sigaction(int sig, const struct sigaction *action,
++                          struct sigaction *old)
++{
++    struct sigvec vector, previous;
++    int result;
++    if (action) {
++        if (action->sa_flags & ~SA_RESTART) { errno = EINVAL; return -1; }
++        vector.sv_handler = action->sa_handler;
++        vector.sv_mask = action->sa_mask;
++        vector.sv_flags = action->sa_flags & SA_RESTART ? 0 : SV_INTERRUPT;
++    }
++    result = sigvec(sig, action ? &vector : NULL, old ? &previous : NULL);
++    if (!result && old) {
++        old->sa_handler = previous.sv_handler;
++        old->sa_mask = previous.sv_mask;
++        old->sa_flags = previous.sv_flags & SV_INTERRUPT ? 0 : SA_RESTART;
++    }
++    return result;
++}
++#define sigemptyset next_sigemptyset
++#define sigfillset next_sigfillset
++#define sigaddset next_sigaddset
++#define sigdelset next_sigdelset
++#define sigismember next_sigismember
++#define sigprocmask next_sigprocmask
++#define sigaction(n,a,o) next_sigaction(n,a,o)
++#define sigsuspend(s) sigpause(*(s))
++/* There is no BSD equivalent for querying pending signals. */
++#define sigpending(s) not_here("sigpending")
++#endif
++
+ typedef sigset_t* POSIX__SigSet;
+ typedef HV* POSIX__SigAction;
+ #ifdef I_TERMIOS
+diff --git a/perl.h b/perl.h
+index 1bab046..5f12f60 100644
+--- a/perl.h
++++ b/perl.h
+@@ -557,6 +557,18 @@ register struct op *Perl_op asm(stringify(OP_IN_REGISTER));
+ #   include <unistd.h>
+ #endif
+ 
++#ifdef NeXT
++extern char *getwd(char *);
++/* BSD getgroups doesn't implement the POSIX zero-size query. */
++static int
++Perl_next_getgroups(int count, int *groups)
++{
++    int query[NGROUPS];
++    return getgroups(count ? count : NGROUPS, count ? groups : query);
++}
++#define getgroups Perl_next_getgroups
++#endif
++
+ #if defined(HAS_SYSCALL) && !defined(HAS_SYSCALL_PROTO) && !defined(PERL_MICRO)
+ EXTERN_C int syscall(int, ...);
+ #endif
+diff --git a/util.c b/util.c
+index 6ac7c5e..7a76ba4 100644
+--- a/util.c
++++ b/util.c
+@@ -1603,7 +1603,12 @@ Perl_my_setenv(pTHX_ char *nam, char *val)
+ #endif
+   {
+ #ifndef PERL_USE_SAFE_PUTENV
++#ifdef NeXT
++    /* OPENSTEP has no putenv; always use Perl's environ-array path. */
++    if (1) {
++#else
+     if (!PL_use_safe_putenv) {
++#endif
+     /* most putenv()s leak, so we manipulate environ directly */
+     register I32 i=setenv_getix(nam);          /* where does it go? */
+     int nlen, vlen;
+@@ -4256,14 +4261,18 @@ Perl_getcwd_sv(pTHX_ register SV *sv)
+     SvTAINTED_on(sv);
+ #endif
+ 
+-#ifdef HAS_GETCWD
++#if defined(HAS_GETCWD) || defined(NeXT)
+     {
+ 	char buf[MAXPATHLEN];
+ 
+ 	/* Some getcwd()s automatically allocate a buffer of the given
+ 	 * size from the heap if they are given a NULL buffer pointer.
+ 	 * The problem is that this behaviour is not portable. */
++#ifdef NeXT
++	if (getwd(buf)) {
++#else
+ 	if (getcwd(buf, sizeof(buf) - 1)) {
++#endif
+ 	    sv_setpv(sv, buf);
+ 	    return TRUE;
+ 	}

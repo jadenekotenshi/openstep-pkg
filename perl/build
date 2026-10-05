@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+if test -d "perl-$VERSION"; then cd "perl-$VERSION"; fi
+patch -p1 < "perl-$VERSION-openstep.patch"
+# GCC 4.2 cannot emit usable PIC for this target; link the bundled XS modules.
+/usr/local/bin/ksh ./Configure -des -O -Dprefix=/usr/local \
+    -Dcc=/usr/local/bin/gcc-4.2 -Dld=/usr/local/bin/gcc-4.2 \
+    -Dhintfile=next_4 -Dosname=next -Dosvers=4.2 \
+    -Dmake=/bin/gnumake -Dsh=/usr/local/bin/ksh -Duseposix=true \
+    -Uusedl -Duseshrplib=false -Dd_mmap=undef \
+    -Dldflags='-Wl,-prebind' \
+    -Dccflags='-fno-common -DUSE_NEXT_CTYPE -DUSE_PERL_SBRK -DNX_CURRENT_COMPILER_RELEASE=400 -DNS_TARGET_MAJOR=4'
+/bin/gnumake
+/bin/gnumake install DESTDIR="$DESTDIR"
+/bin/ranlib "$DESTDIR/usr/local/lib/perl5/$VERSION/OPENSTEP-Mach/CORE/libperl.a"

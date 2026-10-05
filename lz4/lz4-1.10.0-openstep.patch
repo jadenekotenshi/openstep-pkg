@@ -1,0 +1,188 @@
+--- a/lib/lz4.h
++++ b/lib/lz4.h
+@@ -696,7 +696,7 @@
+ #define LZ4_HASHTABLESIZE (1 << LZ4_MEMORY_USAGE)
+ #define LZ4_HASH_SIZE_U32 (1 << LZ4_HASHLOG)       /* required as macro for static allocation */
+ 
+-#if defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */)
++#if !defined(NeXT) && (defined(__cplusplus) || (defined (__STDC_VERSION__) && (__STDC_VERSION__ >= 199901L) /* C99 */))
+ # include <stdint.h>
+   typedef  int8_t  LZ4_i8;
+   typedef uint8_t  LZ4_byte;
+--- a/lib/Makefile
++++ b/lib/Makefile
+@@ -45,6 +45,7 @@
+ 
+ BUILD_SHARED:=yes
+ BUILD_STATIC:=yes
++ARFLAGS = rcs
+ 
+ CPPFLAGS+= -DXXH_NAMESPACE=LZ4_
+ USERCFLAGS:= -O3 $(CFLAGS)
+@@ -102,7 +103,7 @@
+ ifeq ($(BUILD_STATIC),yes)  # can be disabled on command line
+ 	@echo compiling static library
+ 	$(COMPILE.c) $^
+-	$(AR) rcs $@ *.o
++	$(AR) $(ARFLAGS) $@ *.o
+ endif
+ 
+ ifeq ($(WINBASED),yes)
+--- a/programs/bench.c
++++ b/programs/bench.c
+@@ -738,7 +738,12 @@
+     BMK_loadFiles(srcBuffer, benchedSize, fileSizes, fileNamesTable, nbFiles);
+ 
+     /* Bench */
++#ifdef NeXT
++    /* A 32-bit unsigned count uses at most 17 of mfName's 20 bytes. */
++    sprintf (mfName, " %u files", nbFiles);
++#else
+     snprintf (mfName, sizeof(mfName), " %u files", nbFiles);
++#endif
+     {   const char* displayName = (nbFiles > 1) ? mfName : fileNamesTable[0];
+         benchError = BMK_benchCLevel(srcBuffer, benchedSize,
+                         displayName, cLevel, cLevelLast,
+--- a/programs/lz4io.c
++++ b/programs/lz4io.c
+@@ -48,6 +48,23 @@
+ #include "platform.h"  /* Large File Support, SET_BINARY_MODE, SET_SPARSE_FILE_MODE, PLATFORM_POSIX_VERSION, __64BIT__ */
+ #include "timefn.h"    /* TIME_ */
+ #include "util.h"      /* UTIL_getFileStat, UTIL_setFileStat */
++
++#ifdef NeXT
++/* OPENSTEP printf does not support long long integer conversions. */
++static const char *LZ4IO_u64text(unsigned long long value, char buffer[21])
++{
++    char *end = buffer + 20;
++    *end = 0;
++    do { *--end = '0' + value % 10; value /= 10; } while (value);
++    return end;
++}
++#define LZ4IO_PRIu64 "s"
++#define LZ4IO_U64(value) LZ4IO_u64text((value), (char[21]){0})
++#else
++#define LZ4IO_PRIu64 "llu"
++#define LZ4IO_U64(value) (value)
++#endif
++
+ #include <stdio.h>     /* fprintf, fopen, fread, stdin, stdout, fflush, getchar */
+ #include <stdlib.h>    /* malloc, free */
+ #include <string.h>    /* strerror, strcmp, strlen */
+@@ -882,8 +899,8 @@
+ 
+         /* Status */
+         DISPLAYLEVEL(2, "\r%79s\r", "");    /* blank line */
+-        DISPLAYLEVEL(2,"Compressed %llu bytes into %llu bytes ==> %.2f%% \n",
+-                    rjd.totalReadSize, wr.totalCSize,
++        DISPLAYLEVEL(2,"Compressed %" LZ4IO_PRIu64 " bytes into %" LZ4IO_PRIu64 " bytes ==> %.2f%% \n",
++                    LZ4IO_U64(rjd.totalReadSize), LZ4IO_U64(wr.totalCSize),
+                     (double)wr.totalCSize / (double)(rjd.totalReadSize + !rjd.totalReadSize) * 100.);
+         *readSize = rjd.totalReadSize;
+     }
+@@ -1349,8 +1366,8 @@
+ 
+     /* Final Status */
+     DISPLAYLEVEL(2, "\r%79s\r", "");
+-    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
+-                    filesize, compressedfilesize,
++    DISPLAYLEVEL(2, "Compressed %" LZ4IO_PRIu64 " bytes into %" LZ4IO_PRIu64 " bytes ==> %.2f%%\n",
++                    LZ4IO_U64(filesize), LZ4IO_U64(compressedfilesize),
+                     (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
+     *inStreamSize = filesize;
+ 
+@@ -1479,8 +1496,8 @@
+ 
+     /* Final Status */
+     DISPLAYLEVEL(2, "\r%79s\r", "");
+-    DISPLAYLEVEL(2, "Compressed %llu bytes into %llu bytes ==> %.2f%%\n",
+-                    filesize, compressedfilesize,
++    DISPLAYLEVEL(2, "Compressed %" LZ4IO_PRIu64 " bytes into %" LZ4IO_PRIu64 " bytes ==> %.2f%%\n",
++                    LZ4IO_U64(filesize), LZ4IO_U64(compressedfilesize),
+                     (double)compressedfilesize / (double)(filesize + !filesize /* avoid division by zero */ ) * 100.);
+     *inStreamSize = filesize;
+ 
+@@ -2434,7 +2451,7 @@
+ 
+     /* Final Status */
+     DISPLAYLEVEL(2, "\r%79s\r", "");
+-    DISPLAYLEVEL(2, "%-30.30s : decoded %llu bytes \n", input_filename, filesize);
++    DISPLAYLEVEL(2, "%-30.30s : decoded %" LZ4IO_PRIu64 " bytes \n", input_filename, LZ4IO_U64(filesize));
+     *outGenSize = filesize;
+     (void)output_filename;
+ 
+@@ -2760,22 +2777,22 @@
+                             if (totalBlocksSize) {
+                                 char bTypeBuffer[5];
+                                 LZ4IO_blockTypeID(frameInfo.lz4FrameInfo.blockSizeID, frameInfo.lz4FrameInfo.blockMode, bTypeBuffer);
+-                                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s",
+-                                             cfinfo->frameCount + 1,
++                                if (displayNow) DISPLAYOUT("    %6" LZ4IO_PRIu64 " %14s %5s %8s",
++                                             LZ4IO_U64(cfinfo->frameCount + 1),
+                                              LZ4IO_frameTypeNames[frameInfo.frameType],
+                                              bTypeBuffer,
+                                              frameInfo.lz4FrameInfo.contentChecksumFlag ? "XXH32" : "-");
+                                 if (frameInfo.lz4FrameInfo.contentSize) {
+                                     double const ratio = (double)(totalBlocksSize + hSize) / (double)frameInfo.lz4FrameInfo.contentSize * 100;
+-                                    if (displayNow) DISPLAYOUT(" %20llu %20llu %9.2f%%\n",
+-                                                    totalBlocksSize + hSize,
+-                                                    frameInfo.lz4FrameInfo.contentSize,
++                                    if (displayNow) DISPLAYOUT(" %20" LZ4IO_PRIu64 " %20" LZ4IO_PRIu64 " %9.2f%%\n",
++                                                    LZ4IO_U64(totalBlocksSize + hSize),
++                                                    LZ4IO_U64(frameInfo.lz4FrameInfo.contentSize),
+                                                     ratio);
+                                     /* Now we've consumed frameInfo we can use it to store the total contentSize */
+                                     frameInfo.lz4FrameInfo.contentSize += cfinfo->frameSummary.lz4FrameInfo.contentSize;
+                                 }
+                                 else {
+-                                    if (displayNow) DISPLAYOUT(" %20llu %20s %9s \n", totalBlocksSize + hSize, "-", "-");
++                                    if (displayNow) DISPLAYOUT(" %20" LZ4IO_PRIu64 " %20s %9s \n", LZ4IO_U64(totalBlocksSize + hSize), "-", "-");
+                                     cfinfo->allContentSize = 0;
+                                 }
+                                 result = LZ4IO_LZ4F_OK;
+@@ -2793,11 +2810,11 @@
+                     break;
+                 }
+                 if (totalBlocksSize) {
+-                    if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20llu %20s %9s\n",
+-                                 cfinfo->frameCount + 1,
++                    if (displayNow) DISPLAYOUT("    %6" LZ4IO_PRIu64 " %14s %5s %8s %20" LZ4IO_PRIu64 " %20s %9s\n",
++                                 LZ4IO_U64(cfinfo->frameCount + 1),
+                                  LZ4IO_frameTypeNames[frameInfo.frameType],
+                                  "-", "-",
+-                                 totalBlocksSize + 4,
++                                 LZ4IO_U64(totalBlocksSize + 4),
+                                  "-", "-");
+                     result = LZ4IO_LZ4F_OK;
+             }   }
+@@ -2815,8 +2832,8 @@
+                 int const errorNb = fseek_u32(finput, size, SEEK_CUR);
+                 if (errorNb != 0)
+                     END_PROCESS(43, "Stream error : cannot skip skippable area");
+-                if (displayNow) DISPLAYOUT("    %6llu %14s %5s %8s %20u %20s %9s\n",
+-                             cfinfo->frameCount + 1,
++                if (displayNow) DISPLAYOUT("    %6" LZ4IO_PRIu64 " %14s %5s %8s %20u %20s %9s\n",
++                             LZ4IO_U64(cfinfo->frameCount + 1),
+                              "SkippableFrame",
+                              "-", "-", size + 8, "-", "-");
+ 
+@@ -2860,7 +2877,7 @@
+         }
+         if (g_displayLevel >= 3) {
+             /* verbose mode */
+-            DISPLAYOUT("%s(%llu/%llu)\n", cfinfo.fileName, (unsigned long long)idx + 1, (unsigned  long long)ifnIdx);
++            DISPLAYOUT("%s(%" LZ4IO_PRIu64 "/%" LZ4IO_PRIu64 ")\n", cfinfo.fileName, LZ4IO_U64((unsigned long long)idx + 1), LZ4IO_U64((unsigned long long)ifnIdx));
+             DISPLAYOUT("    %6s %14s %5s %8s %20s %20s %9s\n",
+                         "Frame", "Type", "Block", "Checksum", "Compressed", "Uncompressed", "Ratio");
+         }
+@@ -2876,8 +2893,8 @@
+         if (g_displayLevel < 3) {
+             /* Display summary */
+             char buffers[3][10];
+-            DISPLAYOUT("%10llu %14s %5s %11s %13s ",
+-                    cfinfo.frameCount,
++            DISPLAYOUT("%10" LZ4IO_PRIu64 " %14s %5s %11s %13s ",
++                    LZ4IO_U64(cfinfo.frameCount),
+                     cfinfo.eqFrameTypes ? LZ4IO_frameTypeNames[cfinfo.frameSummary.frameType] : "-" ,
+                     cfinfo.eqBlockTypes ? LZ4IO_blockTypeID(cfinfo.frameSummary.lz4FrameInfo.blockSizeID,
+                                                             cfinfo.frameSummary.lz4FrameInfo.blockMode, buffers[0]) : "-",

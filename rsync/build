@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
+CC=/usr/local/bin/gcc-4.2
+CXX=/usr/local/bin/g++-4.2
+CFLAGS='-O2 -march=i486'
+CPPFLAGS='-D_POSIX_SOURCE -I./openstep -I/usr/local/include -I/NextDeveloper/Headers/bsd'
+# Eager binding prevents dyld re-entry from child-exit signal handlers.
+LDFLAGS='-L/usr/local/lib -Wl,-bind_at_load'
+AWK=/usr/local/bin/gawk
+CONFIG_SHELL=/usr/local/bin/ksh
+export PATH CC CXX CFLAGS CPPFLAGS LDFLAGS AWK CONFIG_SHELL
+. "$PKG_BUILD_HELPERS"
+if test -d "rsync-$VERSION"; then cd "rsync-$VERSION"; fi
+patch -p1 < "rsync-$VERSION-openstep.patch"
+
+# Link the readiness adapter into configure probes as well as rsync.
+$CC $CFLAGS $CPPFLAGS -c openstep/poll.c -o openstep/poll.o
+$CC $CFLAGS $CPPFLAGS -c openstep/compat.c -o openstep/compat.o
+$CC $CFLAGS $CPPFLAGS $LDFLAGS openstep/poll-test.c \
+    openstep/poll.o openstep/compat.o -o openstep/poll-test
+./openstep/poll-test
+source_root=`pwd`
+LIBS="$source_root/openstep/poll.o $source_root/openstep/compat.o -liconv"
+export LIBS
+run_configure --prefix=/usr/local --build=i386-next-openstep4 \
+    --host=i386-next-openstep4 --disable-idn
+/bin/gnumake SHELL=/usr/local/bin/ksh
+/bin/gnumake SHELL=/usr/local/bin/ksh install DESTDIR="$DESTDIR"

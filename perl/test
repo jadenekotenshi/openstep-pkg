@@ -1,0 +1,94 @@
+#!/bin/sh
+set -e
+PATH="$LOCAL_ROOT/bin:/usr/ucb:/bin:/usr/bin"
+export PATH
+WORK=/tmp/pkg-perl.$$
+mkdir "$WORK"
+trap 'rm -rf "$WORK"' 0 1 2 3 15
+cd "$WORK"
+cat > check.pl <<'PERL'
+use strict;
+use warnings;
+use Cwd qw(getcwd);
+use Digest::MD5 qw(md5_hex);
+use Getopt::Long;
+use Text::Tabs qw(expand);
+use POSIX qw(strftime setlocale LC_TIME);
+
+-x '/bin/pwd' or die "permission/group query\n";
+$) =~ /^\d/ or die "supplementary groups\n";
+my $pattern = qr/(open)(step)/i;
+'OPENSTEP' =~ $pattern or die "regexp\n";
+"$1$2" eq 'OPENSTEP' or die "captures\n";
+md5_hex('abc') eq '900150983cd24fb0d6963f7d28e17f72' or die "XS module\n";
+expand("a\tb") eq 'a       b' or die "tabs\n";
+local @ARGV = ('--count=7');
+my $count;
+GetOptions('count=i' => \$count) && $count == 7 or die "options\n";
+setlocale(LC_TIME, 'C') or die "locale\n";
+strftime('%Y-%m-%d', 0, 0, 0, 1, 0, 100) eq '2000-01-01' or die "strftime\n";
+my $sig = POSIX::SIGUSR1();
+my $set = POSIX::SigSet->new($sig);
+$set->ismember($sig) or die "signal set\n";
+$set->delset($sig);
+$set->ismember($sig) and die "signal delete\n";
+$set->addset($sig);
+my $oldset = POSIX::SigSet->new();
+my $seen = 0;
+my $oldaction = POSIX::SigAction->new();
+my $action = POSIX::SigAction->new(sub { $seen++ }, POSIX::SigSet->new(), 0);
+defined POSIX::sigaction($sig, $action, $oldaction) or die "sigaction: $!\n";
+defined POSIX::sigprocmask(POSIX::SIG_BLOCK(), $set, $oldset) or die "block: $!\n";
+kill($sig, $$) == 1 or die "kill: $!\n";
+$seen == 0 or die "blocked signal delivered\n";
+defined POSIX::sigprocmask(POSIX::SIG_SETMASK(), $oldset) or die "restore: $!\n";
+$seen == 1 or die "signal not delivered\n";
+defined POSIX::sigaction($sig, $oldaction) or die "restore action: $!\n";
+my $cwd = getcwd();
+mkdir('subdirectory', 0700) or die "mkdir: $!\n";
+chdir('subdirectory') or die "chdir: $!\n";
+my $newcwd = getcwd();
+$newcwd eq "$cwd/subdirectory" or die "getcwd fallback: [$newcwd] from [$cwd]\n";
+chdir($cwd) or die "return: $!\n";
+rmdir('subdirectory') or die "rmdir: $!\n";
+$ENV{PERL_OPENSTEP_TEST} = 'child value';
+system($^X, '-e', 'exit($ENV{PERL_OPENSTEP_TEST} eq "child value" ? 0 : 1)') == 0
+    or die "environment/child process\n";
+delete $ENV{PERL_OPENSTEP_TEST};
+exists $ENV{PERL_OPENSTEP_TEST} and die "delete environment\n";
+open(my $file, '>', 'utf8-data') or die "open: $!\n";
+binmode($file, ':utf8');
+print $file "\x{20ac}\n";
+close($file) or die "close: $!\n";
+my @matches = glob('utf8-*');
+@matches == 1 && $matches[0] eq 'utf8-data' or die "file glob\n";
+utime(undef, undef, 'utf8-data') == 1 or die "current timestamps: $!\n";
+abs((stat('utf8-data'))[9] - time) <= 2 or die "timestamp value\n";
+open($file, '<:utf8', 'utf8-data') or die "read: $!\n";
+<$file> eq "\x{20ac}\n" or die "unicode IO\n";
+close($file);
+unlink('utf8-data');
+print "Perl OPENSTEP checks passed\n";
+PERL
+"$LOCAL_ROOT/bin/perl" check.pl
+cat > embed.c <<'C'
+#include "EXTERN.h"
+#include "perl.h"
+int main(int argc, char **argv, char **env) {
+    PerlInterpreter *interp;
+    char *args[] = {"embed", "-e", "exit(6 * 7 == 42 ? 0 : 1)", 0};
+    int result;
+    PERL_SYS_INIT3(&argc, &argv, &env);
+    interp = perl_alloc();
+    perl_construct(interp);
+    result = perl_parse(interp, 0, 3, args, 0);
+    if (!result) result = perl_run(interp);
+    perl_destruct(interp);
+    perl_free(interp);
+    PERL_SYS_TERM();
+    return result;
+}
+C
+"$LOCAL_ROOT/bin/gcc-4.2" `perl -MExtUtils::Embed -e ccopts` embed.c \
+    `perl -MExtUtils::Embed -e ldopts` -o embed
+./embed

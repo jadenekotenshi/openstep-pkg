@@ -1,0 +1,29 @@
+#!/bin/sh
+set -e
+TMP=/usr/tmp/libmpeg2-test.$$
+trap '/bin/rm -f "$TMP" "$TMP.c"' 0
+trap 'exit 1' 1 2 15
+cat > "$TMP.c" <<'EOF'
+#include <sys/types.h>
+typedef u_int8_t uint8_t;
+typedef u_int32_t uint32_t;
+#include <mpeg2dec/mpeg2.h>
+#include <mpeg2dec/mpeg2convert.h>
+#include <assert.h>
+int main(void)
+{
+    unsigned char empty[1];
+    mpeg2dec_t *decoder = mpeg2_init();
+    assert(decoder);
+    assert(mpeg2_info(decoder));
+    mpeg2_buffer(decoder, empty, empty);
+    assert(mpeg2_parse(decoder) == STATE_BUFFER);
+    assert(mpeg2convert_rgb(MPEG2CONVERT_RGB, 32) == mpeg2convert_rgb32);
+    mpeg2_close(decoder);
+    return 0;
+}
+EOF
+/usr/local/bin/gcc-4.2 -O2 -march=i486 -DNeXT -I"$LOCAL_ROOT/include" \
+    "$TMP.c" -L"$LOCAL_ROOT/lib" -lmpeg2convert -lmpeg2 -o "$TMP"
+"$TMP"
+echo "libmpeg2 installed-package tests passed"

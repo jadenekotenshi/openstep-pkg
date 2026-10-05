@@ -1,0 +1,12 @@
+pdksh
+gcc42
+make
+patch
+sed
+grep
+gawk
+coreutils
+curl
+zlib
+bzip2
+pkg-config
