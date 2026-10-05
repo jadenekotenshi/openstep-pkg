@@ -9,6 +9,31 @@ diff -ruN -x '*.o' a/x/arrayfunc.c b/arrayfunc.c
  
  #ifndef LBRACK
  #  define LBRACK '['
+diff -ruN -x '*.o' a/x/bashline.c b/bashline.c
+--- a/bashline.c	2025-06-25 19:53:44.000000000 +0000
++++ b/bashline.c	2026-10-05 23:53:10.583804648 +0000
+@@ -4142,7 +4142,7 @@
+ 	}
+     }
+ #else
+-    rl_point++:
++    rl_point++;
+ #endif
+   return point;
+ }
+diff -ruN -x '*.o' a/x/builtins/printf.def b/builtins/printf.def
+--- a/builtins/printf.def	2025-03-17 15:49:35.000000000 +0000
++++ b/builtins/printf.def	2026-10-05 23:54:29.515023734 +0000
+@@ -355,7 +355,9 @@
+ 
+   garglist = orig_arglist = list->next;
+ 
++#if defined (HANDLE_MULTIBYTE)
+   mb_cur_max = MB_CUR_MAX;
++#endif
+ 
+   /* Basic algorithm is to scan the format string for conversion
+      specifications -- once one is found, find out if the field
 diff -ruN -x '*.o' a/x/include/posixwait.h b/include/posixwait.h
 --- a/include/posixwait.h	2019-03-29 17:25:52.000000000 +0000
 +++ b/include/posixwait.h	2026-10-05 23:09:36.342595352 +0000
@@ -56,6 +81,50 @@ diff -ruN -x '*.o' a/x/jobs.c b/jobs.c
    t->running = PS_DONE;
  
    js.c_reaped++;	/* XXX */
+diff -ruN -x '*.o' a/x/lib/glob/glob.c b/lib/glob/glob.c
+--- a/lib/glob/glob.c	2023-07-20 15:28:53.000000000 +0000
++++ b/lib/glob/glob.c	2026-10-05 23:54:29.515787408 +0000
+@@ -120,7 +120,9 @@
+ 
+ /* Make sure these names continue to agree with what's in smatch.c */
+ extern char *glob_patscan (char *, char *, int, int);
++#if defined (HANDLE_MULTIBYTE)
+ extern wchar_t *glob_patscan_wc (wchar_t *, wchar_t *, wint_t, int);
++#endif
+ 
+ /* And this from gmisc.c/gm_loop.c */
+ extern int wextglob_pattern_p (wchar_t *);
+diff -ruN -x '*.o' a/x/lib/glob/smatch.c b/lib/glob/smatch.c
+--- a/lib/glob/smatch.c	2023-05-29 18:15:17.000000000 +0000
++++ b/lib/glob/smatch.c	2026-10-05 23:54:29.515424370 +0000
+@@ -28,6 +28,11 @@
+ 
+ #include "bashansi.h"
+ #include "shmbutil.h"
++
++/* shmbutil.h only declares this when multibyte support is compiled in. */
++#if !defined (HANDLE_MULTIBYTE)
++#  define locale_utf8locale 0
++#endif
+ #include "xmalloc.h"
+ 
+ #include <errno.h>
+diff -ruN -x '*.o' a/x/lib/readline/mbutil.c b/lib/readline/mbutil.c
+--- a/lib/readline/mbutil.c	2024-08-14 14:57:57.000000000 +0000
++++ b/lib/readline/mbutil.c	2026-10-05 23:54:20.597080383 +0000
+@@ -584,6 +584,7 @@
+ #endif
+ }
+ 
++#if defined (HANDLE_MULTIBYTE)
+ /* Compare the first N characters of S1 and S2 without regard to case. If
+    FLAGS&1, apply the mapping specified by completion-map-case and make
+    `-' and `_' equivalent. Returns 1 if the strings are equal. */
+@@ -658,3 +659,4 @@
+     return 1;
+   return (wc1 == wc2);
+ }
++#endif /* HANDLE_MULTIBYTE */
 diff -ruN -x '*.o' a/x/lib/sh/Makefile.in b/lib/sh/Makefile.in
 --- a/lib/sh/Makefile.in	2024-11-13 20:37:41.000000000 +0000
 +++ b/lib/sh/Makefile.in	2026-10-05 22:43:00.014848978 +0000
