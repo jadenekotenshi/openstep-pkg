@@ -50,3 +50,12 @@ whether `long double` should be 128-bit.
   but a hand-edited hello-world with a direct `call _printf` and no stub sections
   assembled, linked and ran on OPENSTEP/SPARC.  This port therefore emits direct
   calls, as the i386 port does.
+- **Duplicate libc symbols.** Direct calls make `ld` extract libiberty's `getopt.o`,
+  whose `opterr/optind/optopt` System also defines; NeXT's SPARC `ld` rejects the
+  duplicates unless given `-m`.  The sparc bootstrap passes `BOOT_LDFLAGS=-Wl,-m`.
+- **No `.lcomm` for exported zero data.**  `sparc.h` emitted `int x = 0;` as
+  `.globl _x` + `.lcomm _x,...`, which NeXT's `as` keeps file-local, so the symbol
+  was never exported (`undefined _have_error`).  `sparc/next.h` undefines
+  `ASM_OUTPUT_ALIGNED_BSS` so such data goes in `.data` with `.space`, as on i386.
+- **Resuming.**  `GCC42_RESUME=1` continues an interrupted build in place;
+  `GCC42_BOOT_EXTRA_CFLAGS` adds flags to the stage 2/3 compiles only.

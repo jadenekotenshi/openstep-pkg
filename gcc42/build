@@ -49,6 +49,10 @@ FLEX=/usr/local/bin/flex
 BISON=/usr/local/bin/bison
 BUILD_CFLAGS='-O2 -D_POSIX_SOURCE'
 BOOT_CFLAGS="$BUILD_CFLAGS --param ggc-min-expand=5 --param ggc-min-heapsize=4096"
+# Extra flags for the stage 2/3 compiles only.  A stage-1 compiler built before
+# the sparc/next.h ASM_OUTPUT_ALIGNED_BSS fix needs -fno-zero-initialized-in-bss
+# (the same placement the fix gives) when resuming with GCC42_RESUME=1.
+BOOT_CFLAGS="$BOOT_CFLAGS $GCC42_BOOT_EXTRA_CFLAGS"
 # Stage 2 and 3 link with direct calls, so ld pulls libiberty's getopt.o, whose
 # data symbols System also defines.  OPENSTEP/SPARC ld rejects that unless
 # multiple definitions are allowed (-m, the first definition wins).

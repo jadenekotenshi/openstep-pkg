@@ -1745,7 +1745,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/gcc/config/sparc/next.h
-@@ -0,0 +1,133 @@
+@@ -0,0 +1,138 @@
 +/* Target definitions for GNU compiler for SPARC running OPENSTEP 4.
 +   Copyright (C) 1993, 1995, 1996, 1999 Free Software Foundation, Inc.
 +
@@ -1838,6 +1838,11 @@ index 0000000..1111111
 +( fputs ("\t.comm ", (FILE)),			\
 +  assemble_name ((FILE), (NAME)),		\
 +  fprintf ((FILE), ",%u\n", (int)(ROUNDED)))
++
++/* sparc.h routes initialised-to-zero globals through .lcomm, which NeXT's
++   assembler treats as file-local even after .globl, so they would never be
++   exported.  Like i386, put them in .data with .space instead.  */
++#undef ASM_OUTPUT_ALIGNED_BSS
 +
 +#undef ASM_OUTPUT_SKIP
 +#define ASM_OUTPUT_SKIP(FILE,SIZE)  \
