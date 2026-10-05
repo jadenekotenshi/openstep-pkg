@@ -22,6 +22,45 @@ trace_enabled() {
     return 1
 }
 
+# Work out which OPENSTEP architecture we are running on and export it, along
+# with the default compiler flags for it.  arch(1) prints i386, sparc, m68k or
+# hppa; when it is missing, assume i386 as pkg always has.  An architecture
+# pkg does not know is passed through with no default flags.
+detect_arch() {
+    arch_raw=${PKG_ARCH:-`/usr/bin/arch 2>/dev/null`}
+
+    case $arch_raw in
+        ""|i[3-9]86|i386*)  PKG_ARCH=i386 ;;
+        sparc*)             PKG_ARCH=sparc ;;
+        m68*)               PKG_ARCH=m68k ;;
+        hppa*)              PKG_ARCH=hppa ;;
+        *)                  PKG_ARCH=$arch_raw ;;
+    esac
+
+    PKG_TARGET=$PKG_ARCH-next-openstep4
+
+    case $PKG_ARCH in
+        i386)
+            arch_syscc=-m486
+            arch_gcc42=-march=i486
+        ;;
+        sparc)
+            # gcc-4.2 is configured for V8 (sun4m), so it needs no flag.
+            arch_syscc=-mv8
+            arch_gcc42=
+        ;;
+        *)
+            arch_syscc=
+            arch_gcc42=
+        ;;
+    esac
+
+    PKG_SYSCC_ARCH_FLAGS=${PKG_SYSCC_ARCH_FLAGS-$arch_syscc}
+    PKG_GCC42_ARCH_FLAGS=${PKG_GCC42_ARCH_FLAGS-$arch_gcc42}
+
+    export PKG_ARCH PKG_TARGET PKG_SYSCC_ARCH_FLAGS PKG_GCC42_ARCH_FLAGS
+}
+
 usage() {
     cat <<'EOF'
 usage:
@@ -31,6 +70,17 @@ usage:
   pkg list
   pkg remove <name>
   pkg test <name>...
+  pkg arch
+
+architecture:
+  pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)
+  and exports these to build, test, post-install and pre-remove:
+    PKG_ARCH               i386, sparc, m68k or hppa
+    PKG_TARGET             <arch>-next-openstep4, for configure --build/--host
+    PKG_SYSCC_ARCH_FLAGS   default flags for the system /bin/cc (i386 -m486, sparc -mv8)
+    PKG_GCC42_ARCH_FLAGS   default flags for gcc-4.2 (i386 -march=i486, sparc none:
+                           V8 is its default)
+  Set either *_FLAGS variable (even to empty) to override it.
 
 package layout:
   build         required build script
@@ -906,7 +956,17 @@ remove_name() {
 
 ACTION=$1
 
+detect_arch
+
 case $ACTION in
+    arch)
+        [ $# -eq 1 ] || die "arch takes no arguments"
+        echo "PKG_ARCH=$PKG_ARCH"
+        echo "PKG_TARGET=$PKG_TARGET"
+        echo "PKG_SYSCC_ARCH_FLAGS=$PKG_SYSCC_ARCH_FLAGS"
+        echo "PKG_GCC42_ARCH_FLAGS=$PKG_GCC42_ARCH_FLAGS"
+    ;;
+
     download)
         [ $# -eq 2 ] || die "download requires <package-dir>"
         load_pkg "$2"

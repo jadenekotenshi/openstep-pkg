@@ -92,7 +92,7 @@ select selectmodule.c
 _socket socketmodule.c
 EOF
 
-run_configure --build=i386-next-openstep4 --host=i386-next-openstep4 \
+run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
   --prefix="$PREFIX" --disable-shared --without-ensurepip \
   --disable-test-modules
 

@@ -19,8 +19,8 @@ export DESTDIR VERSION PATH CC SED GREP EGREP AWK CONFIG_SHELL
 patch -p1 < "$PATCHFILE"
 
 run_configure \
-  --build=i386-next-openstep4.2 \
-  --host=i386-next-openstep4.2 \
+  --build=$PKG_TARGET.2 \
+  --host=$PKG_TARGET.2 \
   --prefix=/usr/local \
   --disable-shared \
   --enable-static \

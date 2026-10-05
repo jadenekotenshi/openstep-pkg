@@ -17,8 +17,8 @@ export PATH CC CFLAGS LDFLAGS CONFIG_SHELL SHELL_PATH GREP AWK
 . "$PKG_BUILD_HELPERS"
 patch -p1 < "git-$VERSION-openstep.patch"
 run_configure \
-    --build=i386-next-openstep4 \
-    --host=i386-next-openstep4 \
+    --build=$PKG_TARGET \
+    --host=$PKG_TARGET \
     --prefix=/usr/local \
     --with-shell=/usr/local/bin/ksh \
     --with-curl=/usr/local \
@@ -48,7 +48,7 @@ make_git() {
     NEEDS_SOCKET= NEEDS_LIBGEN= CURL_LDFLAGS="-L/usr/local/lib -lcurl -lssl -lcrypto -lz" \
     MKDIR_WO_TRAILING_SLASH=YesPlease DEFAULT_PAGER=/usr/ucb/more DEFAULT_EDITOR=/usr/ucb/vi \
     ARFLAGS=rc OVERRIDE_STRDUP=YesPlease \
-    uname_S=NeXT uname_M=i386 uname_R=4.2 uname_V=Mach uname_O=NeXT NO_SETITIMER= NO_PREAD=YesPlease CSPRNG_METHOD=openssl \
+    uname_S=NeXT uname_M=$PKG_ARCH uname_R=4.2 uname_V=Mach uname_O=NeXT NO_SETITIMER= NO_PREAD=YesPlease CSPRNG_METHOD=openssl \
     NO_CURL= SOCKLEN_T= NO_INTTYPES_H= COCCI_GOALS= COCCI_GLOB= COCCI_TEST_RES= \
     INSTALL=/usr/local/bin/install INSTALL_STRIP=-s "$@"
 }

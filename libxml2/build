@@ -17,7 +17,7 @@ export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED NEED_TRIO
 . "$PKG_BUILD_HELPERS"
 patch -p1 < "libxml2-$VERSION-openstep.patch"
 run_configure --prefix=/usr/local \
-  --build=i386-next-openstep4 --host=i386-next-openstep4 \
+  --build=$PKG_TARGET --host=$PKG_TARGET \
   --disable-shared --enable-static --disable-dependency-tracking \
   --without-python --with-iconv=/usr/local --with-zlib=/usr/local
 # The shipped Makefile omits trionan from the bundled Trio objects.

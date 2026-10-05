@@ -12,7 +12,7 @@ patch -p1 < "ffmpeg-$VERSION-openstep.patch"
 # CONFIG_SHELL argument. Invoke the installed shell explicitly.
 "$CONFIG_SHELL" ./configure --cc=/usr/local/bin/gcc-4.2 \
     --prefix=/usr/local --target-os=openstep --arch=x86 \
-    --extra-cflags='-O2 -march=i486 -DNeXT -I/usr/local/include' \
+    --extra-cflags='-O2 '"$PKG_GCC42_ARCH_FLAGS"' -DNeXT -I/usr/local/include' \
     --extra-ldflags=-L/usr/local/lib --enable-static --disable-shared \
     --disable-ffplay --disable-ffserver --disable-devices --disable-vhook \
     --disable-mmx --disable-yasm \

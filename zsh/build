@@ -24,8 +24,8 @@ export AWK
 patch -p1 < "zsh-$VERSION-openstep.patch"
 
 /usr/local/bin/ksh ./configure \
-    --build=i386-next-openstep4 \
-    --host=i386-next-openstep4 \
+    --build=$PKG_TARGET \
+    --host=$PKG_TARGET \
     --prefix=/usr/local \
     --disable-dynamic \
     --disable-locale \

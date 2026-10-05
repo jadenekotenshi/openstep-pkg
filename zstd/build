@@ -8,7 +8,7 @@ if test -d "zstd-$VERSION"; then cd "zstd-$VERSION"; fi
 patch -p1 < "zstd-$VERSION-openstep.patch"
 make_zstd() {
     /usr/local/bin/gnumake CC=/usr/local/bin/gcc-4.2 SHELL=/usr/local/bin/ksh \
-        CFLAGS='-O2 -march=i486 -DCLOCKS_PER_SEC=CLK_TCK -D_POSIX_SOURCE -I/usr/local/include' \
+        CFLAGS='-O2 '"$PKG_GCC42_ARCH_FLAGS"' -DCLOCKS_PER_SEC=CLK_TCK -D_POSIX_SOURCE -I/usr/local/include' \
         LDFLAGS=-L/usr/local/lib DEBUGFLAGS= DEPFLAGS= ZSTD_NO_ASM=1 ARFLAGS=rc \
         BUILD_DIR=obj/openstep UNAME=OPENSTEP LIBVER="$VERSION" \
         LIBVER_MAJOR=1 LIBVER_MINOR=5 LIBVER_PATCH=7 ZSTD_VERSION="$VERSION" \

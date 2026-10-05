@@ -16,8 +16,8 @@ export DESTDIR VERSION PATH CC AWK CPPFLAGS LDFLAGS
 
 patch -p1 < "$PATCHFILE"
 run_configure \
-  --build=i386-next-openstep4 \
-  --host=i386-next-openstep4 \
+  --build=$PKG_TARGET \
+  --host=$PKG_TARGET \
   --prefix=/usr/local \
   --with-ssl-dir=/usr/local \
   --with-zlib=/usr/local

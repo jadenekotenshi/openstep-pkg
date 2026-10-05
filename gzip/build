@@ -30,7 +30,7 @@ export gl_cv_absolute_time_h gl_cv_absolute_unistd_h
 . "$PKG_BUILD_HELPERS"
 
 patch -p1 < "$PATCHFILE"
-run_configure --build=i386-next-openstep4 --host=i386-next-openstep4 \
+run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
   --disable-dependency-tracking --prefix=/usr/local
 gnumake
 

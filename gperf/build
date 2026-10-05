@@ -23,7 +23,7 @@ export gl_cv_func_getdtablesize_works PATCHFILE
 . "$PKG_BUILD_HELPERS"
 
 patch -p1 < "$PATCHFILE"
-run_configure --build=i386-next-openstep4 --host=i386-next-openstep4 \
+run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
   --disable-dependency-tracking --prefix=/usr/local
 gnumake
 gnumake install DESTDIR="$DESTDIR"

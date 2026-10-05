@@ -28,7 +28,7 @@ CPPFLAGS="-I`pwd`/openstep -I/usr/local/include"
 export CPPFLAGS
 # The patch updates both configure.ac and its generated configure.
 /usr/bin/touch configure
-run_configure --build=i386-next-openstep4 --host=i386-next-openstep4 \
+run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
     --prefix=/usr/local --infodir="/usr/local/share/info/emacs-$VERSION" \
     --without-x --without-ns --without-modules --without-gnutls \
     --without-native-compilation --with-wide-int

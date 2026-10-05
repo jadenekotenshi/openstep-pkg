@@ -14,6 +14,25 @@ sh ./pkg list
 sh ./pkg remove bash
 ```
 
+## Architecture
+
+`pkg` detects the machine with `arch(1)` (`i386`, `sparc`, `m68k` or `hppa`; i386 if
+`arch` is missing, or set `PKG_ARCH` to override) and exports to every `build`, `test`,
+`post-install` and `pre-remove` hook:
+
+| variable               | i386            | sparc            | m68k, hppa |
+| ---------------------- | --------------- | ---------------- | ---------- |
+| `PKG_ARCH`             | `i386`          | `sparc`          | `m68k`, `hppa` |
+| `PKG_TARGET`           | `i386-next-openstep4` | `sparc-next-openstep4` | `<arch>-next-openstep4` |
+| `PKG_SYSCC_ARCH_FLAGS` | `-m486`         | `-mv8`           | none       |
+| `PKG_GCC42_ARCH_FLAGS` | `-march=i486`   | none (V8 is the default) | none |
+
+Use them instead of hard-coding an architecture: `--build=$PKG_TARGET --host=$PKG_TARGET`
+for configure, `CFLAGS="-O2 $PKG_GCC42_ARCH_FLAGS"` with `gcc-4.2` or
+`CFLAGS="-O2 $PKG_SYSCC_ARCH_FLAGS"` with `/bin/cc`.  `build-helpers.sh` also provides
+`pkg_arch_flags COMPILER`, which picks the right set from the compiler's name.  Either
+`*_FLAGS` variable can be overridden, even to empty.  `sh ./pkg arch` prints the values.
+
 ## Compiler selection
 
 Packages that need the newer compiler depend on `gcc42` and explicitly use
