@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+PERL=/usr/local/bin/perl
+export PATH PERL
+. "$PKG_BUILD_HELPERS"
+run_configure --prefix=/usr/local
+/bin/gnumake
+/bin/gnumake check
+/bin/gnumake install DESTDIR="$DESTDIR"
