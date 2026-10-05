@@ -12,9 +12,16 @@ AWK=/usr/local/bin/gawk
 # configure's own "*-*-nextstep*" case (lockf() is broken there) does not match
 # the openstep4 host name.
 ac_cv_func_lockf=no
-export PATH CC CFLAGS SED GREP EGREP AWK ac_cv_func_lockf
+# OPENSTEP's libc has no tcgetattr() and friends, so configure's termios probe
+# fails.  The patch adds lib/util/openstep_termios.c (built on the BSD ioctls)
+# and the -D renames below send every call to it.
+ac_cv_sys_posix_termios=yes
+TERMIOS_RENAMES='-Dtcgetattr=openstep_tcgetattr -Dtcsetattr=openstep_tcsetattr -Dtcgetpgrp=openstep_tcgetpgrp -Dtcsetpgrp=openstep_tcsetpgrp -Dcfgetispeed=openstep_cfgetispeed -Dcfgetospeed=openstep_cfgetospeed -Dcfsetispeed=openstep_cfsetispeed -Dcfsetospeed=openstep_cfsetospeed'
+CPPFLAGS=$TERMIOS_RENAMES
+export PATH CC CFLAGS CPPFLAGS SED GREP EGREP AWK ac_cv_func_lockf ac_cv_sys_posix_termios
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
+patch -p1 < "sudo-$VERSION-openstep.patch"
 # No dlopen() here, so link the sudoers policy plugin into sudo and build no
 # shared libraries.  Hardening (-fstack-protector, PIE) needs runtime support
 # this system lacks.
