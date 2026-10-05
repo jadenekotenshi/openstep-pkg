@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+if test -d "p7zip_$VERSION"; then cd "p7zip_$VERSION"; fi
+patch -p1 < "p7zip-$VERSION-openstep.patch"
+# makefile.openstep is this port's machine file (single-threaded gcc-4.2, with
+# the openstep/ pthread, wchar and dirent stand-ins).
+cp makefile.openstep makefile.machine
+OPENSTEP_INC=`pwd`/openstep
+export OPENSTEP_INC
+/bin/gnumake 7za OPENSTEP_INC="$OPENSTEP_INC"
+/usr/local/bin/mkdir -p "$DESTDIR/usr/local/bin" "$DESTDIR/usr/local/man/man1"
+/bin/cp bin/7za "$DESTDIR/usr/local/bin/7za"
+/bin/chmod 755 "$DESTDIR/usr/local/bin/7za"
+/bin/cp man1/7za.1 "$DESTDIR/usr/local/man/man1/7za.1"
+/bin/chmod 644 "$DESTDIR/usr/local/man/man1/7za.1"
