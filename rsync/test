@@ -1,0 +1,87 @@
+#!/bin/sh
+set -e
+work=${TMPDIR-/tmp}/rsync-pkg-test-$$
+mkdir "$work"
+daemon_pid=
+second_pid=
+trap 'for p in $daemon_pid $second_pid; do kill "$p" 2>/dev/null || :; wait "$p" 2>/dev/null || :; done; rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+rsync=$LOCAL_ROOT/bin/rsync
+"$rsync" --version
+"$LOCAL_ROOT/bin/rsync-ssl" --help > "$work/ssl-help"
+grep 'Usage: rsync' "$work/ssl-help"
+if "$LOCAL_ROOT/bin/rsync-ssl" --HELPER 'bad host' rsync --server --daemon . > "$work/ssl-invalid" 2>&1; then exit 1; fi
+grep 'invalid rsync-ssl hostname' "$work/ssl-invalid"
+mkdir "$work/src" "$work/dst" "$work/download" "$work/upload"
+gawk 'BEGIN {for(i=0;i<8192;i++) printf "%08d: rsync OPENSTEP delta data\n",i}' > "$work/src/data"
+mkdir "$work/src/sub"
+echo nested > "$work/src/sub/nested"
+echo 'name with spaces' > "$work/src/a file"
+ln "$work/src/data" "$work/src/hard"
+ln -s data "$work/src/link"
+"$rsync" -aH "$work/src/" "$work/dst/"
+for codec in zstd lz4 zlib zlibx; do
+    case "$codec" in
+        zstd) checksum=xxh128;;
+        lz4) checksum=xxh3;;
+        zlib) checksum=xxh64;;
+        zlibx) checksum=md5;;
+    esac
+    echo "$codec delta" >> "$work/src/data"
+    "$rsync" -aHcz --no-whole-file --checksum-choice="$checksum" \
+        --compress-choice="$codec" --stats "$work/src/" "$work/dst/" > "$work/stats"
+    cmp "$work/src/data" "$work/dst/data"
+    cmp "$work/src/a file" "$work/dst/a file"
+    cmp "$work/src/sub/nested" "$work/dst/sub/nested"
+    test "$work/dst/data" -ef "$work/dst/hard"
+    test -L "$work/dst/link"
+    grep 'Matched data: [1-9]' "$work/stats"
+done
+echo extra > "$work/dst/extra"
+echo excluded > "$work/src/skip"
+"$rsync" -aH --delete --exclude=skip "$work/src/" "$work/dst/"
+test ! -e "$work/dst/extra"
+test ! -e "$work/dst/skip"
+"$rsync" -aHnci --exclude=skip "$work/src/" "$work/dst/" > "$work/unchanged"
+test ! -s "$work/unchanged"
+
+# Exercise actual TCP sockets on loopback, with both daemon directions.
+port=$((20000 + $$ % 20000))
+cat > "$work/rsyncd.conf" <<EOF
+use chroot = no
+pid file = $work/daemon.pid
+log file = $work/daemon.log
+lock file = $work/daemon.lock
+max connections = 1
+[source]
+path = $work/src
+read only = yes
+[destination]
+path = $work/upload
+read only = no
+EOF
+"$rsync" --daemon --no-detach --address=127.0.0.1 --port="$port" \
+    --config="$work/rsyncd.conf" > "$work/daemon-output" 2>&1 &
+daemon_pid=$!
+attempt=0
+while ! "$rsync" --contimeout=2 "rsync://127.0.0.1:$port/" > "$work/modules" 2>&1; do
+    attempt=$((attempt + 1))
+    if test "$attempt" -ge 5; then cat "$work/daemon-output" "$work/modules"; exit 1; fi
+    sleep 1
+done
+# A second daemon must fail to acquire the same pid-file lock.
+"$rsync" --daemon --no-detach --address=127.0.0.1 --port=$((port + 1)) \
+    --config="$work/rsyncd.conf" > "$work/second-daemon" 2>&1 &
+second_pid=$!
+sleep 1
+if kill -0 "$second_pid" 2>/dev/null; then cat "$work/second-daemon"; exit 1; fi
+if wait "$second_pid"; then exit 1; fi
+second_pid=
+grep 'failed to lock pid file' "$work/second-daemon"
+"$rsync" -aH --timeout=10 "rsync://127.0.0.1:$port/source/" "$work/download/"
+cmp "$work/src/data" "$work/download/data"
+"$rsync" -aH --timeout=10 "$work/src/" "rsync://127.0.0.1:$port/destination/"
+cmp "$work/src/data" "$work/upload/data"
+cmp "$work/src/sub/nested" "$work/upload/sub/nested"
+if "$rsync" --contimeout=2 "rsync://127.0.0.1:$port/missing/" "$work/download/" > /dev/null 2>&1; then exit 1; fi
+echo 'rsync delta/checksum/compression, links, filters, deletion, dry-run and TCP daemon tests passed'

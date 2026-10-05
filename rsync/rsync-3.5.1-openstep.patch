@@ -1,0 +1,533 @@
+--- a/lib/compat.c
++++ b/lib/compat.c
+@@ -44,7 +44,7 @@
+ }
+ 
+ #ifndef HAVE_GETCWD
+- char *getcwd(char *buf, int size)
++ char *getcwd(char *buf, size_t size)
+ {
+ 	return getwd(buf);
+ }
+--- a/lib/getaddrinfo.c
++++ b/lib/getaddrinfo.c
+@@ -44,6 +44,7 @@
+  */
+ 
+ #include "rsync.h"
++#include "ifuncs.h"
+ 
+ #ifndef SMB_MALLOC
+ #define SMB_MALLOC(s) malloc(s)
+@@ -293,15 +294,16 @@
+ 					INADDR_ANY,
+ 					&hints,
+ 					res);
+-		} else if (hints.ai_flags & AI_NUMERICHOST) {
++		} else {
+ 			struct in_addr ip;
+-			if (inet_pton(AF_INET, node, &ip) <= 0)
+-				return EAI_FAIL;
+-			return getaddr_info_single_addr(service,
++			/* Old gethostbyname implementations need not accept numeric IPs. */
++			if (inet_pton(AF_INET, node, &ip) > 0)
++				return getaddr_info_single_addr(service,
+ 					ntohl(ip.s_addr),
+ 					&hints,
+ 					res);
+-		} else {
++			if (hints.ai_flags & AI_NUMERICHOST)
++				return EAI_NONAME;
+ 			return getaddr_info_name(node,
+ 						service,
+ 						&hints,
+--- a/main.c
++++ b/main.c
+@@ -135,6 +135,8 @@
+ #  define SIGACTMASK(n,h) SIGACTION(n,h)
+ # endif
+ static struct sigaction sigact;
++#else
++#define SIGACTMASK(n,h) SIGACTION(n,h)
+ #endif
+ 
+ struct pid_status {
+--- a/openstep/compat.c
++++ b/openstep/compat.c
+@@ -0,0 +1,120 @@
++#include "compat.h"
++#include <stdarg.h>
++#include <errno.h>
++#include <sys/stat.h>
++#include <ctype.h>
++#include <unistd.h>
++#undef open
++
++/* Same checked conversion used by the repository's Git OPENSTEP port. */
++long long openstep_strtoll(const char *s, char **end, int base)
++{
++    const char *start = s, *digits;
++    unsigned long long value = 0, limit;
++    unsigned int d;
++    int negative = 0, overflow = 0;
++    while (isspace((unsigned char)*s)) s++;
++    if (*s == '-' || *s == '+') negative = *s++ == '-';
++    if (base && (base < 2 || base > 36)) {
++        errno = EINVAL;
++        if (end) *end = (char *)start;
++        return 0;
++    }
++    if ((base == 0 || base == 16) && s[0] == '0' &&
++        (s[1] == 'x' || s[1] == 'X') && isxdigit((unsigned char)s[2])) {
++        s += 2; base = 16;
++    }
++    if (!base) base = *s == '0' ? 8 : 10;
++    limit = negative ? (unsigned long long)INT64_MAX + 1 : INT64_MAX;
++    digits = s;
++    for (;; s++) {
++        unsigned char c = *s;
++        if (c >= '0' && c <= '9') d = c - '0';
++        else if (c >= 'a' && c <= 'z') d = c - 'a' + 10;
++        else if (c >= 'A' && c <= 'Z') d = c - 'A' + 10;
++        else break;
++        if (d >= (unsigned int)base) break;
++        if (value > (limit - d) / base) overflow = 1;
++        else value = value * base + d;
++    }
++    if (end) *end = (char *)(s == digits ? start : s);
++    if (overflow) {
++        errno = ERANGE;
++        return negative ? -INT64_MAX - 1 : INT64_MAX;
++    }
++    return negative ? -(long long)(value - (value != 0)) - (value != 0) : (long long)value;
++}
++
++int openstep_open(const char *path, int flags, ...)
++{
++    int fd, saved_errno, mode = 0, created = 0;
++    int native_flags = flags & ~(O_CLOEXEC | O_NOFOLLOW);
++    struct stat before, after;
++    va_list args;
++    if (flags & O_CREAT) {
++        va_start(args, flags);
++        mode = va_arg(args, int);
++        va_end(args);
++    }
++    if (flags & O_NOFOLLOW) {
++        /* Create exclusively, or validate the existing inode before any
++         * truncation. Never open an unexpected leaf for a destructive write. */
++        native_flags = (native_flags & ~O_TRUNC) | O_NONBLOCK;
++        if (lstat(path, &before) < 0) {
++            if (errno != ENOENT || !(flags & O_CREAT)) return -1;
++            native_flags |= O_EXCL;
++            created = 1;
++        } else {
++            if (flags & O_EXCL) { errno = EEXIST; return -1; }
++            if ((before.st_mode & S_IFMT) == S_IFLNK) { errno = ELOOP; return -1; }
++            native_flags &= ~O_CREAT;
++        }
++    }
++    fd = open(path, native_flags, mode);
++    if (fd >= 0 && (flags & O_NOFOLLOW)) {
++        if (fstat(fd, &after) < 0) goto fail;
++        if (!created && (before.st_dev != after.st_dev || before.st_ino != after.st_ino)) {
++            errno = ELOOP;
++            goto fail;
++        }
++        if ((flags & O_TRUNC) && ftruncate(fd, 0) < 0) goto fail;
++        if (!(flags & O_NONBLOCK) && fcntl(fd, F_SETFL, flags & ~(O_CLOEXEC | O_NOFOLLOW)) < 0)
++            goto fail;
++    }
++    if (fd >= 0 && (flags & O_CLOEXEC) && fcntl(fd, F_SETFD, FD_CLOEXEC) < 0) {
++fail:
++        saved_errno = errno;
++        close(fd);
++        errno = saved_errno;
++        return -1;
++    }
++    return fd;
++}
++
++/* OPENSTEP has no fchdir. Validate the resulting cwd against the held fd
++ * before any transfer operation can use it. A renamed path may fail safely. */
++int openstep_fchdir(int fd, const char *path)
++{
++    struct stat target, previous, actual;
++    char saved[MAXPATHLEN];
++    int error;
++    if (fstat(fd, &target) < 0 || stat(".", &previous) < 0
++     || !getwd(saved))
++        return -1;
++    if (chdir(path) < 0)
++        return -1;
++    if (stat(".", &actual) == 0) {
++        if (actual.st_dev == target.st_dev && actual.st_ino == target.st_ino)
++            return 0;
++        errno = EAGAIN;
++    }
++    error = errno;
++    /* Never continue a failed transfer in a substituted working directory. */
++    if (chdir(saved) < 0 || stat(".", &actual) < 0
++     || actual.st_dev != previous.st_dev || actual.st_ino != previous.st_ino) {
++        fputs("rsync: cannot restore working directory after chdir race\n", stderr);
++        _exit(1);
++    }
++    errno = error;
++    return -1;
++}
+--- a/openstep/compat.h
++++ b/openstep/compat.h
+@@ -0,0 +1,65 @@
++#ifndef RSYNC_OPENSTEP_COMPAT_H
++#define RSYNC_OPENSTEP_COMPAT_H
++/* BSD byte-order constants are hidden in the POSIX header view. */
++#ifdef _POSIX_SOURCE
++#define RSYNC_RESTORE_POSIX_SOURCE
++#undef _POSIX_SOURCE
++#endif
++#include <machine/endian.h>
++#ifdef RSYNC_RESTORE_POSIX_SOURCE
++#define _POSIX_SOURCE 1
++#endif
++#include <sys/types.h>
++/* readdir returns BSD direct even when POSIX dirent.h is present. */
++#define dirent direct
++#include <sys/dir.h>
++#undef HAVE_DIRENT_H
++#define HAVE_SYS_DIR_H 1
++#include <libc.h>
++#include <fcntl.h>
++#include <errno.h>
++#include <time.h>
++/* rsync is single threaded; copy libc's static result into the caller's tm. */
++static inline struct tm *openstep_localtime_r(const time_t *t, struct tm *out)
++{
++    struct tm *value = localtime(t);
++    if (!value) return NULL;
++    *out = *value;
++    return out;
++}
++#define localtime_r openstep_localtime_r
++typedef unsigned char uint8_t;
++typedef unsigned short uint16_t;
++typedef unsigned int uint32_t;
++typedef unsigned long long uintmax_t;
++#ifndef SIZE_MAX
++#define SIZE_MAX ((size_t)-1)
++#endif
++#ifndef ENOTSUP
++#define ENOTSUP EOPNOTSUPP
++#endif
++#ifndef EOVERFLOW
++#define EOVERFLOW ERANGE
++#endif
++long long openstep_strtoll(const char *, char **, int);
++#define strtoll openstep_strtoll
++/* The BSD headers provide intN_t and u_intN_t, but not uintN_t. */
++#define uint16 u_int16_t
++#define uint32 u_int32_t
++#ifndef INT64_MAX
++#define INT64_MAX 9223372036854775807LL
++#endif
++#ifdef USE_OPENSSL
++/* The local OpenSSL port supplies socklen_t as a typedef. */
++#undef socklen_t
++#include <openssl/e_os2.h>
++#endif
++/* Preserve close-on-exec using fcntl on this single-threaded platform. */
++#define O_CLOEXEC 0x10000000
++#define O_NOFOLLOW 0x20000000
++/* Only a selector for rsync's wrappers; AT_FDCWD stays unavailable. */
++#define AT_REMOVEDIR 0x200
++int openstep_open(const char *, int, ...);
++int openstep_fchdir(int, const char *);
++#define open openstep_open
++#endif
+--- a/openstep/poll-test.c
++++ b/openstep/poll-test.c
+@@ -0,0 +1,65 @@
++#include <assert.h>
++#include <sys/types.h>
++#include <sys/time.h>
++#include <sys/stat.h>
++#include <libc.h>
++#include <errno.h>
++#include "poll.h"
++#include "compat.h"
++int main(void)
++{
++    int pipefd[2];
++    char *tail;
++    char byte;
++    struct pollfd fds[2];
++    struct timeval start, end;
++    struct stat before, after;
++    int fd = open("/dev/null", O_RDONLY | O_CLOEXEC);
++    assert(strtoll("-9223372036854775808", &tail, 10) == -INT64_MAX - 1 && !*tail);
++    errno = 0;
++    assert(strtoll("9223372036854775808", &tail, 10) == INT64_MAX && errno == ERANGE && !*tail);
++    assert(strtoll("0xabcdefZ", &tail, 0) == 0xabcdef && *tail == 'Z');
++    assert(strtoll("077", &tail, 0) == 63 && !*tail);
++    assert(strtoll(" +", &tail, 0) == 0 && *tail == ' ');
++    assert(fd >= 0 && (fcntl(fd, F_GETFD, 0) & FD_CLOEXEC));
++    close(fd);
++    fd = open(".", O_RDONLY);
++    assert(fd >= 0 && fstat(fd, &before) == 0);
++    assert(openstep_fchdir(fd, ".") == 0);
++    assert(openstep_fchdir(fd, "..") < 0 && errno == EAGAIN);
++    assert(stat(".", &after) == 0);
++    assert(before.st_dev == after.st_dev && before.st_ino == after.st_ino);
++    close(fd);
++    assert(symlink("poll-test.c", "openstep/poll-test-link") == 0);
++    assert(open("openstep/poll-test-link", O_RDONLY | O_NOFOLLOW) < 0 && errno == ELOOP);
++    assert(open("openstep/poll-test-link", O_WRONLY | O_TRUNC | O_NOFOLLOW) < 0 && errno == ELOOP);
++    unlink("openstep/poll-test-link");
++    fd = open("openstep/poll-test.c", O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
++    assert(fd >= 0 && (fcntl(fd, F_GETFD, 0) & FD_CLOEXEC));
++    close(fd);
++    fd = open("openstep/poll-test-data", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
++    assert(fd >= 0 && write(fd, "data", 4) == 4);
++    close(fd);
++    assert(open("openstep/poll-test-data", O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600) < 0 && errno == EEXIST);
++    fd = open("openstep/poll-test-data", O_WRONLY | O_TRUNC | O_NOFOLLOW);
++    assert(fd >= 0 && fstat(fd, &after) == 0 && after.st_size == 0);
++    close(fd);
++    unlink("openstep/poll-test-data");
++    assert(pipe(pipefd) == 0);
++    fds[0].fd = pipefd[0]; fds[0].events = POLLIN;
++    assert(poll(fds, 1, 0) == 0);
++    assert(write(pipefd[1], "x", 1) == 1);
++    assert(poll(fds, 1, 100) == 1 && (fds[0].revents & POLLIN));
++    assert(read(pipefd[0], &byte, 1) == 1 && byte == 'x');
++    close(pipefd[1]);
++    assert(poll(fds, 1, 100) == 1 && read(pipefd[0], &byte, 1) == 0);
++    close(pipefd[0]);
++    fds[1].fd = FD_SETSIZE; fds[1].events = POLLIN;
++    assert(poll(fds, 2, 100) == 2);
++    assert((fds[0].revents & POLLNVAL) && (fds[1].revents & POLLNVAL));
++    gettimeofday(&start, NULL);
++    assert(poll(NULL, 0, 100) == 0);
++    gettimeofday(&end, NULL);
++    assert((end.tv_sec-start.tv_sec)*1000000 + end.tv_usec-start.tv_usec >= 80000);
++    return 0;
++}
+--- a/openstep/poll.c
++++ b/openstep/poll.c
+@@ -0,0 +1,54 @@
++/* Read/write readiness adapter for rsync on OPENSTEP. */
++#include <sys/types.h>
++#include <sys/time.h>
++#include <libc.h>
++#include <fcntl.h>
++#include <errno.h>
++#include "poll.h"
++
++int poll(struct pollfd *fds, nfds_t count, int timeout)
++{
++    fd_set reads, writes, excepts;
++    struct timeval tv;
++    nfds_t i;
++    int fd, maxfd = -1, invalid = 0, ready = 0, result;
++    FD_ZERO(&reads); FD_ZERO(&writes); FD_ZERO(&excepts);
++    for (i = 0; i < count; i++) {
++        fds[i].revents = 0;
++        fd = fds[i].fd;
++        if (fd < 0) continue;
++        /* Never let a descriptor outside fd_set corrupt the stack. */
++        if (fd >= FD_SETSIZE || (fcntl(fd, F_GETFL, 0) < 0 && errno == EBADF)) {
++            fds[i].revents = POLLNVAL;
++            invalid++;
++            continue;
++        }
++        if (fds[i].events & POLLIN) FD_SET(fd, &reads);
++        if (fds[i].events & POLLOUT) FD_SET(fd, &writes);
++        if (fds[i].events & POLLPRI) FD_SET(fd, &excepts);
++        if (fd > maxfd) maxfd = fd;
++    }
++    if (invalid) timeout = 0;
++    if (maxfd < 0) {
++        if (timeout < 0) { pause(); return -1; }
++        /* select with no descriptors is not a timer on OPENSTEP. */
++        if (timeout / 1000 && sleep(timeout / 1000)) { errno = EINTR; return -1; }
++        if (timeout % 1000) usleep((timeout % 1000) * 1000);
++        return invalid;
++    }
++    tv.tv_sec = timeout < 0 ? 0 : timeout / 1000;
++    tv.tv_usec = timeout < 0 ? 0 : (timeout % 1000) * 1000;
++    result = select(maxfd + 1, &reads, &writes, &excepts, timeout < 0 ? NULL : &tv);
++    if (result < 0) return -1;
++    for (i = 0; i < count; i++) {
++        fd = fds[i].fd;
++        if (fd < 0) continue;
++        if (!(fds[i].revents & POLLNVAL)) {
++            if (FD_ISSET(fd, &reads)) fds[i].revents |= POLLIN;
++            if (FD_ISSET(fd, &writes)) fds[i].revents |= POLLOUT;
++            if (FD_ISSET(fd, &excepts)) fds[i].revents |= POLLPRI;
++        }
++        if (fds[i].revents) ready++;
++    }
++    return ready;
++}
+--- a/openstep/poll.h
++++ b/openstep/poll.h
+@@ -0,0 +1,12 @@
++#ifndef RSYNC_OPENSTEP_POLL_H
++#define RSYNC_OPENSTEP_POLL_H
++typedef unsigned long nfds_t;
++struct pollfd { int fd; short events, revents; };
++#define POLLIN 1
++#define POLLPRI 2
++#define POLLOUT 4
++#define POLLERR 8
++#define POLLHUP 16
++#define POLLNVAL 32
++int poll(struct pollfd *, nfds_t, int);
++#endif
+--- a/popt/lookup3.c
++++ b/popt/lookup3.c
+@@ -34,7 +34,11 @@
+ */
+ /* -------------------------------------------------------------------- */
+ 
++#ifdef NeXT
++#include "openstep/compat.h"
++#else
+ #include <stdint.h>
++#endif
+ 
+ #if defined(_JLU3_SELFTEST)
+ # define _JLU3_jlu32w		1
+--- a/popt/poptint.h
++++ b/popt/poptint.h
+@@ -9,7 +9,11 @@
+ #ifndef H_POPTINT
+ #define H_POPTINT
+ 
++#ifdef NeXT
++#include "openstep/compat.h"
++#else
+ #include <stdint.h>
++#endif
+ 
+ /**
+  * Wrapper to free(3), hides const compilation noise, permit NULL, return NULL.
+@@ -155,4 +159,3 @@
+ #endif
+ 
+ #define N_(foo) foo
+-
+--- a/popt/system.h
++++ b/popt/system.h
+@@ -4,6 +4,11 @@
+ 
+ #ifdef HAVE_CONFIG_H
+ #include "config.h"
++#endif
++
++#ifdef NeXT
++#include "rsync.h"
++#include "ifuncs.h"
+ #endif
+ 
+ #include <ctype.h>
+--- a/rsync-ssl
++++ b/rsync-ssl
+@@ -1,4 +1,4 @@
+-#!/usr/bin/env bash
++#!/usr/local/bin/bash
+ 
+ # This script uses openssl, gnutls, or stunnel to secure an rsync daemon connection.
+ 
+@@ -185,7 +185,7 @@
+ 
+ function validate_ssl_hostname {
+     local host="$1"
+-    if [[ -z "$host" || "$host" == -* || "$host" =~ [^A-Za-z0-9._:-] ]]; then
++    if [[ -z "$host" || "$host" == -* || "$host" == *[!A-Za-z0-9._:-]* ]]; then
+ 	echo "invalid rsync-ssl hostname: $host" 1>&2
+ 	exit 1
+     fi
+--- a/rsync.h
++++ b/rsync.h
+@@ -346,6 +346,10 @@
+ #include "errcode.h"
+ 
+ #include "config.h"
++
++#ifdef NeXT
++#include "openstep/compat.h"
++#endif
+ 
+ /* The default RSYNC_RSH is always set in config.h. */
+ 
+--- a/util1.c
++++ b/util1.c
+@@ -711,6 +711,11 @@
+ /** Lock a byte range in a open file */
+ int lock_range(int fd, int offset, int len)
+ {
++#ifdef NeXT
++	/* ponytail: flock permits one connection per lock file; use per-slot
++	 * lock files if larger configured connection limits are needed. */
++	return flock(fd, LOCK_EX | LOCK_NB) == 0;
++#else
+ 	struct flock lock;
+ 
+ 	lock.l_type = F_WRLCK;
+@@ -720,6 +725,7 @@
+ 	lock.l_pid = 0;
+ 
+ 	return fcntl(fd,F_SETLK,&lock) == 0;
++#endif
+ }
+ 
+ #define ENSURE_MEMSPACE(buf, type, sz, req) \
+@@ -1307,6 +1313,12 @@
+ 	return dest;
+ }
+ 
++#ifdef NeXT
++#define change_dir_fd openstep_fchdir
++#else
++#define change_dir_fd(fd, path) fchdir(fd)
++#endif
++
+ /* Like chdir(), but it keeps track of the current directory (in the
+  * global "curr_dir"), and ensures that the path size doesn't overflow.
+  * Also cleans the path using the clean_fname() function. */
+@@ -1352,7 +1364,7 @@
+ 				int dfd = open_no_attacker_symlinks_dirfd(dir);
+ 				if (dfd < 0)
+ 					return 0;
+-				if (fchdir(dfd) != 0) {
++				if (change_dir_fd(dfd, dir) != 0) {
+ 					int e = errno;
+ 					close(dfd);
+ 					errno = e;
+@@ -1383,7 +1395,7 @@
+ 				dfd = open_no_attacker_symlinks_dirfd(nf);
+ 				if (dfd < 0)
+ 					return 0;
+-				if (fchdir(dfd) != 0) {
++				if (change_dir_fd(dfd, nf) != 0) {
+ 					int e = errno;
+ 					close(dfd);
+ 					errno = e;
+@@ -1445,7 +1457,7 @@
+ 				if (dfd < 0) {
+ 					chdir_failed = 1;
+ 				} else {
+-					chdir_failed = fchdir(dfd) != 0;
++					chdir_failed = change_dir_fd(dfd, curr_dir) != 0;
+ 					close(dfd);
+ 				}
+ 			} else if (am_daemon && symlink_optout_allowed()) {
+@@ -1463,7 +1475,7 @@
+ 				if (dfd < 0)
+ 					chdir_failed = 1;
+ 				else {
+-					chdir_failed = fchdir(dfd) != 0;
++					chdir_failed = change_dir_fd(dfd, curr_dir) != 0;
+ 					close(dfd);
+ 				}
+ 			} else {
