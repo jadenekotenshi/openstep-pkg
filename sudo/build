@@ -22,6 +22,12 @@ export PATH CC CFLAGS CPPFLAGS SED GREP EGREP AWK ac_cv_func_lockf ac_cv_sys_pos
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 patch -p1 < "sudo-$VERSION-openstep.patch"
+# pdksh leaves the quotes in `echo \"$var\"` inside backticks, so configure's
+# library search ends up with -l"-lsocket" and dies with "bad substitution".
+/bin/sed -e 's/echo \\"\$libs\\"|/echo $libs|/' \
+    -e 's/echo \\"\$devsearch\\"|/echo $devsearch|/' configure > configure.new
+/bin/mv configure.new configure
+/bin/chmod 755 configure
 # No dlopen() here, so link the sudoers policy plugin into sudo and build no
 # shared libraries.  Hardening (-fstack-protector, PIE) needs runtime support
 # this system lacks.
