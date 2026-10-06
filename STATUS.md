@@ -42,7 +42,7 @@ has not been attempted.
 | libhubbub | validated | — |
 | libiconv | validated | validated |
 | libmad | validated | — |
-| libmpeg2 | queued for testing | — |
+| libmpeg2 | validated | — |
 | libnsbmp | validated | — |
 | libnsfb | validated | — |
 | libnsgif | validated | — |
