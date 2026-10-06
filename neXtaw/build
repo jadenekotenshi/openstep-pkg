@@ -72,8 +72,17 @@ run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
     --disable-shared --disable-dependency-tracking --x-includes="$x11_prefix/include" \
     --x-libraries="$x11_prefix/lib"
 check_tree "after configure"
-/bin/gnumake SHELL="$CONFIG_SHELL"
-/bin/gnumake install SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR"
+# The X libraries here are static archives, so the link order matters:
+# libX11 has to come after the libraries that use it (configure puts it first).
+# Give make a LIBS in dependency order, with libSM and libICE only when the
+# X11 install has them.
+nx_sm=
+if ls "$x11_prefix"/lib/libSM* > /dev/null 2>&1 && ls "$x11_prefix"/lib/libICE* > /dev/null 2>&1; then
+    nx_sm="-lSM -lICE"
+fi
+nx_libs="-lXmu -lXt $nx_sm -lXext -lX11"
+/bin/gnumake SHELL="$CONFIG_SHELL" LIBS="$nx_libs"
+/bin/gnumake install SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR" LIBS="$nx_libs"
 
 # The demo program is not installed by make; keep it as a smoke test.
 /usr/local/bin/mkdir -p "$DESTDIR/usr/local/bin"
