@@ -124,6 +124,18 @@ fi
 /bin/cp sys/share/lev_lex.c sys/share/lev_yacc.c sys/share/dgn_lex.c sys/share/dgn_yacc.c util/
 
 /bin/sh sys/unix/setup.sh sys/unix/hints/openstep
+# The old Bourne /bin/sh treats an unquoted ^ as a pipe, so dat/Makefile's
+# "grep ^#define ..." (building NetHack.ad) ran grep with no arguments and left
+# the X resource file empty.  Quote the patterns.
+/bin/cat > nh-fix.sed <<'FEOF'
+s/grep ^#define/grep '^#define'/
+s/grep -v ^#define/grep -v '^#define'/
+FEOF
+/bin/sed -f nh-fix.sed dat/Makefile > dat/Makefile.new
+/bin/mv dat/Makefile.new dat/Makefile
+/bin/rm -f nh-fix.sed
+# lev_comp and dgn_comp (util/) use strdup(), which this libc lacks.
+echo "LFLAGS += $strdup_shim" >> util/Makefile
 # Use NetHack's own pattern matcher instead of the system regcomp(); this has to
 # be set in the generated makefile because the object list is read early.
 /bin/sed 's/^REGEXOBJ = posixregex.o/REGEXOBJ = pmatchregex.o/' src/Makefile > src/Makefile.new
