@@ -17,7 +17,7 @@ has not been attempted.
 | class-dump | validated | — |
 | coreutils | validated | validated |
 | curl | validated | validated |
-| roboclient | untested (new) | — |
+| roboclient | validated | — |
 | diffutils | validated | — |
 | duktape | validated | — |
 | emacs | validated | — |
