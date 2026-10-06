@@ -62,8 +62,8 @@ diff -ruN a/sh.types.h b/sh.types.h
  # endif /* _SPEED_T */
 diff -ruN a/tc.func.c b/tc.func.c
 --- a/tc.func.c	2026-10-06 04:38:14.544376003 +0000
-+++ b/tc.func.c	2026-10-06 04:38:27.404158402 +0000
-@@ -2051,7 +2051,16 @@
++++ b/tc.func.c	2026-10-06 04:53:54.234910322 +0000
+@@ -2051,7 +2051,19 @@
  {
      struct sigaction sa;
      struct strbuf hostname = strbuf_INIT;
@@ -75,6 +75,9 @@ diff -ruN a/tc.func.c b/tc.func.c
 +    union wait status;
 +    extern int wait4();
 +# define waitpid(p, s, o)	wait4((p), (s), (o), (void *) 0)
++# ifndef WEXITSTATUS
++#  define WEXITSTATUS(w)	((w).w_retcode)
++# endif
 +#else
 +    int status;
 +#endif
