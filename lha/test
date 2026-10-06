@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 PREFIX="$LOCAL_ROOT"
-PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+PATH="$PREFIX/bin:/usr/local/bin:/usr/ucb:/bin:/usr/bin"
 export PATH
 WORK=/tmp/pkg-lha.$$
 mkdir "$WORK"

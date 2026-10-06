@@ -2,7 +2,7 @@
 set -e
 PREFIX="$LOCAL_ROOT"
 TCSH="$PREFIX/bin/tcsh"
-PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+PATH="$PREFIX/bin:/usr/local/bin:/usr/ucb:/bin:/usr/bin"
 export PATH
 WORK=/tmp/pkg-tcsh.$$
 mkdir "$WORK"
