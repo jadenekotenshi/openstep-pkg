@@ -119,6 +119,24 @@ struct timespec {
 };
 /* libntp's realpath and work_fork code use ssize_t, which OPENSTEP lacks. */
 typedef int ssize_t;
+/* <sys/wait.h> here defines the W*() status macros for the BSD "union wait"
+   (members w_T and w_S), but ntpd keeps the status in a plain int.  Replace them
+   with the standard int forms (the BSD wait status layout). */
+#include <sys/wait.h>
+#undef WIFEXITED
+#undef WEXITSTATUS
+#undef WIFSIGNALED
+#undef WTERMSIG
+#undef WIFSTOPPED
+#undef WSTOPSIG
+#undef WCOREDUMP
+#define WIFEXITED(s)	(((s) & 0177) == 0)
+#define WEXITSTATUS(s)	(((s) >> 8) & 0377)
+#define WIFSIGNALED(s)	(((s) & 0377) != 0177 && ((s) & 0177) != 0)
+#define WTERMSIG(s)	((s) & 0177)
+#define WIFSTOPPED(s)	(((s) & 0377) == 0177)
+#define WSTOPSIG(s)	(((s) >> 8) & 0377)
+#define WCOREDUMP(s)	((s) & 0200)
 /* ISO C's EILSEQ is missing from <errno.h> here (the BSD value). */
 #include <errno.h>
 #ifndef EILSEQ
