@@ -3,7 +3,6 @@
 BIN="$ROOT_DIR/usr/local/bin/sudo"
 ETC="$ROOT_DIR/usr/local/etc"
 RUNDIR="$ROOT_DIR/usr/local/var/run/sudo"
-VARDIR="$ROOT_DIR/usr/local/var/db/sudo"
 
 # sudo only works setuid root.
 if [ -f "$BIN" ]; then
@@ -13,11 +12,10 @@ if [ -f "$BIN" ]; then
     chmod 4755 "$BIN" 2>/dev/null || :
 fi
 
-for dir in "$RUNDIR" "$VARDIR" "$VARDIR/lectured"; do
-    [ -d "$dir" ] || /usr/local/bin/mkdir -p "$dir" 2>/dev/null || :
-done
-chmod 0711 "$RUNDIR" "$VARDIR" 2>/dev/null || :
-chmod 0700 "$VARDIR/lectured" 2>/dev/null || :
+# The timestamp directory; sudo 1.7 keeps it root-only.
+[ -d "$RUNDIR" ] || /usr/local/bin/mkdir -p "$RUNDIR" 2>/dev/null || :
+chown root "$RUNDIR" 2>/dev/null || :
+chmod 0700 "$RUNDIR" 2>/dev/null || :
 
 # Install the default policy only when there is none: never replace an
 # administrator's sudoers.  sudo refuses a sudoers that is not root-owned 0440.

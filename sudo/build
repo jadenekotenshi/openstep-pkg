@@ -9,28 +9,28 @@ SED=/bin/sed
 GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
 AWK=/usr/local/bin/gawk
+# This is sudo 1.7.10p9, not a current release: 1.8 and later need siginfo_t,
+# SA_SIGINFO, struct timespec and other POSIX.1-2001 features that OPENSTEP's
+# libc and headers lack.  1.7 falls back to sgtty when there is no POSIX
+# termios (OPENSTEP has <termios.h> but no tcgetattr()).
 # configure's own "*-*-nextstep*" case (lockf() is broken there) does not match
 # the openstep4 host name.
 ac_cv_func_lockf=no
-# OPENSTEP's libc has no tcgetattr() and friends, so configure's termios probe
-# fails.  The patch adds lib/util/openstep_termios.c (built on the BSD ioctls)
-# and the -D renames below send every call to it.
-ac_cv_sys_posix_termios=yes
-TERMIOS_RENAMES='-Dtcgetattr=openstep_tcgetattr -Dtcsetattr=openstep_tcsetattr -Dtcgetpgrp=openstep_tcgetpgrp -Dtcsetpgrp=openstep_tcsetpgrp -Dcfgetispeed=openstep_cfgetispeed -Dcfgetospeed=openstep_cfgetospeed -Dcfsetispeed=openstep_cfsetispeed -Dcfsetospeed=openstep_cfsetospeed'
-CPPFLAGS=$TERMIOS_RENAMES
+# Do not pick up a stray zlib for sudoreplay.
+ac_cv_lib_z_gzdopen=no
 # pdksh stalls and mis-expands parts of sudo's configure; zsh runs it cleanly.
 CONFIG_SHELL=/usr/local/bin/zsh
-export PATH CC CFLAGS CPPFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf ac_cv_sys_posix_termios
+export PATH CC CFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf ac_cv_lib_z_gzdopen
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
-# OPENSTEP's headers lack a number of POSIX integer types (id_t for certain,
-# others depending on which feature macros are set).  Probe each one with the
-# real compiler and flags, and typedef only the ones that are missing into a
+
+# OPENSTEP's headers hide some POSIX types without feature macros.  Probe each
+# with the real compiler and flags, and typedef only the missing ones into a
 # header forced into every compile, configure's probes included.
 types_h=`pwd`/openstep-types.h
 : > "$types_h"
 probe_type() {
-    printf '#include <sys/types.h>\n#include <stddef.h>\n#include <signal.h>\n#include <time.h>\n#include <termios.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n%s probe_var;\n' "$1" > probe_type.c
+    printf '#include <sys/types.h>\n#include <stddef.h>\n#include <signal.h>\n#include <time.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n%s probe_var;\n' "$1" > probe_type.c
     if $CC $CFLAGS -c probe_type.c -o probe_type.o > /dev/null 2>&1; then
         :
     else
@@ -42,34 +42,35 @@ probe_type pid_t int
 probe_type ssize_t int
 probe_type sigset_t 'unsigned int'
 probe_type uintptr_t 'unsigned long'
-probe_type speed_t 'unsigned long'
 /bin/rm -f probe_type.c probe_type.o
 echo "sudo: missing types typedef'd:" `/bin/cat "$types_h" | /bin/sed 's/^typedef .* \([a-z_]*\);$/\1/'`
-CPPFLAGS="$CPPFLAGS -include $types_h"
+CPPFLAGS="-include $types_h"
 export CPPFLAGS
-patch -p1 < "sudo-$VERSION-openstep.patch"
-# (Kept as a precaution under zsh.)  pdksh leaves the quotes in `echo \"$var\"` inside backticks, so configure's
-# library searches end up with -l"-lsocket" and die with "bad substitution" or
-# hang waiting for an unbalanced quote.  This system has no libsocket, libinet,
-# libnsl or libresolv (the socket calls are in libc), so the loops that search
-# for them are emptied rather than run under pdksh.
+
+# Precaution against pdksh: pdksh leaves the quotes in `echo \"$var\"` inside
+# backticks, so configure's library searches end up with -l"-lsocket".  This
+# system has no libsocket, libinet, libnsl or libresolv (the socket calls are
+# in libc), so the loops that search for them are emptied.
 /bin/sed -e 's/echo \\"\$\([A-Za-z_]*\)\\"|/echo $\1|/' \
     -e 's/^\([ 	]*for _*libs in\) "-lsocket".*; do$/\1 ; do/' configure > configure.new
 /bin/mv configure.new configure
 /bin/chmod 755 configure
-# No dlopen() here, so link the sudoers policy plugin into sudo and build no
-# shared libraries.  Hardening (-fstack-protector, PIE) needs runtime support
-# this system lacks.
+
+# No shared libraries or dlopen() here, so no noexec support; hardening
+# (-fstack-protector, PIE) needs runtime support this system lacks.
 # sudo defaults sysconfdir to /etc even with a prefix; keep everything under
 # /usr/local (sudoers is then /usr/local/etc/sudoers).
 run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
-    --disable-shared --disable-shared-libutil --enable-static-sudoers \
-    --disable-hardening --disable-nls --disable-tmpfiles.d --without-sendmail \
-    --with-rundir=/usr/local/var/run/sudo --with-vardir=/usr/local/var/db/sudo
+    --disable-shared --with-noexec=no --disable-hardening --without-pam \
+    --without-sendmail --with-timedir=/usr/local/var/run/sudo
 /bin/gnumake
-# INSTALL_OWNER= keeps the build from needing root; post-install sets ownership.
-/bin/gnumake install INSTALL_OWNER= DESTDIR="$DESTDIR"
+
+# Install owned by whoever is building (post-install makes it root's).
+ids=`/usr/bin/id`
+uid=`echo "$ids" | /bin/sed 's/^uid=\([0-9]*\).*/\1/'`
+gid=`echo "$ids" | /bin/sed 's/.*gid=\([0-9]*\).*/\1/'`
+/bin/gnumake install DESTDIR="$DESTDIR" install_uid="$uid" install_gid="$gid"
 
 # Never ship a sudoers file: a reinstall would replace the administrator's.
 # post-install installs this default only if none exists.
@@ -89,4 +90,5 @@ for stray in etc usr/lib; do
     fi
 done
 test -x "$DESTDIR/usr/local/bin/sudo"
+test -x "$DESTDIR/usr/local/sbin/visudo"
 chmod 4755 "$DESTDIR/usr/local/bin/sudo" 2>/dev/null || :

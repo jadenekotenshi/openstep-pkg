@@ -11,8 +11,7 @@ trap 'rm -rf "$WORK"' 0 1 2 3 15
 
 [ -x "$SUDO" ]
 [ -x "$VISUDO" ]
-[ -x "$PREFIX/bin/cvtsudoers" ]
-"$SUDO" -V | grep 'Sudo version' > /dev/null
+"$SUDO" -V | grep 'Sudo version 1\.7\.10p9' > /dev/null
 
 # The default policy is shipped as sudoers.dist and must parse.
 [ -f "$PREFIX/etc/sudoers.dist" ]
@@ -30,9 +29,6 @@ if "$VISUDO" -c -f "$WORK/bad" > /dev/null 2>&1; then
     echo "visudo accepted a malformed sudoers" >&2
     exit 1
 fi
-
-# cvtsudoers reads the policy and writes JSON.
-"$PREFIX/bin/cvtsudoers" -f json "$WORK/good" | grep '"Defaults"' > /dev/null
 
 # Where we are allowed to, check the real thing: setuid root, and root can
 # run a command as root without a password.
