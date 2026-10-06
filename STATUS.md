@@ -94,7 +94,7 @@ has not been attempted.
 | zip | validated | — |
 | zlib | validated | validated |
 | zsh | validated | validated |
-| zstd | being tested | — |
+| zstd | validated | — |
 
 ## Notes
 
