@@ -69,7 +69,7 @@ has not been attempted.
 | p7zip | validated | — |
 | patch | validated | validated |
 | pdksh | validated | validated |
-| perl | not recorded | building; fixes pushed, no result yet |
+| perl | not recorded | validated |
 | pkg-config | validated | — |
 | python311 | validated | — |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | — |
