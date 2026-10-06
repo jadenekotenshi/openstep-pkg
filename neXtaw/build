@@ -48,7 +48,7 @@ touch X11/neXtaw/laygram.c X11/neXtaw/laygram.h X11/neXtaw/laylex.c
 
 # Static library only: the 1999 libtool cannot build OPENSTEP shared libraries.
 run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
-    --disable-shared --x-includes="$x11_prefix/include" \
+    --disable-shared --disable-dependency-tracking --x-includes="$x11_prefix/include" \
     --x-libraries="$x11_prefix/lib"
 /bin/gnumake SHELL="$CONFIG_SHELL"
 /bin/gnumake install SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR"
