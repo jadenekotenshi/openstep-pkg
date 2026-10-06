@@ -21,7 +21,7 @@ has not been attempted.
 | duktape | validated | — |
 | emacs | queued for testing | — |
 | expat | validated | validated |
-| ffmpeg | queued for testing | — |
+| ffmpeg | compiling | — |
 | findutils | validated | validated |
 | flex | validated | validated |
 | freetype | validated | — |
@@ -54,7 +54,7 @@ has not been attempted.
 | libwapcaplet | validated | — |
 | libxml2 | validated | — |
 | lua | validated | — |
-| lz4 | being tested | — |
+| lz4 | validated | — |
 | m4 | validated | validated |
 | make | validated | validated |
 | mktemp | validated | validated |
@@ -65,13 +65,13 @@ has not been attempted.
 | netsurf-buildsystem | validated | — |
 | neXtaw | not yet built (needs HAVE_X11=1) | — |
 | nsgenbind | validated | — |
-| ntp | written; never built on OPENSTEP | — |
+| ntp | configure passes; compile errors being fixed | — |
 | openssh | validated | validated |
 | openssl | validated | validated |
 | p7zip | validated | — |
 | patch | validated | validated |
 | pdksh | validated | validated |
-| perl | not recorded | validated |
+| perl | compiling | validated |
 | pkg-config | validated | — |
 | python311 | validated | — |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | — |
