@@ -19,7 +19,7 @@ has not been attempted.
 | curl | validated | validated |
 | diffutils | validated | — |
 | duktape | validated | — |
-| emacs | queued for testing | — |
+| emacs | validated | — |
 | expat | validated | validated |
 | ffmpeg | validated | — |
 | findutils | validated | validated |
@@ -59,7 +59,7 @@ has not been attempted.
 | make | validated | validated |
 | mktemp | validated | validated |
 | mpg123 | validated | — |
-| nano | validated | — |
+| nano | validated | validated |
 | ncurses | validated | validated |
 | nethack | not yet built (`?HAVE_X11` adds the X11 interface) | — |
 | netsurf-buildsystem | validated | — |
