@@ -1,6 +1,6 @@
-diff -ruN tca/tcsh-6.24.13/configure tcb/tcsh-6.24.13/configure
---- a/configure	2024-06-12 05:52:47.000000000 +0000
-+++ b/configure	2026-10-06 02:52:24.776204814 +0000
+diff -ruN a/configure b/configure
+--- a/configure	2026-10-06 04:04:35.599231962 +0000
++++ b/configure	2026-10-06 04:04:35.631414900 +0000
 @@ -6089,6 +6089,10 @@
    *-qnx6*) :
          tcsh_config_file=qnx6
@@ -12,9 +12,9 @@ diff -ruN tca/tcsh-6.24.13/configure tcb/tcsh-6.24.13/configure
    *) :
      as_fn_error $? "Tcsh can't guess the configuration file name
  for \`${host}' systems.
-diff -ruN tca/tcsh-6.24.13/sh.file.c tcb/tcsh-6.24.13/sh.file.c
---- a/sh.file.c	2024-06-12 05:52:47.000000000 +0000
-+++ b/sh.file.c	2026-10-06 03:27:58.106615432 +0000
+diff -ruN a/sh.file.c b/sh.file.c
+--- a/sh.file.c	2026-10-06 04:04:35.608476102 +0000
++++ b/sh.file.c	2026-10-06 04:04:35.616595131 +0000
 @@ -218,6 +218,7 @@
  # endif /* POSIX */
  #else
@@ -23,9 +23,9 @@ diff -ruN tca/tcsh-6.24.13/sh.file.c tcb/tcsh-6.24.13/sh.file.c
  #endif /* TERMIO */
  
      pintr_disabled++;
-diff -ruN tca/tcsh-6.24.13/sh.types.h tcb/tcsh-6.24.13/sh.types.h
---- a/sh.types.h	2024-06-12 05:52:47.000000000 +0000
-+++ b/sh.types.h	2026-10-06 03:17:38.366341686 +0000
+diff -ruN a/sh.types.h b/sh.types.h
+--- a/sh.types.h	2026-10-06 04:04:35.608971219 +0000
++++ b/sh.types.h	2026-10-06 04:04:35.626305796 +0000
 @@ -166,10 +166,8 @@
   *** NeXT OS 3.x
   ***/
@@ -48,3 +48,20 @@ diff -ruN tca/tcsh-6.24.13/sh.types.h tcb/tcsh-6.24.13/sh.types.h
  #  define _SPEED_T
      typedef unsigned int speed_t;
  # endif /* _SPEED_T */
+diff -ruN a/tc.os.h b/tc.os.h
+--- a/tc.os.h	2026-10-06 04:04:35.611373727 +0000
++++ b/tc.os.h	2026-10-06 04:04:35.629066267 +0000
+@@ -449,10 +449,13 @@
+ /*
+  * From Tony_Mason@transarc.com, override NeXT's malloc stuff.
+  */
++/* tc.alloc.c only defines these when SYSMALLOC is not set. */
++# ifndef SYSMALLOC
+ # define malloc tcsh_malloc
+ # define calloc tcsh_calloc
+ # define realloc tcsh_realloc
+ # define free tcsh_free
++# endif /* !SYSMALLOC */
+ #endif /* NeXT */
+ 
+ #if defined(HAVE_GETHOSTNAME) && !HAVE_DECL_GETHOSTNAME
