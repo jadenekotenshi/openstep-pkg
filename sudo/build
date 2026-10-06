@@ -46,10 +46,11 @@ probe_type sigset_t int
 probe_type uintptr_t 'unsigned long'
 /bin/rm -f probe_type.c probe_type.o
 echo "sudo: missing types typedef'd:" `/bin/cat "$types_h" | /bin/sed 's/^typedef .* \([a-z_]*\);$/\1/'`
-CPPFLAGS="-include $types_h"
+CPPFLAGS="-include $types_h -Dgetgroups=openstep_getgroups"
 export CPPFLAGS
 
-# OPENSTEP's libc has no tcgetpgrp(), tcsetpgrp() or setpgid().  sudo only enables I/O
+# OPENSTEP's libc has no tcgetpgrp(), tcsetpgrp(), setpgid() or getcwd(), and its
+# getgroups() fails the POSIX getgroups(0, NULL) query.  sudo only enables I/O
 # logging (log_input/log_output, sudoreplay) when configure finds tcsetpgrp(),
 # and exec_pty.c calls both, so supply them from the BSD ioctls and setpgrp(), and hand the
 # object to configure through LIBS, which it uses for every link test and then
@@ -57,6 +58,8 @@ export CPPFLAGS
 /bin/cat > openstep_tc.c <<'TCEOF'
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <errno.h>
+#include <string.h>
 
 int
 tcgetpgrp(fd)
@@ -75,6 +78,58 @@ tcsetpgrp(fd, pgrp)
     int pgrp;
 {
     return ioctl(fd, TIOCSPGRP, (char *)&pgrp);
+}
+
+/* BSD getgroups() cannot answer the POSIX "how many?" query getgroups(0, NULL):
+   it fails with EINVAL.  The build renames sudo's calls to this one. */
+int
+openstep_getgroups(n, list)
+    int n;
+    int *list;
+{
+    int all[256];
+    int count, i;
+    extern int getgroups();
+
+    if (n != 0)
+	return getgroups(n, list);
+    count = getgroups(256, all);
+    return count;
+}
+
+/* No getcwd() either; the BSD getwd() does the job (and, unlike sudo's own
+   readdir-walking replacement, copes with this system's directory structs). */
+char *
+getcwd(buf, size)
+    char *buf;
+    unsigned int size;
+{
+    char path[2048];
+    extern char *getwd();
+    extern char *malloc();
+    unsigned int len;
+
+    if (buf != 0 && size == 0) {
+	errno = EINVAL;
+	return 0;
+    }
+    if (getwd(path) == 0) {
+	errno = EACCES;
+	return 0;
+    }
+    len = strlen(path) + 1;
+    if (buf == 0) {
+	if (size < len)
+	    size = len;
+	buf = malloc(size);
+	if (buf == 0)
+	    return 0;
+    } else if (size < len) {
+	errno = ERANGE;
+	return 0;
+    }
+    memcpy(buf, path, len);
+    return buf;
 }
 
 /* POSIX setpgid() is the BSD two-argument setpgrp(). */
