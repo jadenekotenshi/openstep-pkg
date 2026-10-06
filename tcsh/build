@@ -252,4 +252,5 @@ run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
     --disable-nls --disable-nls-catalogs --disable-rpath
 /bin/gnumake LDFLAGS_FOR_BUILD="$LDFLAGS $GETHOST_OBJ"
 /usr/local/bin/mkdir -p "$DESTDIR/usr/local/bin" "$DESTDIR/usr/local/man/man1"
-/bin/gnumake install DESTDIR="$DESTDIR"
+# Makefile.in sets MKDIR_P with GNU make's ?=, which the system gnumake lacks.
+/bin/gnumake install DESTDIR="$DESTDIR" MKDIR_P="/usr/local/bin/mkdir -p"
