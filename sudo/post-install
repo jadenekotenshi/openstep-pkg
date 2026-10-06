@@ -17,6 +17,12 @@ fi
 chown root "$RUNDIR" 2>/dev/null || :
 chmod 0700 "$RUNDIR" 2>/dev/null || :
 
+# I/O logs (log_input/log_output, replayed with sudoreplay) are root-only.
+IOLOGDIR="$ROOT_DIR/usr/local/var/log/sudo-io"
+[ -d "$IOLOGDIR" ] || /usr/local/bin/mkdir -p "$IOLOGDIR" 2>/dev/null || :
+chown root "$IOLOGDIR" 2>/dev/null || :
+chmod 0700 "$IOLOGDIR" 2>/dev/null || :
+
 # Install the default policy only when there is none: never replace an
 # administrator's sudoers.  sudo refuses a sudoers that is not root-owned 0440.
 if [ ! -f "$ETC/sudoers" ] && [ -f "$ETC/sudoers.dist" ]; then

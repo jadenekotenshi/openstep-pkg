@@ -45,6 +45,38 @@ echo "sudo: missing types typedef'd:" `/bin/cat "$types_h" | /bin/sed 's/^typede
 CPPFLAGS="-include $types_h"
 export CPPFLAGS
 
+# OPENSTEP's libc has no tcgetpgrp() or tcsetpgrp().  sudo only enables I/O
+# logging (log_input/log_output, sudoreplay) when configure finds tcsetpgrp(),
+# and exec_pty.c calls both, so supply them from the BSD ioctls and hand the
+# object to configure through LIBS, which it uses for every link test and then
+# for the final link.  (No system headers here, so no prototype can clash.)
+/bin/cat > openstep_tc.c <<'TCEOF'
+#include <sys/types.h>
+#include <sys/ioctl.h>
+
+int
+tcgetpgrp(fd)
+    int fd;
+{
+    int pgrp;
+
+    if (ioctl(fd, TIOCGPGRP, (char *)&pgrp) == -1)
+	return -1;
+    return pgrp;
+}
+
+int
+tcsetpgrp(fd, pgrp)
+    int fd;
+    int pgrp;
+{
+    return ioctl(fd, TIOCSPGRP, (char *)&pgrp);
+}
+TCEOF
+$CC $CFLAGS -c openstep_tc.c -o openstep_tc.o
+LIBS=`pwd`/openstep_tc.o
+export LIBS
+
 # Precaution against pdksh: pdksh leaves the quotes in `echo \"$var\"` inside
 # backticks, so configure's library searches end up with -l"-lsocket".  This
 # system has no libsocket, libinet, libnsl or libresolv (the socket calls are
@@ -64,7 +96,7 @@ run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
     --disable-shared --with-noexec=no --disable-hardening --without-pam \
     --without-sendmail --with-timedir=/usr/local/var/run/sudo \
-    --enable-zlib=/usr/local
+    --enable-zlib=/usr/local --with-iologdir=/usr/local/var/log/sudo-io
 /bin/gnumake
 
 # Install owned by whoever is building (post-install makes it root's).
@@ -92,4 +124,6 @@ for stray in etc usr/lib; do
 done
 test -x "$DESTDIR/usr/local/bin/sudo"
 test -x "$DESTDIR/usr/local/sbin/visudo"
+# I/O logging (and with it sudoreplay) must have been enabled.
+test -x "$DESTDIR/usr/local/bin/sudoreplay"
 chmod 4755 "$DESTDIR/usr/local/bin/sudo" 2>/dev/null || :

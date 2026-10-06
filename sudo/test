@@ -11,6 +11,8 @@ trap 'rm -rf "$WORK"' 0 1 2 3 15
 
 [ -x "$SUDO" ]
 [ -x "$VISUDO" ]
+[ -x "$PREFIX/bin/sudoreplay" ]
+"$PREFIX/bin/sudoreplay" -h 2>&1 | grep -i usage > /dev/null
 "$SUDO" -V | grep 'Sudo version 1\.7\.10p9' > /dev/null
 
 # The default policy is shipped as sudoers.dist and must parse.
