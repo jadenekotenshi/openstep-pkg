@@ -1,7 +1,31 @@
+diff -ruN pa/sudo-1.7.10p9/exec.c pc/sudo-1.7.10p9/exec.c
+--- a/exec.c	2015-02-10 17:05:31.000000000 +0000
++++ b/exec.c	2026-10-06 00:40:49.512744456 +0000
+@@ -27,7 +27,7 @@
+ #include <sys/wait.h>
+ #ifdef HAVE_TERMIOS_H
+ # include <termios.h>
+-#else
++#elif defined(HAVE_TERMIO_H)
+ # include <termio.h>
+ #endif /* HAVE_TERMIOS_H */
+ #include <sys/ioctl.h>
+diff -ruN pa/sudo-1.7.10p9/exec_pty.c pc/sudo-1.7.10p9/exec_pty.c
+--- a/exec_pty.c	2015-02-10 17:05:31.000000000 +0000
++++ b/exec_pty.c	2026-10-06 00:40:49.513416543 +0000
+@@ -26,7 +26,7 @@
+ #include <sys/wait.h>
+ #ifdef HAVE_TERMIOS_H
+ # include <termios.h>
+-#else
++#elif defined(HAVE_TERMIO_H)
+ # include <termio.h>
+ #endif /* HAVE_TERMIOS_H */
+ #include <sys/ioctl.h>
 diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 --- a/missing.h	2015-02-10 17:05:31.000000000 +0000
-+++ b/missing.h	2026-10-06 00:36:24.729560649 +0000
-@@ -200,23 +200,41 @@
++++ b/missing.h	2026-10-06 00:40:49.513804928 +0000
+@@ -200,23 +200,44 @@
  
  /*
   * Emulate POSIX signals via sigvec(2)
@@ -24,6 +48,9 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 +# endif
 +# ifndef SA_RESETHAND
 +#  define SA_RESETHAND	SV_RESETHAND
++# endif
++# ifndef SA_INTERRUPT
++#  define SA_INTERRUPT	0			/* sigvec() interrupts by default */
 +# endif
  # define sa_handler	sv_handler
  # define sa_mask	sv_mask
