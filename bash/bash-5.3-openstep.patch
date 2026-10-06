@@ -125,6 +125,17 @@ diff -ruN -x '*.o' a/x/lib/readline/mbutil.c b/lib/readline/mbutil.c
    return (wc1 == wc2);
  }
 +#endif /* HANDLE_MULTIBYTE */
+diff -ruN -x '*.o' a/x/lib/readline/rltty.c b/lib/readline/rltty.c
+--- a/lib/readline/rltty.c	2025-06-05 13:22:33.000000000 +0000
++++ b/lib/readline/rltty.c	2026-10-06 01:00:22.247202246 +0000
+@@ -139,6 +139,7 @@
+ static void prepare_terminal_settings (int, TIOTYPE, TIOTYPE *);
+ 
+ static void set_special_char (Keymap, TIOTYPE *, int, rl_command_func_t *);
++static void _rl_bind_tty_special_chars (Keymap, TIOTYPE);
+ 
+ static void
+ save_tty_chars (TIOTYPE *tiop)
 diff -ruN -x '*.o' a/x/lib/sh/Makefile.in b/lib/sh/Makefile.in
 --- a/lib/sh/Makefile.in	2024-11-13 20:37:41.000000000 +0000
 +++ b/lib/sh/Makefile.in	2026-10-05 22:43:00.014848978 +0000
