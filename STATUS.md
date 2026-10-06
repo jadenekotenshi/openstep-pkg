@@ -97,8 +97,10 @@ has not been attempted.
 ## Notes
 
 - **sudo** is 1.7.10p9, not a current release.  1.8 and later need `siginfo_t`,
-  `SA_SIGINFO` and `struct timespec`, which OPENSTEP lacks.  1.7.10p9 has known
-  CVEs; do not expose a machine running it.  I/O logging (`log_output`) and
+  `SA_SIGINFO` and `struct timespec`, which OPENSTEP lacks.  The package patches
+  CVE-2021-3156 (Baron Samedit), CVE-2019-14287 (`-u#-1`) and CVE-2019-18634
+  (`pwfeedback` overflow); other known issues remain (see `sudo/` patch comments),
+  so do not expose a machine running it.  I/O logging (`log_output`) and
   `sudoreplay` are built (with zlib), but the `log_output` path has only been
   checked by compiling, not exercised.
 - **tar** installs as `gtar`; it never installs `tar` or `gnutar`.

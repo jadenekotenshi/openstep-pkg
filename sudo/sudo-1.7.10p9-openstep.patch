@@ -215,6 +215,19 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
  #endif
  
  /*
+diff -ruN pa/sudo-1.7.10p9/parse_args.c pc/sudo-1.7.10p9/parse_args.c
+--- a/parse_args.c	2015-02-10 17:05:31.000000000 +0000
++++ b/parse_args.c	2026-10-06 03:55:55.193245191 +0000
+@@ -278,6 +278,9 @@
+     }
+     if ((flags & valid_flags) != flags)
+ 	usage(1);
++    /* CVE-2021-3156: sudoedit has no shell mode, and -s/-i must not set it. */
++    if (mode == MODE_EDIT && ISSET(flags, MODE_SHELL | MODE_LOGIN_SHELL))
++	usage(1);
+     if (mode == MODE_EDIT &&
+        (ISSET(flags, MODE_PRESERVE_ENV) || sudo_user.env_vars != NULL)) {
+ 	if (ISSET(mode, MODE_PRESERVE_ENV))
 diff -ruN pa/sudo-1.7.10p9/sigaction.c pc/sudo-1.7.10p9/sigaction.c
 --- a/sigaction.c	2015-02-10 17:05:31.000000000 +0000
 +++ b/sigaction.c	2026-10-06 00:31:34.868595605 +0000
@@ -227,6 +240,82 @@ diff -ruN pa/sudo-1.7.10p9/sigaction.c pc/sudo-1.7.10p9/sigaction.c
      int signo;
  {
  
+diff -ruN pa/sudo-1.7.10p9/sudo.c pc/sudo-1.7.10p9/sudo.c
+--- a/sudo.c	2015-02-10 17:05:31.000000000 +0000
++++ b/sudo.c	2026-10-06 03:55:55.193850719 +0000
+@@ -812,7 +812,7 @@
+ 	    char *to, *from, **av;
+ 	    size_t size, n;
+ 
+-	    if (ISSET(sudo_mode, MODE_SHELL)) {
++	    if (ISSET(sudo_mode, MODE_RUN) && ISSET(sudo_mode, MODE_SHELL)) {
+ 		for (size = 0, av = NewArgv + 1; *av; av++)
+ 		    size += strlen(*av) + 1;
+ 		user_args = emalloc(size);
+@@ -824,7 +824,9 @@
+ 		 */
+ 		for (to = user_args, av = NewArgv + 1; (from = *av); av++) {
+ 		    while (*from) {
+-			if (from[0] == '\\' && !isspace((unsigned char)from[1]))
++			/* CVE-2021-3156: never step over the terminating NUL. */
++			if (from[0] == '\\' && from[1] != '\0' &&
++			    !isspace((unsigned char)from[1]))
+ 			    from++;
+ 			*to++ = *from++;
+ 		    }
+@@ -1250,6 +1252,28 @@
+ }
+ 
+ /*
++ * Returns TRUE if STR is a plain decimal id that is not the reserved -1 /
++ * 4294967295 value (strtoul() wraps "-1" to the same thing).
++ */
++static int
++numeric_id_ok(str)
++    const char *str;
++{
++    char *ep;
++    unsigned long ul;
++
++    if (*str == '\0' || isspace((unsigned char)*str))
++	return FALSE;
++    errno = 0;
++    ul = strtoul(str, &ep, 10);
++    if (*ep != '\0' || errno == ERANGE)
++	return FALSE;
++    if (ul == (unsigned long) -1 || (ul & 0xffffffffUL) == 0xffffffffUL)
++	return FALSE;
++    return TRUE;
++}
++
++/*
+  * Get passwd entry for the user we are going to run commands as
+  * and store it in runas_pw.  By default, commands run as "root".
+  */
+@@ -1260,6 +1284,13 @@
+     if (runas_pw != NULL)
+ 	pw_delref(runas_pw);
+     if (*user == '#') {
++	/* CVE-2019-14287: uid -1 (4294967295) means "do not change" to
++	   setresuid()/setreuid(), which would leave the command running as
++	   root, so refuse it (and anything that is not a plain number). */
++	if (!numeric_id_ok(user + 1)) {
++	    audit_failure(NewArgv, "unknown user: %s", user);
++	    log_fatal(NO_MAIL|MSG_ONLY, "unknown user: %s", user);
++	}
+ 	if ((runas_pw = sudo_getpwuid(atoi(user + 1))) == NULL)
+ 	    runas_pw = sudo_fakepwnam(user, runas_gr ? runas_gr->gr_gid : 0);
+     } else {
+@@ -1281,6 +1312,9 @@
+     if (runas_gr != NULL)
+ 	gr_delref(runas_gr);
+     if (*group == '#') {
++	/* The same goes for gid -1 and setresgid()/setregid(). */
++	if (!numeric_id_ok(group + 1))
++	    log_fatal(NO_MAIL|MSG_ONLY, "unknown group: %s", group);
+ 	if ((runas_gr = sudo_getgrgid(atoi(group + 1))) == NULL)
+ 	    runas_gr = sudo_fakegrnam(group);
+     } else {
 diff -ruN pa/sudo-1.7.10p9/sudoreplay.c pc/sudo-1.7.10p9/sudoreplay.c
 --- a/sudoreplay.c	2015-02-10 17:05:31.000000000 +0000
 +++ b/sudoreplay.c	2026-10-06 01:58:20.340902303 +0000
@@ -250,3 +339,22 @@ diff -ruN pa/sudo-1.7.10p9/sudoreplay.c pc/sudo-1.7.10p9/sudoreplay.c
  	kill(getpid(), signo);
 +    }
  }
+diff -ruN pa/sudo-1.7.10p9/tgetpass.c pc/sudo-1.7.10p9/tgetpass.c
+--- a/tgetpass.c	2015-02-10 17:05:31.000000000 +0000
++++ b/tgetpass.c	2026-10-06 03:55:55.194115654 +0000
+@@ -259,12 +259,14 @@
+ 	    break;
+ 	if (feedback) {
+ 	    if (c == term_kill) {
++		/* CVE-2019-18634: give back exactly what was erased; the
++		   write may fail, leaving part of the line in place. */
+ 		while (cp > buf) {
+ 		    if (write(fd, "\b \b", 3) == -1)
+ 			break;
+ 		    --cp;
++		    left++;
+ 		}
+-		left = bufsiz;
+ 		continue;
+ 	    } else if (c == term_erase) {
+ 		if (cp > buf) {
