@@ -1,7 +1,7 @@
 diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 --- a/missing.h	2015-02-10 17:05:31.000000000 +0000
-+++ b/missing.h	2026-10-06 00:31:34.868509192 +0000
-@@ -200,23 +200,40 @@
++++ b/missing.h	2026-10-06 00:36:24.729560649 +0000
+@@ -200,23 +200,41 @@
  
  /*
   * Emulate POSIX signals via sigvec(2)
@@ -15,6 +15,7 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 -# define SA_ONSTACK	SV_ONSTACK
 -# define SA_RESTART	SV_INTERRUPT		/* opposite effect */
 -# define SA_RESETHAND	SV_RESETHAND
++# include <signal.h>		/* for sigset_t and struct sigvec */
 +# ifndef SA_ONSTACK
 +#  define SA_ONSTACK	SV_ONSTACK
 +# endif
