@@ -61,7 +61,7 @@ has not been attempted.
 | mpg123 | validated | — |
 | nano | validated | validated |
 | ncurses | validated | validated |
-| nethack | not yet built (`?HAVE_X11` adds the X11 interface) | — |
+| nethack | validated (tty; X11 interface not yet tested) | — |
 | netsurf-buildsystem | validated | — |
 | neXtaw | validated | — |
 | nsgenbind | validated | — |
