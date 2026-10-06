@@ -1,6 +1,6 @@
 diff -ruN pla/perl-5.8.9/doio.c plb/perl-5.8.9/doio.c
 --- a/doio.c	2008-10-29 07:36:21.000000000 +0000
-+++ b/doio.c	2026-10-06 01:20:44.990793276 +0000
++++ b/doio.c	2026-10-06 14:18:48.573655370 +0000
 @@ -1789,7 +1789,12 @@
              * "current time". */
  
@@ -16,7 +16,7 @@ diff -ruN pla/perl-5.8.9/doio.c plb/perl-5.8.9/doio.c
  #ifdef HAS_FUTIMES
 diff -ruN pla/perl-5.8.9/ext/Cwd/Cwd.xs plb/perl-5.8.9/ext/Cwd/Cwd.xs
 --- a/ext/Cwd/Cwd.xs	2008-10-30 22:39:26.000000000 +0000
-+++ b/ext/Cwd/Cwd.xs	2026-10-06 01:20:44.991003206 +0000
++++ b/ext/Cwd/Cwd.xs	2026-10-06 14:18:48.574242703 +0000
 @@ -86,7 +86,11 @@
  		resolved_len = 1;
  		left_len = my_strlcpy(left, path + 1, sizeof(left));
@@ -31,7 +31,7 @@ diff -ruN pla/perl-5.8.9/ext/Cwd/Cwd.xs plb/perl-5.8.9/ext/Cwd/Cwd.xs
  	}
 diff -ruN pla/perl-5.8.9/ext/POSIX/POSIX.xs plb/perl-5.8.9/ext/POSIX/POSIX.xs
 --- a/ext/POSIX/POSIX.xs	2008-05-25 23:01:44.000000000 +0000
-+++ b/ext/POSIX/POSIX.xs	2026-10-06 01:20:44.991136119 +0000
++++ b/ext/POSIX/POSIX.xs	2026-10-06 14:18:48.574575361 +0000
 @@ -1,5 +1,9 @@
  #define PERL_EXT_POSIX
  
@@ -108,8 +108,8 @@ diff -ruN pla/perl-5.8.9/ext/POSIX/POSIX.xs plb/perl-5.8.9/ext/POSIX/POSIX.xs
  #ifdef I_TERMIOS
 diff -ruN pla/perl-5.8.9/perl.h plb/perl-5.8.9/perl.h
 --- a/perl.h	2008-12-13 22:22:28.000000000 +0000
-+++ b/perl.h	2026-10-06 01:20:52.536197030 +0000
-@@ -557,6 +557,23 @@
++++ b/perl.h	2026-10-06 14:18:48.652745172 +0000
+@@ -557,6 +557,25 @@
  #   include <unistd.h>
  #endif
  
@@ -119,13 +119,15 @@ diff -ruN pla/perl-5.8.9/perl.h plb/perl-5.8.9/perl.h
 +#  define NGROUPS 16
 +#endif
 +extern char *getwd(char *);
-+extern int getgroups(int, int *);
++/* Declared without a prototype: <unistd.h> may already declare it, with a
++   different group type, and a prototype of ours would then conflict. */
++extern int getgroups();
 +/* BSD getgroups doesn't implement the POSIX zero-size query. */
 +static int
-+Perl_next_getgroups(int count, int *groups)
++Perl_next_getgroups(int count, void *groups)
 +{
 +    int query[NGROUPS];
-+    return getgroups(count ? count : NGROUPS, count ? groups : query);
++    return getgroups(count ? count : NGROUPS, count ? groups : (void *)query);
 +}
 +#define getgroups Perl_next_getgroups
 +#endif
@@ -135,7 +137,7 @@ diff -ruN pla/perl-5.8.9/perl.h plb/perl-5.8.9/perl.h
  #endif
 diff -ruN pla/perl-5.8.9/util.c plb/perl-5.8.9/util.c
 --- a/util.c	2008-11-04 09:07:04.000000000 +0000
-+++ b/util.c	2026-10-06 01:20:44.991946866 +0000
++++ b/util.c	2026-10-06 14:18:48.577071674 +0000
 @@ -1603,7 +1603,12 @@
  #endif
    {

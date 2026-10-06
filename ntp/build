@@ -76,6 +76,8 @@ struct timespec {
 	time_t	tv_sec;
 	long	tv_nsec;
 };
+/* libntp's realpath and work_fork code use ssize_t, which OPENSTEP lacks. */
+typedef int ssize_t;
 #endif
 SEOF
 # ntp's copy of ISC expects an isc/ipv6.h to supply the IPv6 types on systems

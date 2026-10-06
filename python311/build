@@ -2,7 +2,10 @@
 
 set -e
 
-ulimit -d 65536
+# Data and stack limits for the whole build, including the freshly built
+# interpreter that freezes the importlib modules.  PKG_PYTHON_DATA_LIMIT (in KB)
+# overrides the data limit if the build runs out of memory.
+ulimit -d ${PKG_PYTHON_DATA_LIMIT-65536}
 ulimit -s 8192
 
 DESTDIR=$1

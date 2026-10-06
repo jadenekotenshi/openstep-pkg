@@ -32,6 +32,11 @@ export gl_cv_absolute_time_h gl_cv_absolute_unistd_h
 patch -p1 < "$PATCHFILE"
 run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
   --disable-dependency-tracking --prefix=/usr/local
+# On SPARC the system cc dies with an abort (signal 6) optimizing deflate.c.
+# Compile that one file without optimization; the rest builds as usual.
+if test "$PKG_ARCH" = sparc; then
+    gnumake deflate.o CFLAGS=-g
+fi
 gnumake
 
 test -d "$DESTDIR/usr" || mkdir "$DESTDIR/usr"
