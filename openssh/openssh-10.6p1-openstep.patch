@@ -107,7 +107,7 @@ diff -ruN a/defines.h b/defines.h
  #endif
 diff -ruN a/includes.h b/includes.h
 --- a/includes.h	2026-10-06 08:45:31.000000000 +0000
-+++ b/includes.h	2026-10-06 21:59:25.895760752 +0000
++++ b/includes.h	2026-10-06 22:19:29.620208999 +0000
 @@ -115,7 +115,9 @@
  #endif
  
@@ -118,9 +118,19 @@ diff -ruN a/includes.h b/includes.h
  #ifdef HAVE_RPC_TYPES_H
  # include <rpc/types.h> /* For INADDR_LOOPBACK */
  #endif
-@@ -171,6 +173,9 @@
+@@ -170,7 +172,19 @@
+ #endif
  
  #ifdef WITH_OPENSSL
++#ifdef HAVE_NEXT
++/*
++ * configure replaces the missing socklen_t with a macro, but the OPENSTEP
++ * OpenSSL e_os2.h typedefs it; drop the macro before OpenSSL is included.
++ */
++# ifdef socklen_t
++#  undef socklen_t
++# endif
++#endif
  #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
 +#ifdef HAVE_NEXT
 +#include <openssl/e_os2.h>
@@ -359,7 +369,16 @@ diff -ruN a/openbsd-compat/bsd-misc.c b/openbsd-compat/bsd-misc.c
  #endif
 diff -ruN a/openbsd-compat/bsd-misc.h b/openbsd-compat/bsd-misc.h
 --- a/openbsd-compat/bsd-misc.h	2026-10-06 08:45:31.000000000 +0000
-+++ b/openbsd-compat/bsd-misc.h	2026-10-06 21:59:25.896999044 +0000
++++ b/openbsd-compat/bsd-misc.h	2026-10-06 22:19:29.619637585 +0000
+@@ -65,7 +65,7 @@
+ int utimes(const char *, struct timeval *);
+ #endif /* HAVE_UTIMES */
+ 
+-#ifndef HAVE_DIRFD
++#if !defined(HAVE_DIRFD) && !defined(dirfd)
+ int dirfd(void *);
+ #endif
+ 
 @@ -199,6 +199,7 @@
  #endif
  
