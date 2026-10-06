@@ -7,7 +7,8 @@ export PATH
 [ -x "$PREFIX/sbin/ntpd" ] || { echo "ntp: missing sbin/ntpd" >&2; exit 1; }
 [ ! -e "$PREFIX/bin/ntpd" ] || { echo "ntp: ntpd should live in sbin" >&2; exit 1; }
 [ -f "$PREFIX/etc/ntpd.conf.dist" ] || { echo "ntp: missing ntpd.conf.dist" >&2; exit 1; }
-for tool in ntpq ntpdc ntpdate ntp-keygen ntptime ntptrace; do
+# (ntptime needs kernel PLL support, which OPENSTEP lacks; configure does not build it.)
+for tool in ntpq ntpdc ntpdate ntp-keygen ntptrace; do
     [ -x "$PREFIX/bin/$tool" ] || { echo "ntp: missing $tool" >&2; exit 1; }
 done
 "$PREFIX/sbin/ntpd" --version 2>&1 | grep '4\.2\.8' > /dev/null

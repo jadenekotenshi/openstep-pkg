@@ -65,7 +65,7 @@ has not been attempted.
 | netsurf-buildsystem | validated | — |
 | neXtaw | validated | — |
 | nsgenbind | validated | — |
-| ntp | configure passes; compile errors being fixed | — |
+| ntp | built and installed; test hook being fixed | — |
 | openssh | validated | validated |
 | openssl | validated | validated |
 | p7zip | validated | — |
