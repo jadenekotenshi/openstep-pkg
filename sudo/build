@@ -122,9 +122,9 @@ pkg_step configure sudo_configure
 /bin/gnumake
 
 # Install owned by whoever is building (post-install makes it root's).
-ids=`/usr/bin/id`
-uid=`echo "$ids" | /bin/sed 's/^uid=\([0-9]*\).*/\1/'`
-gid=`echo "$ids" | /bin/sed 's/.*gid=\([0-9]*\).*/\1/'`
+# id comes from the coreutils dependency (/usr/local/bin/id).
+uid=`id -u`
+gid=`id -g`
 /bin/gnumake install DESTDIR="$DESTDIR" install_uid="$uid" install_gid="$gid"
 
 # Never ship a sudoers file: a reinstall would replace the administrator's.

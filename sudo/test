@@ -34,7 +34,7 @@ fi
 
 # Where we are allowed to, check the real thing: setuid root, and root can
 # run a command as root without a password.
-if [ "`/usr/bin/id -u`" = 0 ]; then
+if [ "`id -u`" = 0 ]; then
     [ -u "$SUDO" ]
     [ -f "$PREFIX/etc/sudoers" ]
     test "`"$SUDO" -n -u root /bin/echo sudo-works`" = sudo-works
