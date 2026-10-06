@@ -626,6 +626,19 @@ copy_local_source() {
     fi
 }
 
+# The system gnutar cannot read tarballs written by current tar (extended
+# headers, long names).  Use GNU tar from the "tar" package (installed as
+# gtar) when it is there; packages whose sources need it depend on "tar".
+archive_tar() {
+    for at_dir in "$ROOT_DIR/usr/local/bin" /usr/local/bin; do
+        if [ -x "$at_dir/gtar" ]; then
+            echo "$at_dir/gtar"
+            return 0
+        fi
+    done
+    echo gnutar
+}
+
 extract_archive() {
     archive=$1
     dest=$2
@@ -641,10 +654,10 @@ extract_archive() {
 
     case $archive in
         *.tar.gz|*.tgz)
-            gnutar -xzf "$archive" -C "$target_dir"
+            `archive_tar` -xzf "$archive" -C "$target_dir"
         ;;
         *.tar)
-            gnutar -xf "$archive" -C "$target_dir"
+            `archive_tar` -xf "$archive" -C "$target_dir"
         ;;
         *.tar.bz2|*.tbz2|*.tar.xz|*.txz)
             die "unsupported archive format on this system: $archive"

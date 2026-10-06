@@ -191,6 +191,11 @@ Rules:
 
 The optional second field is the destination directory inside the build root.
 
+Source archives are unpacked with `gtar` (from the `tar` package, in
+`/usr/local/bin`) when it is installed, and with the system `gnutar` otherwise.  The
+system `gnutar` cannot read tarballs written by current GNU tar, so a package with
+such a source lists `tar` in its `depends` (`openssh` does).
+
 ## `depends`
 
 Optional file with one package name per line.
