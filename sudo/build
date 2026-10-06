@@ -23,10 +23,29 @@ CONFIG_SHELL=/usr/local/bin/zsh
 export PATH CC CFLAGS CPPFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf ac_cv_sys_posix_termios
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
-# OPENSTEP has no id_t; sudo only uses it as an integer holding a uid or gid.
-# Force a typedef into every compile, configure's probes included.
-printf 'typedef unsigned int id_t;\n' > openstep-id_t.h
-CPPFLAGS="$CPPFLAGS -include `pwd`/openstep-id_t.h"
+# OPENSTEP's headers lack a number of POSIX integer types (id_t for certain,
+# others depending on which feature macros are set).  Probe each one with the
+# real compiler and flags, and typedef only the ones that are missing into a
+# header forced into every compile, configure's probes included.
+types_h=`pwd`/openstep-types.h
+: > "$types_h"
+probe_type() {
+    printf '#include <sys/types.h>\n#include <stddef.h>\n#include <signal.h>\n#include <time.h>\n#include <termios.h>\n#include <unistd.h>\n#include <sys/socket.h>\n#include <netinet/in.h>\n%s probe_var;\n' "$1" > probe_type.c
+    if $CC $CFLAGS -c probe_type.c -o probe_type.o > /dev/null 2>&1; then
+        :
+    else
+        echo "typedef $2 $1;" >> "$types_h"
+    fi
+}
+probe_type id_t 'unsigned int'
+probe_type pid_t int
+probe_type ssize_t int
+probe_type sigset_t 'unsigned int'
+probe_type uintptr_t 'unsigned long'
+probe_type speed_t 'unsigned long'
+/bin/rm -f probe_type.c probe_type.o
+echo "sudo: missing types typedef'd:" `/bin/cat "$types_h" | /bin/sed 's/^typedef .* \([a-z_]*\);$/\1/'`
+CPPFLAGS="$CPPFLAGS -include $types_h"
 export CPPFLAGS
 patch -p1 < "sudo-$VERSION-openstep.patch"
 # (Kept as a precaution under zsh.)  pdksh leaves the quotes in `echo \"$var\"` inside backticks, so configure's
