@@ -29,7 +29,7 @@ sig_h=`pwd`/openstep-sig.h
 #include <signal.h>
 SIGEOF
 probe_sig() {
-    printf '#include "%s"\n%s\n' "$sig_h" "$1" > probe_sig.c
+    { echo "#include \"$sig_h\""; echo "$1"; } > probe_sig.c
     $CC $CFLAGS -c probe_sig.c -o probe_sig.o > /dev/null 2>&1
 }
 probe_sig 'sigset_t probe_set;' || echo 'typedef unsigned int sigset_t;' >> "$sig_h"
