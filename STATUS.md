@@ -63,7 +63,7 @@ has not been attempted.
 | ncurses | validated | validated |
 | nethack | not yet built (`?HAVE_X11` adds the X11 interface) | — |
 | netsurf-buildsystem | validated | — |
-| neXtaw | not yet built (needs HAVE_X11=1) | — |
+| neXtaw | validated | — |
 | nsgenbind | validated | — |
 | ntp | configure passes; compile errors being fixed | — |
 | openssh | validated | validated |
