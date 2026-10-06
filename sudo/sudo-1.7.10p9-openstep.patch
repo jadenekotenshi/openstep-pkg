@@ -205,7 +205,16 @@ diff -ruN pa/sudo-1.7.10p9/sigaction.c pc/sudo-1.7.10p9/sigaction.c
  
 diff -ruN pa/sudo-1.7.10p9/sudoreplay.c pc/sudo-1.7.10p9/sudoreplay.c
 --- a/sudoreplay.c	2015-02-10 17:05:31.000000000 +0000
-+++ b/sudoreplay.c	2026-10-06 01:44:59.285399973 +0000
++++ b/sudoreplay.c	2026-10-06 01:58:20.340902303 +0000
+@@ -770,7 +770,7 @@
+ 	    }
+ 	    matched = rc == REG_NOMATCH ? 0 : 1;
+ #else
+-	    matched = strstr(log.cmd, sn->u.pattern) != NULL;
++	    matched = strstr(log->cmd, sn->u.pattern) != NULL;
+ #endif
+ 	    break;
+ 	case ST_FROMDATE:
 @@ -1208,6 +1208,9 @@
      int signo;
  {
