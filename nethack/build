@@ -13,6 +13,26 @@ pkg_apply_patch "nethack-$VERSION-openstep.patch"
 # The game installs under /usr/local/lib/nethackdir with a launcher in
 # /usr/local/bin.  There is no games user or group here, so ownership is left
 # alone and the score and save files are writable by everyone who can run it.
+# OPENSTEP's libc has no strdup(), which the X libraries use; link a small
+# definition in (it goes ahead of the terminal library in WINTTYLIB below).
+/bin/cat > openstep_strdup.c <<'SDEOF'
+#include <stdlib.h>
+#include <string.h>
+
+char *
+strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != 0)
+	memcpy(p, s, n);
+    return p;
+}
+SDEOF
+$CC $PKG_GCC42_ARCH_FLAGS -O2 -c openstep_strdup.c -o openstep_strdup.o
+strdup_obj=`pwd`/openstep_strdup.o
+
 hints=sys/unix/hints/openstep
 /bin/cat > "$hints" <<'HEOF'
 #-PRE
@@ -32,7 +52,7 @@ LINK=$(CC)
 WINSRC = $(WINTTYSRC)
 WINOBJ = $(WINTTYOBJ)
 WINLIB = $(WINTTYLIB)
-WINTTYLIB = -ltermcap
+WINTTYLIB = @STRDUP@ -ltermcap
 
 CHOWN=true
 CHGRP=true
@@ -89,7 +109,7 @@ HEOF
     fi
 fi
 
-/bin/sed "s|@CFLAGS@|-O2 $PKG_GCC42_ARCH_FLAGS|" "$hints" > "$hints.new"
+/bin/sed -e "s|@CFLAGS@|-O2 $PKG_GCC42_ARCH_FLAGS|" -e "s|@STRDUP@|$strdup_obj|" "$hints" > "$hints.new"
 /bin/mv "$hints.new" "$hints"
 
 # The distribution carries pre-generated lex and yacc output; use it instead of
