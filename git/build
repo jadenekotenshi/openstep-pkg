@@ -70,7 +70,17 @@ make_git() {
     INSTALL=/usr/local/bin/install INSTALL_STRIP=-s "$@"
 }
 
+echo "git: building with CC=$CC CFLAGS=$CFLAGS"
 make_git
+echo "git: GIT-CFLAGS used by the build:"
+/bin/cat GIT-CFLAGS
+# Known-answer check of the SHA-1 and object code before anything else runs: a
+# wrong id here means byte order or compiler trouble, not a repository problem.
+hello_id=`printf 'hello\n' | ./git hash-object --stdin`
+if test "$hello_id" != ce013625030ba8dba906f756967f9e9ca394464a; then
+    echo "git: hash-object gave $hello_id, expected ce013625030ba8dba906f756967f9e9ca394464a" >&2
+    exit 1
+fi
 # Exercise the platform behavior that repository storage and child processes need.
 "$CC" $PKG_GCC42_ARCH_FLAGS -O2 -Icompat/openstep -I/usr/local/include \
     compat/openstep-test.c compat/openstep.o compat/snprintf.o \
