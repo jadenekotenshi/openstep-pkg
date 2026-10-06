@@ -40,6 +40,197 @@ gl_cv_absolute_fcntl_h=$abs_fcntl_h
 gl_cv_absolute_sys_stat_h=$abs_sys_stat_h
 export gl_cv_absolute_fcntl_h gl_cv_absolute_sys_stat_h
 
+# OPENSTEP's libc has no snprintf(), sysconf() or fchdir() (gnulib's at-function
+# emulation and chdir-long need fchdir), and its headers may still declare them.
+# The shim below implements them under private names, and the -D renames send
+# tar's calls there so they can never clash with a system prototype.  fchdir()
+# has no kernel support here, so open/close/dup/dup2/fcntl are renamed too, and
+# the shim remembers the absolute path behind every descriptor it hands out.
+/bin/cat > openstep_tarshim.c <<'SHIMEOF'
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MAXFDS 1024
+static char *fd_path[MAXFDS];
+
+extern char *getwd();
+
+static void
+forget(int fd)
+{
+    if (fd >= 0 && fd < MAXFDS && fd_path[fd] != 0) {
+	free(fd_path[fd]);
+	fd_path[fd] = 0;
+    }
+}
+
+static void
+remember(int fd, const char *path)
+{
+    char cwd[2048];
+    char *copy;
+    size_t n;
+
+    if (fd < 0 || fd >= MAXFDS)
+	return;
+    forget(fd);
+    if (path[0] == '/') {
+	copy = (char *)malloc(strlen(path) + 1);
+	if (copy != 0)
+	    strcpy(copy, path);
+    } else {
+	if (getwd(cwd) == 0)
+	    return;
+	n = strlen(cwd) + 1 + strlen(path) + 1;
+	copy = (char *)malloc(n);
+	if (copy != 0) {
+	    strcpy(copy, cwd);
+	    strcat(copy, "/");
+	    strcat(copy, path);
+	}
+    }
+    fd_path[fd] = copy;
+}
+
+static void
+copy_path(int from, int to)
+{
+    if (to < 0 || to >= MAXFDS)
+	return;
+    forget(to);
+    if (from >= 0 && from < MAXFDS && fd_path[from] != 0) {
+	fd_path[to] = (char *)malloc(strlen(fd_path[from]) + 1);
+	if (fd_path[to] != 0)
+	    strcpy(fd_path[to], fd_path[from]);
+    }
+}
+
+int
+openstep_open(const char *path, int flags, ...)
+{
+    va_list ap;
+    int mode, fd;
+
+    va_start(ap, flags);
+    mode = va_arg(ap, int);
+    va_end(ap);
+    fd = open(path, flags, mode);
+    if (fd >= 0)
+	remember(fd, path);
+    return fd;
+}
+
+int
+openstep_close(int fd)
+{
+    forget(fd);
+    return close(fd);
+}
+
+int
+openstep_dup(int fd)
+{
+    int nfd = dup(fd);
+
+    if (nfd >= 0)
+	copy_path(fd, nfd);
+    return nfd;
+}
+
+int
+openstep_dup2(int fd, int fd2)
+{
+    int r = dup2(fd, fd2);
+
+    if (r >= 0)
+	copy_path(fd, fd2);
+    return r;
+}
+
+int
+openstep_fcntl(int fd, int cmd, ...)
+{
+    va_list ap;
+    long arg;
+    int r;
+
+    va_start(ap, cmd);
+    arg = va_arg(ap, long);
+    va_end(ap);
+    r = fcntl(fd, cmd, arg);
+    if (r >= 0 && cmd == F_DUPFD)
+	copy_path(fd, r);
+    return r;
+}
+
+int
+openstep_fchdir(int fd)
+{
+    if (fd < 0 || fd >= MAXFDS || fd_path[fd] == 0) {
+	errno = EBADF;
+	return -1;
+    }
+    return chdir(fd_path[fd]);
+}
+
+long
+openstep_sysconf(int name)
+{
+    switch (name) {
+#ifdef _SC_PAGESIZE
+    case _SC_PAGESIZE:
+	return getpagesize();
+#endif
+#ifdef _SC_OPEN_MAX
+    case _SC_OPEN_MAX:
+	return getdtablesize();
+#endif
+#ifdef _SC_ARG_MAX
+    case _SC_ARG_MAX:
+	return 262144;
+#endif
+#ifdef _SC_NGROUPS_MAX
+    case _SC_NGROUPS_MAX:
+	return 16;
+#endif
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+/* The output is formatted into a large buffer and cut to fit. */
+int
+openstep_snprintf(char *buf, size_t size, const char *fmt, ...)
+{
+    static char tmp[65536];
+    va_list ap;
+    int n;
+
+    va_start(ap, fmt);
+    n = vsprintf(tmp, fmt, ap);
+    va_end(ap);
+    if (n < 0)
+	return n;
+    if (size > 0) {
+	size_t m = ((size_t)n < size - 1) ? (size_t)n : size - 1;
+	memcpy(buf, tmp, m);
+	buf[m] = 0;
+    }
+    return n;
+}
+SHIMEOF
+$CC $CFLAGS -c openstep_tarshim.c -o openstep_tarshim.o
+LIBS=`pwd`/openstep_tarshim.o
+CPPFLAGS='-Dopen=openstep_open -Dclose=openstep_close -Ddup=openstep_dup -Ddup2=openstep_dup2 -Dfcntl=openstep_fcntl -Dfchdir=openstep_fchdir -Dsysconf=openstep_sysconf -Dsnprintf=openstep_snprintf'
+export LIBS CPPFLAGS
+
 # --program-prefix=g installs the program as gtar (and the man page as gtar.1,
 # the remote tape helper as grmt, whose compiled-in default path matches).
 # It must never be installed as "tar" or "gnutar": the system has its own, and
