@@ -1,6 +1,6 @@
 diff -ruN a/configure b/configure
---- a/configure	2026-10-06 04:04:35.599231962 +0000
-+++ b/configure	2026-10-06 04:04:35.631414900 +0000
+--- a/configure	2026-10-06 04:30:47.654803620 +0000
++++ b/configure	2026-10-06 04:30:47.700185523 +0000
 @@ -6089,6 +6089,10 @@
    *-qnx6*) :
          tcsh_config_file=qnx6
@@ -13,8 +13,8 @@ diff -ruN a/configure b/configure
      as_fn_error $? "Tcsh can't guess the configuration file name
  for \`${host}' systems.
 diff -ruN a/sh.file.c b/sh.file.c
---- a/sh.file.c	2026-10-06 04:04:35.608476102 +0000
-+++ b/sh.file.c	2026-10-06 04:04:35.616595131 +0000
+--- a/sh.file.c	2026-10-06 04:30:47.668580128 +0000
++++ b/sh.file.c	2026-10-06 04:30:47.682322325 +0000
 @@ -218,6 +218,7 @@
  # endif /* POSIX */
  #else
@@ -23,9 +23,21 @@ diff -ruN a/sh.file.c b/sh.file.c
  #endif /* TERMIO */
  
      pintr_disabled++;
+diff -ruN a/sh.proc.c b/sh.proc.c
+--- a/sh.proc.c	2026-10-06 04:30:47.669699451 +0000
++++ b/sh.proc.c	2026-10-06 04:30:47.695249483 +0000
+@@ -43,7 +43,7 @@
+ # define HZ 16
+ #endif /* aiws */
+ 
+-#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid)
++#if defined(_BSD) || (defined(IRIS4D) && __STDC__) || defined(__lucid) || defined(NeXT)
+ # define BSDWAIT
+ #endif /* _BSD || (IRIS4D && __STDC__) || __lucid */
+ #ifndef WTERMSIG
 diff -ruN a/sh.types.h b/sh.types.h
---- a/sh.types.h	2026-10-06 04:04:35.608971219 +0000
-+++ b/sh.types.h	2026-10-06 04:04:35.626305796 +0000
+--- a/sh.types.h	2026-10-06 04:30:47.670404047 +0000
++++ b/sh.types.h	2026-10-06 04:30:47.694172941 +0000
 @@ -166,10 +166,8 @@
   *** NeXT OS 3.x
   ***/
@@ -49,8 +61,8 @@ diff -ruN a/sh.types.h b/sh.types.h
      typedef unsigned int speed_t;
  # endif /* _SPEED_T */
 diff -ruN a/tc.os.h b/tc.os.h
---- a/tc.os.h	2026-10-06 04:04:35.611373727 +0000
-+++ b/tc.os.h	2026-10-06 04:04:35.629066267 +0000
+--- a/tc.os.h	2026-10-06 04:30:47.673390760 +0000
++++ b/tc.os.h	2026-10-06 04:30:47.695778829 +0000
 @@ -449,10 +449,13 @@
  /*
   * From Tony_Mason@transarc.com, override NeXT's malloc stuff.
