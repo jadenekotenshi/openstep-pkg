@@ -39,8 +39,10 @@ check_status() {
 }
 
 check_status "exit status of a child" 7 'sh -c "exit 7"; echo $?'
-# Old BSD sh/kill only take numeric signals (kill -15), not names.
-check_status "status of a child killed by SIGTERM" 143 'sh -c "kill -15 \$\$"; echo $?'
+# SIGKILL, because OPENSTEP's /bin/sh catches HUP, INT and TERM and exits with an
+# ordinary status of its own (208); SIGKILL cannot be caught, so the child
+# really dies from the signal.  (Old BSD kill takes only numeric signals.)
+check_status "status of a child killed by SIGKILL" 137 'sh -c "kill -9 \$\$"; echo $?'
 check_status "wait for a background job" 0 'sleep 1 & wait $!; echo $?'
 check_status "exit status of a subshell" 3 '(exit 3); echo $?'
 check_status "exit status of a failed pipeline" 1 'false | false; echo $?'
