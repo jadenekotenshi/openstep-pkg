@@ -109,6 +109,43 @@ diff -ruN -x '*.o' a/x/lib/glob/smatch.c b/lib/glob/smatch.c
  #include "xmalloc.h"
  
  #include <errno.h>
+diff -ruN -x '*.o' a/x/lib/readline/input.c b/lib/readline/input.c
+--- a/lib/readline/input.c	2025-05-02 13:29:05.000000000 +0000
++++ b/lib/readline/input.c	2026-10-06 01:27:06.158155295 +0000
+@@ -720,8 +720,10 @@
+   else
+     result = pselect (nfds, readfds, writefds, exceptfds, NULL, sigmask);
+ #else
++#  if defined (HAVE_POSIX_SIGNALS)
+   if (sigmask)
+     sigprocmask (SIG_SETMASK, sigmask, &origmask);
++#  endif
+ 
+   if (timeout)
+     {
+@@ -732,8 +734,10 @@
+   else
+     result = select (nfds, readfds, writefds, exceptfds, NULL);
+ 
++#  if defined (HAVE_POSIX_SIGNALS)
+   if (sigmask)
+     sigprocmask (SIG_SETMASK, &origmask, NULL);
++#  endif
+ #endif
+ 
+   if (tmout_status == 1 && result == 0)
+@@ -871,7 +875,10 @@
+ 	 timeouts. We handled MinGW above. */
+       FD_ZERO (&readfds);
+       FD_SET (fd, &readfds);
+-#  if defined (HANDLE_SIGNALS)
++#  if !defined (HAVE_POSIX_SIGNALS)
++      /* No sigprocmask(), so no signal mask to hand to select. */
++      result = _rl_timeout_select (fd + 1, &readfds, NULL, NULL, NULL, NULL);
++#  elif defined (HANDLE_SIGNALS)
+       result = _rl_timeout_select (fd + 1, &readfds, NULL, NULL, NULL, &_rl_orig_sigset);
+ #  else
+       sigemptyset (&empty_set);
 diff -ruN -x '*.o' a/x/lib/readline/mbutil.c b/lib/readline/mbutil.c
 --- a/lib/readline/mbutil.c	2024-08-14 14:57:57.000000000 +0000
 +++ b/lib/readline/mbutil.c	2026-10-05 23:54:20.597080383 +0000
