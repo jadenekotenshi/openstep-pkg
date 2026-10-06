@@ -58,7 +58,7 @@ diff -ruN pa/sudo-1.7.10p9/glob.c pc/sudo-1.7.10p9/glob.c
 +#endif /* !HAVE_GLOB */
 diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 --- a/missing.h	2015-02-10 17:05:31.000000000 +0000
-+++ b/missing.h	2026-10-06 01:24:44.707880308 +0000
++++ b/missing.h	2026-10-06 01:44:59.284858401 +0000
 @@ -104,6 +104,26 @@
  #ifndef S_ISDIR
  # define S_ISDIR(m)		(((m) & _S_IFMT) == _S_IFDIR)
@@ -132,7 +132,7 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
   * On POSIX systems, O_NOCTTY is the default so some OS's may lack this define.
   */
  #ifndef O_NOCTTY
-@@ -200,23 +259,44 @@
+@@ -200,23 +259,47 @@
  
  /*
   * Emulate POSIX signals via sigvec(2)
@@ -147,6 +147,9 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 -# define SA_RESTART	SV_INTERRUPT		/* opposite effect */
 -# define SA_RESETHAND	SV_RESETHAND
 +# include <signal.h>		/* for sigset_t and struct sigvec */
++# ifndef SV_RESETHAND
++#  define SV_RESETHAND	0		/* BSD sigvec() cannot reset handlers */
++# endif
 +# ifndef SA_ONSTACK
 +#  define SA_ONSTACK	SV_ONSTACK
 +# endif
@@ -200,3 +203,17 @@ diff -ruN pa/sudo-1.7.10p9/sigaction.c pc/sudo-1.7.10p9/sigaction.c
      int signo;
  {
  
+diff -ruN pa/sudo-1.7.10p9/sudoreplay.c pc/sudo-1.7.10p9/sudoreplay.c
+--- a/sudoreplay.c	2015-02-10 17:05:31.000000000 +0000
++++ b/sudoreplay.c	2026-10-06 01:44:59.285399973 +0000
+@@ -1208,6 +1208,9 @@
+     int signo;
+ {
+     term_restore(STDIN_FILENO, 0);
+-    if (signo)
++    if (signo) {
++	/* SA_RESETHAND may not exist (BSD sigvec), so reset the handler here. */
++	(void) signal(signo, SIG_DFL);
+ 	kill(getpid(), signo);
++    }
+ }
