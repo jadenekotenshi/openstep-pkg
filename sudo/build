@@ -22,6 +22,10 @@ export PATH CC CFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 
+# OPENSTEP's <signal.h> declares sigaction() and friends but libc lacks them;
+# sudo's sigvec(2) emulation is renamed so it cannot clash with the headers.
+patch -p1 < "sudo-$VERSION-openstep.patch"
+
 # OPENSTEP's headers hide some POSIX types without feature macros.  Probe each
 # with the real compiler and flags, and typedef only the missing ones into a
 # header forced into every compile, configure's probes included.
@@ -38,7 +42,7 @@ probe_type() {
 probe_type id_t 'unsigned int'
 probe_type pid_t int
 probe_type ssize_t int
-probe_type sigset_t 'unsigned int'
+probe_type sigset_t int
 probe_type uintptr_t 'unsigned long'
 /bin/rm -f probe_type.c probe_type.o
 echo "sudo: missing types typedef'd:" `/bin/cat "$types_h" | /bin/sed 's/^typedef .* \([a-z_]*\);$/\1/'`
