@@ -12,20 +12,20 @@ has not been attempted.
 |---|---|---|
 | bash | validated | — |
 | bison | validated | validated |
-| bzip2 | validated | — |
-| ca-certificates | validated | — |
+| bzip2 | validated | validated |
+| ca-certificates | validated | validated |
 | class-dump | validated | — |
 | coreutils | validated | validated |
-| curl | validated | — |
+| curl | validated | validated |
 | diffutils | validated | — |
 | duktape | validated | — |
 | emacs | queued for testing | — |
-| expat | validated | — |
+| expat | validated | validated |
 | ffmpeg | queued for testing | — |
-| findutils | validated | — |
+| findutils | validated | validated |
 | flex | validated | validated |
 | freetype | validated | — |
-| freeze | validated | — |
+| freeze | validated | validated |
 | gawk | validated | validated |
 | gcc42 | validated | validated (port; bootstraps, compare passes, `pkg test` passes) |
 | git | validated | — |
@@ -40,7 +40,7 @@ has not been attempted.
 | libcss | validated | — |
 | libdom | validated | — |
 | libhubbub | validated | — |
-| libiconv | validated | — |
+| libiconv | validated | validated |
 | libmad | validated | — |
 | libmpeg2 | queued for testing | — |
 | libnsbmp | validated | — |
@@ -57,18 +57,18 @@ has not been attempted.
 | lz4 | being tested | — |
 | m4 | validated | validated |
 | make | validated | validated |
-| mktemp | validated | — |
+| mktemp | validated | validated |
 | mpg123 | validated | — |
 | nano | validated | — |
 | ncurses | validated | validated |
 | netsurf-buildsystem | validated | — |
 | nsgenbind | validated | — |
 | ntp | written; never built on OPENSTEP | — |
-| openssh | validated | — |
-| openssl | validated | — |
+| openssh | validated | validated |
+| openssl | validated | validated |
 | p7zip | in progress; fixes pushed, no result yet | — |
-| patch | validated | — |
-| pdksh | validated | — |
+| patch | validated | validated |
+| pdksh | validated | validated |
 | perl | not recorded | building; fixes pushed, no result yet |
 | pkg-config | validated | — |
 | python311 | validated | — |
@@ -76,21 +76,21 @@ has not been attempted.
 | quickjs | validated | — |
 | rsync | validated | — |
 | sdl12 | validated | — |
-| sed | validated | — |
+| sed | validated | validated |
 | sudo | validated | — |
 | tar | validated | — |
 | tcsh | in progress; fixes pushed, no result yet | — |
 | termcap | validated | — |
-| texinfo | validated | — |
-| top | validated | — |
+| texinfo | validated | validated |
+| top | validated | validated |
 | unzip | validated | validated |
 | utf8proc | validated | — |
 | vim | validated | — |
-| wget | validated | — |
+| wget | validated | validated |
 | xxhash | validated | fix pushed (manual build); no result recorded |
 | xz | being tested | — |
 | zip | validated | — |
-| zlib | validated | — |
+| zlib | validated | validated |
 | zsh | validated | validated |
 | zstd | being tested | — |
 
