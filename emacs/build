@@ -30,7 +30,8 @@ export CPPFLAGS
 /usr/bin/touch configure
 run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
     --prefix=/usr/local --infodir="/usr/local/share/info/emacs-$VERSION" \
-    --without-x --without-ns --without-modules --without-gnutls \
+    --without-x --with-ns --disable-ns-self-contained \
+    --without-file-notification --without-modules --without-gnutls \
     --without-native-compilation --with-wide-int
 # Use the complete upstream Info manuals. Texinfo 4.8 cannot regenerate
 # the current Texinfo sources; no documentation sources are changed here.
@@ -56,3 +57,14 @@ for dump in "$DESTDIR/usr/local/libexec/emacs/$VERSION"/*/emacs-*.pdmp; do
     fi
 done
 test "$found_dump" = yes
+
+# A native OPENSTEP bundle for Workspace, sharing the normal installation.
+test -d "$DESTDIR/usr/local/Apps" || mkdir "$DESTDIR/usr/local/Apps"
+app="$DESTDIR/usr/local/Apps/Emacs.app"
+mkdir "$app"
+cp nextstep/OPENSTEP-Info.plist "$app/Info.plist"
+cp nextstep/GNUstep/Emacs.base/Resources/emacs.tiff "$app/emacs.tiff"
+cp nextstep/GNUstep/Emacs.base/Resources/README "$app/README-icon"
+ln -s ../../bin/emacs "$app/Emacs"
+# OPENSTEP preserves the bundle executable name when looking for the dump.
+ln -s emacs.pdmp "$dump_dir/Emacs.pdmp"
