@@ -324,7 +324,7 @@ diff -ruN a/misc.c b/misc.c
  /*
 diff -ruN a/openbsd-compat/bsd-misc.c b/openbsd-compat/bsd-misc.c
 --- a/openbsd-compat/bsd-misc.c	2026-10-06 08:45:31.000000000 +0000
-+++ b/openbsd-compat/bsd-misc.c	2026-10-06 21:59:25.896879007 +0000
++++ b/openbsd-compat/bsd-misc.c	2026-10-06 22:31:59.487585755 +0000
 @@ -32,10 +32,18 @@
  #include <time.h>
  #include <unistd.h>
@@ -344,6 +344,15 @@ diff -ruN a/openbsd-compat/bsd-misc.c b/openbsd-compat/bsd-misc.c
  /*
   * NB. duplicate __progname in case it is an alias for argv[0]
   * Otherwise it may get clobbered by setproctitle()
+@@ -157,7 +165,7 @@
+ }
+ #endif
+ 
+-#ifndef HAVE_DIRFD
++#if !defined(HAVE_DIRFD) && !defined(dirfd)
+ int
+ dirfd(void *dir)
+ {
 @@ -390,7 +398,9 @@
  pid_t
  getpgid(pid_t pid)
