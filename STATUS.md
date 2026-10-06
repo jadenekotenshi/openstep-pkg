@@ -32,7 +32,7 @@ has not been attempted.
 | gperf | validated | — |
 | grep | validated | validated |
 | gzip | validated | — |
-| help2man | queued for testing | — |
+| help2man | queued for testing | validated |
 | jpeg | validated | — |
 | less | validated | — |
 | lha | validated | — |
