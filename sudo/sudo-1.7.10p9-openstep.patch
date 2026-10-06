@@ -24,16 +24,34 @@ diff -ruN pa/sudo-1.7.10p9/exec_pty.c pc/sudo-1.7.10p9/exec_pty.c
  #include <sys/ioctl.h>
 diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 --- a/missing.h	2015-02-10 17:05:31.000000000 +0000
-+++ b/missing.h	2026-10-06 00:53:15.926761877 +0000
-@@ -192,6 +192,27 @@
++++ b/missing.h	2026-10-06 00:54:23.803503445 +0000
+@@ -192,6 +192,45 @@
  #endif /* HAVE__INNETGR */
  
  /*
 + * With -D_POSIX_SOURCE, OPENSTEP's <net/if.h> hides the interface flags.
-+ * 0x1 is the BSD value of IFF_UP (interfaces.c handles IFF_LOOPBACK itself).
++ * These are the 4.3BSD values.
 + */
 +#ifndef IFF_UP
 +# define IFF_UP		0x1
++#endif
++#ifndef IFF_BROADCAST
++# define IFF_BROADCAST	0x2
++#endif
++#ifndef IFF_DEBUG
++# define IFF_DEBUG	0x4
++#endif
++#ifndef IFF_LOOPBACK
++# define IFF_LOOPBACK	0x8
++#endif
++#ifndef IFF_POINTOPOINT
++# define IFF_POINTOPOINT 0x10
++#endif
++#ifndef IFF_RUNNING
++# define IFF_RUNNING	0x40
++#endif
++#ifndef IFF_NOARP
++# define IFF_NOARP	0x80
 +#endif
 +
 +/*
@@ -53,7 +71,7 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
   * On POSIX systems, O_NOCTTY is the default so some OS's may lack this define.
   */
  #ifndef O_NOCTTY
-@@ -200,23 +221,44 @@
+@@ -200,23 +239,44 @@
  
  /*
   * Emulate POSIX signals via sigvec(2)
