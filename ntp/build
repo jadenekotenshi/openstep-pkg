@@ -150,6 +150,11 @@ typedef int ssize_t;
 #ifndef MAX_PATH
 # define MAX_PATH	1024
 #endif
+/* wint_t already exists here (a macro in gcc's headers) but libopts' own
+   check cannot see it without <wchar.h>, and its fallback typedef then fails. */
+#ifndef HAVE_WINT_T
+# define HAVE_WINT_T	1
+#endif
 /* <net/if.h> hides the interface flags unless _POSIX_SOURCE is undefined (the
    4.3BSD values). */
 #ifndef IFF_UP
@@ -184,6 +189,24 @@ typedef int ssize_t;
 #endif
 #endif
 SEOF
+# mode_t is hidden without _POSIX_SOURCE; typedef it only if the compiler says
+# it is missing.
+/bin/cat > probe_mode.c <<'PEOF'
+#include <sys/types.h>
+#include <sys/stat.h>
+mode_t probe_mode;
+PEOF
+if $CC $CFLAGS -c probe_mode.c -o probe_mode.o > /dev/null 2>&1; then
+    :
+else
+    /bin/cat >> openstep/ntp-compat.h <<'MEOF'
+#ifndef OPENSTEP_MODE_T
+# define OPENSTEP_MODE_T 1
+typedef unsigned short mode_t;
+#endif
+MEOF
+fi
+/bin/rm -f probe_mode.c probe_mode.o
 # ntp's copy of ISC expects an isc/ipv6.h to supply the IPv6 types on systems
 # without them (only the Windows one ships).  Provide the standard stand-ins:
 # struct in6_addr, struct sockaddr_in6 and the address-class macros.  They only
@@ -364,7 +387,7 @@ GLEOF
 # Mach CThreads; ntpd copes without threads (name lookups use a child process).
 # Everything stays under /usr/local; configuration is /usr/local/etc/ntpd.conf
 # (start ntpd with -c /usr/local/etc/ntpd.conf).
-# ntp wants arc4random_buf() for random numbers when OpenSSL is absent, and
+# ntp wants arc4random_buf() (and strdup, which this libc lacks) for random numbers when OpenSSL is absent, and
 # otherwise falls back to libevent's copy -- but the libevent tearoff does not
 # compile here (no IPv6 types) and nothing else needs it.  Supply a small
 # arc4random_buf(): an RC4 keystream keyed from the system clock, process ids
@@ -429,6 +452,18 @@ rc4_seed(void)
     }
     rc4_ready = 1;
     rc4_count = 0;
+}
+
+/* OPENSTEP's libc has no strdup(). */
+char *
+strdup(const char *str)
+{
+    size_t n = strlen(str) + 1;
+    char *p = (char *)malloc(n);
+
+    if (p != 0)
+	memcpy(p, str, n);
+    return p;
 }
 
 void
