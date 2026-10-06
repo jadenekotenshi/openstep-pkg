@@ -18,5 +18,12 @@ make_lz4 liblz4.a
 make_lz4 install DESTDIR="$DESTDIR" PREFIX=/usr/local
 /bin/ranlib "$DESTDIR/usr/local/lib/liblz4.a"
 cd ../programs
-make_lz4 lz4
-make_lz4 install DESTDIR="$DESTDIR" PREFIX=/usr/local
+# The program's makefile builds its source list with $(wildcard), which came out
+# empty with the SPARC gnumake and left the link with no input files; name the
+# sources instead.
+lz4_srcs="../lib/lz4.c ../lib/lz4file.c ../lib/lz4frame.c ../lib/lz4hc.c ../lib/xxhash.c"
+for f in bench lorem lz4cli lz4io threadpool timefn util; do
+    lz4_srcs="$lz4_srcs $f.c"
+done
+make_lz4 lz4 SRCFILES="$lz4_srcs"
+make_lz4 install DESTDIR="$DESTDIR" PREFIX=/usr/local SRCFILES="$lz4_srcs"
