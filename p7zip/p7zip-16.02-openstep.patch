@@ -12,8 +12,8 @@ diff -ruN p7a/p7zip_16.02/CPP/Common/MyString.h p7b/p7zip_16.02/CPP/Common/MyStr
  wchar_t * wcsstr(const wchar_t *wcs1, const wchar_t *wcs2);
 diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/StdAfx.h
 --- a/CPP/myWindows/StdAfx.h	2015-10-03 18:34:40.000000000 +0000
-+++ b/CPP/myWindows/StdAfx.h	2026-10-06 01:09:54.998332727 +0000
-@@ -29,6 +29,17 @@
++++ b/CPP/myWindows/StdAfx.h	2026-10-06 01:29:11.857975034 +0000
+@@ -29,6 +29,19 @@
  #include <stddef.h>
  #include <ctype.h>
  #include <unistd.h>
@@ -24,6 +24,8 @@ diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/S
 +extern "C" {
 +#endif
 +#include <libc.h>
++/* <libc.h> does not declare getppid() either. */
++extern int getppid(void);
 +#ifdef __cplusplus
 +}
 +#endif
