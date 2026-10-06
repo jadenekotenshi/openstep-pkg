@@ -14,11 +14,15 @@ if test -d "ntp-$VERSION"; then cd "ntp-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 # No sntp (needs libevent), no OpenSSL (MD5 keys still work; SHA-1 keys and
 # Autokey do not), no ntpsnmpd, no ntp-keygen autokey, no kernel PLL tricks.
+# --with-hardenfile skips the OS-detection script (scripts/cvo.sh needs
+# config.guess and uname, which OPENSTEP cannot supply there) and uses no
+# hardening flags.
 # Everything stays under /usr/local; configuration is /usr/local/etc/ntpd.conf
 # (start ntpd with -c /usr/local/etc/ntpd.conf).
 run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
     --without-crypto --without-sntp --without-ntpsnmpd --disable-debugging \
+    --with-hardenfile=harden/default \
     --disable-dependency-tracking
 /bin/gnumake
 /bin/gnumake install DESTDIR="$DESTDIR"
