@@ -224,6 +224,20 @@ diff -ruN -x '*.o' a/x/mksyntax.c b/mksyntax.c
  struct wordflag {
  	int	flag;
  	char	*fstr;
+diff -ruN -x '*.o' a/x/support/bashversion.c b/support/bashversion.c
+--- a/support/bashversion.c	2025-06-25 19:46:38.000000000 +0000
++++ b/support/bashversion.c	2026-10-06 00:08:54.382926768 +0000
+@@ -35,6 +35,10 @@
+ #include "version.h"
+ #include "conftypes.h"
+ 
++/* OPENSTEP's <unistd.h> does not declare the getopt() variables. */
++extern char *optarg;
++extern int optind;
++
+ #define RFLAG	0x0001
+ #define VFLAG	0x0002
+ #define MFLAG	0x0004
 diff -ruN -x '*.o' a/x/y.tab.c b/y.tab.c
 --- a/y.tab.c	2025-06-30 13:56:25.000000000 +0000
 +++ b/y.tab.c	2026-10-05 22:50:44.520250837 +0000
