@@ -137,6 +137,10 @@ typedef int ssize_t;
 #define WIFSTOPPED(s)	(((s) & 0377) == 0177)
 #define WSTOPSIG(s)	(((s) >> 8) & 0377)
 #define WCOREDUMP(s)	((s) & 0200)
+/* No SSIZE_MAX in <limits.h> here; ssize_t is a 32-bit int. */
+#ifndef SSIZE_MAX
+# define SSIZE_MAX	2147483647
+#endif
 /* ISO C's EILSEQ is missing from <errno.h> here (the BSD value). */
 #include <errno.h>
 #ifndef EILSEQ
