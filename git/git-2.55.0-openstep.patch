@@ -769,3 +769,20 @@
  	{
  		printf '%s' "$QUOTED_OUTPUT: "
  		printf '%s\n' "$SOURCE_DIR"/Documentation/*config.adoc \
+--- a/packfile.c
++++ b/packfile.c
+@@ -248,7 +248,13 @@
+ 		if (nr)
+ 			max_size = st_add(max_size, st_mult(nr - 1, 8));
+ 		if (idx_size < min_size || idx_size > max_size)
+-			return error("wrong index v2 file size in %s", path);
++			return error("wrong index v2 file size in %s "
++				     "(size %lu, objects %lu, hash size %lu, "
++				     "expected %lu to %lu)", path,
++				     (unsigned long)idx_size, (unsigned long)nr,
++				     (unsigned long)hashsz,
++				     (unsigned long)min_size,
++				     (unsigned long)max_size);
+ 		if (idx_size != min_size &&
+ 		    /*
+ 		     * make sure we can deal with large pack offsets.
