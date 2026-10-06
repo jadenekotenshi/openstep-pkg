@@ -50,7 +50,7 @@ has not been attempted.
 | libnslog | validated | — |
 | libnsutils | validated | — |
 | libparserutils | validated | — |
-| libpng | validated | — |
+| libpng | validated | validated |
 | libsvgtiny | validated | — |
 | libwapcaplet | validated | — |
 | libxml2 | validated | — |
