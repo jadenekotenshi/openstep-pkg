@@ -1,6 +1,8 @@
+diff --git a/build-aux/move-if-change b/build-aux/move-if-change
+index 19c3ced..ac3324c 100644
 --- a/build-aux/move-if-change
 +++ b/build-aux/move-if-change
-@@ -66,12 +66,16 @@
+@@ -66,12 +66,16 @@ done
  
  test $# -eq 2 || { echo "$0: $usage" >&2; exit 1; }
  
@@ -21,9 +23,11 @@
    fi
  fi
  
+diff --git a/configure b/configure
+index ed30e2d..0c0f99b 100644
 --- a/configure
 +++ b/configure
-@@ -9099,6 +9099,7 @@
+@@ -9099,6 +9099,7 @@ fi
  
  opsys='' unported=no
  case "${canonical}" in
@@ -31,7 +35,7 @@
  
    ## Android
    *linux-android* )
-@@ -14599,6 +14600,7 @@
+@@ -14599,6 +14600,7 @@ fi
  
  LIBS_SYSTEM=
  case "$opsys" in
@@ -39,7 +43,23 @@
    ## IBM's X11R5 uses -lIM and -liconv in AIX 3.2.2.
    aix4-2) LIBS_SYSTEM="-lrts -lIM -liconv" ;;
  
-@@ -60277,6 +60279,25 @@
+@@ -16071,6 +16073,15 @@ if test "${with_ns}" != no; then
+      ns_appresdir=${ns_appdir}/Contents/Resources
+      ns_appsrc=Cocoa/Emacs.base
+      ns_fontfile=macfont.o
++  elif test "${opsys}" = nextstep; then
++     ns_appdir=`pwd`/nextstep/Emacs.app
++     ns_appbindir=${ns_appdir}
++     ns_applibexecdir=${ns_appdir}/libexec
++     ns_applibdir=${ns_appdir}/Frameworks
++     ns_appresdir=${ns_appdir}/Resources
++     ns_appsrc=GNUstep/Emacs.base
++     ns_fontfile="nsfont-openstep.o nsopenstep.o"
++     LIBS_GNUSTEP="-framework AppKit -framework Foundation"
+   elif flags=`(gnustep-config --objc-flags) 2>/dev/null`; then
+      NS_IMPL_GNUSTEP=yes
+      NS_GNUSTEP_CONFIG=yes
+@@ -60277,6 +60288,25 @@ fi
  
  
  
@@ -65,9 +85,11 @@
  : "${CONFIG_STATUS=./config.status}"
  ac_write_fail=0
  ac_clean_files_save=$ac_clean_files
+diff --git a/configure.ac b/configure.ac
+index 4433d29..08756b3 100644
 --- a/configure.ac
 +++ b/configure.ac
-@@ -1413,6 +1413,7 @@
+@@ -1413,6 +1413,7 @@ dnl quotation begins
  
  opsys='' unported=no
  case "${canonical}" in
@@ -75,7 +97,7 @@
  
    ## Android
    *linux-android* )
-@@ -2278,6 +2279,7 @@
+@@ -2278,6 +2279,7 @@ AC_SUBST([C_SWITCH_SYSTEM])
  
  LIBS_SYSTEM=
  case "$opsys" in
@@ -83,7 +105,23 @@
    ## IBM's X11R5 uses -lIM and -liconv in AIX 3.2.2.
    aix4-2) LIBS_SYSTEM="-lrts -lIM -liconv" ;;
  
-@@ -7939,6 +7941,25 @@
+@@ -2793,6 +2795,15 @@ if test "${with_ns}" != no; then
+      ns_appresdir=${ns_appdir}/Contents/Resources
+      ns_appsrc=Cocoa/Emacs.base
+      ns_fontfile=macfont.o
++  elif test "${opsys}" = nextstep; then
++     ns_appdir=`pwd`/nextstep/Emacs.app
++     ns_appbindir=${ns_appdir}
++     ns_applibexecdir=${ns_appdir}/libexec
++     ns_applibdir=${ns_appdir}/Frameworks
++     ns_appresdir=${ns_appdir}/Resources
++     ns_appsrc=GNUstep/Emacs.base
++     ns_fontfile="nsfont-openstep.o nsopenstep.o"
++     LIBS_GNUSTEP="-framework AppKit -framework Foundation"
+   elif flags=`(gnustep-config --objc-flags) 2>/dev/null`; then
+      NS_IMPL_GNUSTEP=yes
+      NS_GNUSTEP_CONFIG=yes
+@@ -7939,6 +7950,25 @@ ARCH_INDEPENDENT_CONFIG_FILES([java/AndroidManifest.xml])
  # configure.
  ndk_CONFIG_FILES
  
@@ -109,9 +147,11 @@
  AC_OUTPUT
  
  if test ! "$with_mailutils"; then
+diff --git a/lib/Makefile.in b/lib/Makefile.in
+index 5068e0f..e6175d3 100644
 --- a/lib/Makefile.in
 +++ b/lib/Makefile.in
-@@ -57,6 +57,9 @@
+@@ -57,6 +57,9 @@ ifeq ($(SYSTEM_TYPE),windows-nt)
    include $(srcdir)/../nt/gnulib-cfg.mk
  endif
  include gnulib.mk
@@ -121,6 +161,8 @@
  ifneq ($(SYSTEM_TYPE),windows-nt)
    libgnu_a_SOURCES += openat-die.c save-cwd.c
  endif
+diff --git a/lib/dirent.in.h b/lib/dirent.in.h
+index 9198c1d..b08638e 100644
 --- a/lib/dirent.in.h
 +++ b/lib/dirent.in.h
 @@ -22,7 +22,9 @@
@@ -134,6 +176,9 @@
  # @INCLUDE_NEXT@ @NEXT_DIRENT_H@
  #endif
  
+diff --git a/lib/fchdir.c b/lib/fchdir.c
+new file mode 100644
+index 0000000..d191a01
 --- /dev/null
 +++ b/lib/fchdir.c
 @@ -0,0 +1,205 @@
@@ -342,6 +387,9 @@
 +  const char *name = _gl_directory_name (fd);
 +  return name ? chdir (name) : -1;
 +}
+diff --git a/lib/getaddrinfo.c b/lib/getaddrinfo.c
+new file mode 100644
+index 0000000..1748504
 --- /dev/null
 +++ b/lib/getaddrinfo.c
 @@ -0,0 +1,578 @@
@@ -923,19 +971,23 @@
 +}
 +
 +#endif
+diff --git a/lib/inttypes.in.h b/lib/inttypes.in.h
+index cbe5a6f..434d0cc 100644
 --- a/lib/inttypes.in.h
 +++ b/lib/inttypes.in.h
-@@ -477,6 +477,10 @@
- # else
- #  define PRIXMAX "lX"
+@@ -479,6 +479,10 @@
  # endif
-+#endif
-+
-+#ifdef NeXT
-+extern uintmax_t strtoumax (const char *, char **, int);
  #endif
  
++#ifdef NeXT
++extern uintmax_t strtoumax (const char *, char **, int);
++#endif
++
  #if !defined PRIdPTR
+ # ifdef INTPTR_MAX
+ #  define PRIdPTR @PRIPTR_PREFIX@ "d"
+diff --git a/lib/nproc.c b/lib/nproc.c
+index b0c9514..eacb438 100644
 --- a/lib/nproc.c
 +++ b/lib/nproc.c
 @@ -22,6 +22,7 @@
@@ -946,6 +998,9 @@
  #if HAVE_SETMNTENT
  # include <mntent.h>
  #endif
+diff --git a/lib/openstep-dirent.h b/lib/openstep-dirent.h
+new file mode 100644
+index 0000000..f162ac6
 --- /dev/null
 +++ b/lib/openstep-dirent.h
 @@ -0,0 +1,13 @@
@@ -962,6 +1017,9 @@
 +#undef DIR_TO_FD
 +#define DIR_TO_FD(d) ((d)->dd_fd)
 +#endif
+diff --git a/lib/openstep-stdio.h b/lib/openstep-stdio.h
+new file mode 100644
+index 0000000..1d638d2
 --- /dev/null
 +++ b/lib/openstep-stdio.h
 @@ -0,0 +1,18 @@
@@ -983,6 +1041,9 @@
 +#define vprintf openstep_vprintf
 +#define vfprintf openstep_vfprintf
 +#define vsprintf openstep_vsprintf
+diff --git a/lib/openstep.c b/lib/openstep.c
+new file mode 100644
+index 0000000..cddbe97
 --- /dev/null
 +++ b/lib/openstep.c
 @@ -0,0 +1,453 @@
@@ -1439,9 +1500,11 @@
 +  return buffer;
 +}
 +#endif
+diff --git a/lib/signal.in.h b/lib/signal.in.h
+index ce844b1..5a77dbf 100644
 --- a/lib/signal.in.h
 +++ b/lib/signal.in.h
-@@ -523,6 +523,11 @@
+@@ -523,6 +523,11 @@ _GL_WARN_ON_USE (sigaction, "sigaction is unportable - "
  # define SA_NODEFER 0
  #endif
  
@@ -1453,9 +1516,11 @@
  
  #endif /* _@GUARD_PREFIX@_SIGNAL_H */
  #endif /* _@GUARD_PREFIX@_SIGNAL_H */
+diff --git a/lib/stdio.in.h b/lib/stdio.in.h
+index 33b0b8e..b6ea0d0 100644
 --- a/lib/stdio.in.h
 +++ b/lib/stdio.in.h
-@@ -2141,6 +2141,9 @@
+@@ -2141,6 +2141,9 @@ _GL_WARN_ON_USE (vsprintf, "vsprintf is not always POSIX compliant - "
                        "POSIX compliance");
  #endif
  
@@ -1465,9 +1530,11 @@
  #endif /* _@GUARD_PREFIX@_STDIO_H */
  #endif /* _@GUARD_PREFIX@_STDIO_H */
  #endif
+diff --git a/lib/stdlib.in.h b/lib/stdlib.in.h
+index 95237f2..226c37a 100644
 --- a/lib/stdlib.in.h
 +++ b/lib/stdlib.in.h
-@@ -1980,6 +1980,10 @@
+@@ -1980,6 +1980,10 @@ _GL_INLINE_HEADER_END
  
  /* MirBSD 10 defines WEXITSTATUS in <sys/wait.h>, not in <stdlib.h>.
     glibc 2.41 defines WCOREDUMP in <sys/wait.h>, not in <stdlib.h>.  */
@@ -1478,9 +1545,11 @@
  #if @GNULIB_SYSTEM_POSIX@ && !(defined WEXITSTATUS && defined WCOREDUMP)
  # include <sys/wait.h>
  #endif
+diff --git a/lib/string.in.h b/lib/string.in.h
+index 0cd83c7..639c080 100644
 --- a/lib/string.in.h
 +++ b/lib/string.in.h
-@@ -1823,6 +1823,9 @@
+@@ -1823,6 +1823,9 @@ _GL_WARN_ON_USE (strverscmp, "strverscmp is unportable - "
  
  _GL_INLINE_HEADER_END
  
@@ -1490,6 +1559,9 @@
  #endif /* _@GUARD_PREFIX@_STRING_H */
  #endif /* _@GUARD_PREFIX@_STRING_H */
  #endif
+diff --git a/lib/strtoull.c b/lib/strtoull.c
+new file mode 100644
+index 0000000..89ec548
 --- /dev/null
 +++ b/lib/strtoull.c
 @@ -0,0 +1,4 @@
@@ -1497,6 +1569,19 @@
 +#define QUAD 1
 +#define UNSIGNED 1
 +#include "strtol.c"
+diff --git a/nextstep/OPENSTEP-Info.plist b/nextstep/OPENSTEP-Info.plist
+new file mode 100644
+index 0000000..ba45d22
+--- /dev/null
++++ b/nextstep/OPENSTEP-Info.plist
+@@ -0,0 +1,4 @@
++{
++  NSExecutable = Emacs;
++  NSIcon = emacs.tiff;
++}
+diff --git a/openstep/langinfo.h b/openstep/langinfo.h
+new file mode 100644
+index 0000000..bca1532
 --- /dev/null
 +++ b/openstep/langinfo.h
 @@ -0,0 +1,7 @@
@@ -1507,6 +1592,9 @@
 +static __inline__ char *nl_langinfo (nl_item item)
 +{ return item == CODESET ? "US-ASCII" : ""; }
 +#endif
+diff --git a/openstep/math.h b/openstep/math.h
+new file mode 100644
+index 0000000..c81f544
 --- /dev/null
 +++ b/openstep/math.h
 @@ -0,0 +1,84 @@
@@ -1594,6 +1682,9 @@
 +#define powf openstep_powf
 +
 +#endif
+diff --git a/openstep/netdb.h b/openstep/netdb.h
+new file mode 100644
+index 0000000..b7b4e8b
 --- /dev/null
 +++ b/openstep/netdb.h
 @@ -0,0 +1,43 @@
@@ -1640,6 +1731,9 @@
 +extern int inet_pton (int, const char *, void *);
 +extern const char *inet_ntop (int, const void *, char *, socklen_t);
 +#endif
+diff --git a/openstep/netinet/in.h b/openstep/netinet/in.h
+new file mode 100644
+index 0000000..2c4c90b
 --- /dev/null
 +++ b/openstep/netinet/in.h
 @@ -0,0 +1,18 @@
@@ -1661,6 +1755,9 @@
 +extern unsigned long htonl (unsigned long);
 +extern unsigned long ntohl (unsigned long);
 +#endif
+diff --git a/openstep/stdint.h b/openstep/stdint.h
+new file mode 100644
+index 0000000..ce1f866
 --- /dev/null
 +++ b/openstep/stdint.h
 @@ -0,0 +1,129 @@
@@ -1793,6 +1890,9 @@
 +#define WINT_WIDTH 32
 +#define SIG_ATOMIC_WIDTH 8
 +#endif
+diff --git a/openstep/sys/resource.h b/openstep/sys/resource.h
+new file mode 100644
+index 0000000..b3fd88a
 --- /dev/null
 +++ b/openstep/sys/resource.h
 @@ -0,0 +1,5 @@
@@ -1801,6 +1901,9 @@
 +#include_next <sys/resource.h>
 +typedef int rlim_t;
 +#endif
+diff --git a/openstep/sys/socket.h b/openstep/sys/socket.h
+new file mode 100644
+index 0000000..1dabeae
 --- /dev/null
 +++ b/openstep/sys/socket.h
 @@ -0,0 +1,11 @@
@@ -1815,6 +1918,9 @@
 +  unsigned long alignment;
 +};
 +#endif
+diff --git a/openstep/termios.h b/openstep/termios.h
+new file mode 100644
+index 0000000..1ba7e3f
 --- /dev/null
 +++ b/openstep/termios.h
 @@ -0,0 +1,15 @@
@@ -1833,6 +1939,9 @@
 +}
 +#define cfsetspeed openstep_cfsetspeed
 +#endif
+diff --git a/openstep/unistd.h b/openstep/unistd.h
+new file mode 100644
+index 0000000..0b4262f
 --- /dev/null
 +++ b/openstep/unistd.h
 @@ -0,0 +1,17 @@
@@ -1853,6 +1962,9 @@
 +extern int getdtablesize (void);
 +extern int getpagesize (void);
 +#endif
+diff --git a/openstep/wchar.h b/openstep/wchar.h
+new file mode 100644
+index 0000000..ea65669
 --- /dev/null
 +++ b/openstep/wchar.h
 @@ -0,0 +1,42 @@
@@ -1898,6 +2010,9 @@
 +  return 1;
 +}
 +#endif
+diff --git a/openstep/wctype.h b/openstep/wctype.h
+new file mode 100644
+index 0000000..1cc7706
 --- /dev/null
 +++ b/openstep/wctype.h
 @@ -0,0 +1,44 @@
@@ -1945,14 +2060,14 @@
 +static __inline__ wint_t towupper (wint_t c)
 +{ return c <= UCHAR_MAX ? toupper ((unsigned char) c) : c; }
 +#endif
+diff --git a/src/conf_post.h b/src/conf_post.h
+index 5b7548f..ac1bc04 100644
 --- a/src/conf_post.h
 +++ b/src/conf_post.h
-@@ -27,6 +27,18 @@
-    include file other than assert.h.  */
- #if !defined ENABLE_CHECKING && !defined NDEBUG
+@@ -29,6 +29,18 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
  # define NDEBUG
-+#endif
-+
+ #endif
+ 
 +/* The gnulib stdint.h fallback uses long for intptr_t.  Its partial
 +   inttypes module expects this prefix from the system's C library. */
 +#if defined NeXT && !defined __PRIPTR_PREFIX
@@ -1963,10 +2078,12 @@
 +# define FIRST_PTY_LETTER 'p'
 +# define HAVE_SNPRINTF 1
 +# undef HAVE_SYS_UTSNAME_H
- #endif
- 
++#endif
++
  /* To help make dependencies clearer elsewhere, this file typically
-@@ -225,7 +237,7 @@
+    does not #include other files.  The exception is ms-w32.h (DOS_NT
+    only) because it historically was included here and changing that
+@@ -225,7 +237,7 @@ extern int emacs_setenv_TZ (char const *);
  #define DECLARE_POINTER_ALIAS(name, type, addr) \
    type _GL_ATTRIBUTE_MAY_ALIAS *name = (type *) (addr)
  
@@ -1975,9 +2092,11 @@
  # define ATTRIBUTE_SECTION(name) __attribute__ ((section (name)))
  #else
  # define ATTRIBUTE_SECTION(name)
+diff --git a/src/floatfns.c b/src/floatfns.c
+index 724ccae..d9dbbfb 100644
 --- a/src/floatfns.c
 +++ b/src/floatfns.c
-@@ -510,7 +510,7 @@
+@@ -510,7 +510,7 @@ emacs_rint (double d)
  }
  #endif
  
@@ -1986,19 +2105,1561 @@
  double
  trunc (double d)
  {
+diff --git a/src/nsfns.m b/src/nsfns.m
+index 148bbc7..d1966b5 100644
+--- a/src/nsfns.m
++++ b/src/nsfns.m
+@@ -997,7 +997,7 @@ Turn the input menu (an NSMenu) into a lisp list for tracking on lisp side.
+                   NSAppKitVersionNumber,
+                   [[NSProcessInfo processInfo] operatingSystemVersionString]];
+ #else
+-  tmp = [NSString initWithUTF8String:@"ns-unknown"];
++  tmp = @"OPENSTEP 4.2";
+ #endif
+   string = [tmp lispString];
+   [autorelease release];
+@@ -1598,7 +1598,13 @@ Turn the input menu (an NSMenu) into a lisp list for tracking on lisp side.
+ 	  top_left = NSMakePoint (NSMinX ([main_window frame]),
+ 				  NSMaxY ([main_window frame]));
+ 	  top_left = [frame_window cascadeTopLeftFromPoint: top_left];
++#ifdef NeXT
++          /* Apply the native cascade result directly.  Repeating the
++             cascade on this window can crash OPENSTEP AppKit.  */
++          [frame_window setFrameTopLeftPoint: top_left];
++#else
+ 	  [frame_window cascadeTopLeftFromPoint: top_left];
++#endif
+ 	}
+       else
+ 	[frame_window center];
+@@ -1716,7 +1722,7 @@ Frames are listed from topmost (first) to bottommost (last).  */)
+ {
+   id panel;
+   BOOL ret;
+-#ifdef NS_IMPL_GNUSTEP
++#if defined NS_IMPL_GNUSTEP || defined NeXT
+   NSString *dirS, *initS;
+   BOOL no_types;
+ #endif
+@@ -1796,7 +1802,9 @@ Frames are listed from topmost (first) to bottommost (last).  */)
+ 
+   [panel setTitle: promptS];
+ 
++#ifndef NeXT
+   [panel setAllowsOtherFileTypes: YES];
++#endif
+   [panel setTreatsFilePackagesAsDirectories: YES];
+   [panel setDelegate: fileDelegate];
+ 
+@@ -2264,7 +2272,11 @@ Frames are listed from topmost (first) to bottommost (last).  */)
+ 		[NSColor colorWithUnsignedLong:c]
+ 		forKey: [NSString stringWithLispString: name]];
+ 	}
++#ifdef NeXT
++      NS_DURING
++#else
+       @try
++#endif
+ 	{
+ #if defined (NS_IMPL_COCOA) && MAC_OS_X_VERSION_MAX_ALLOWED >= 101100
+ #if MAC_OS_X_VERSION_MIN_REQUIRED < 101100
+@@ -2281,10 +2293,18 @@ Frames are listed from topmost (first) to bottommost (last).  */)
+ 		fprintf (stderr, "ns_init_colors: could not write Emacs.clr\n");
+ #endif
+ 	}
++#ifdef NeXT
++      NS_HANDLER
++	{
++	  NSLog(@"ns_init_colors: could not write Emacs.clr: %@", [localException reason]);
++	}
++      NS_ENDHANDLER
++#else
+       @catch (NSException *e)
+ 	{
+ 	  NSLog(@"ns_init_colors: could not write Emacs.clr: %@", e.reason);
+ 	}
++#endif
+     }
+ }
+ 
+@@ -3838,6 +3858,10 @@ The position is returned as a cons cell (X . Y) of the
+ If PROGRESS is nil, remove the progress indicator.  */)
+   (Lisp_Object progress)
+ {
++#ifdef NeXT
++  return Qnil; /* No Dock progress API in OPENSTEP. */
++#else
++
+   block_input ();
+   NSDockTile *dock_tile = [NSApp dockTile];
+   /* Use NSLevelIndicator with reliable redraws, not NSProgressIndicator.  */
+@@ -3902,6 +3926,8 @@ The position is returned as a cons cell (X . Y) of the
+   [dock_tile display];
+   unblock_input ();
+   return Qnil;
++#endif
++
+ }
+ 
+ /* A unique integer sleep block id and a hash map of its id to opaque
+diff --git a/src/nsfont-openstep.m b/src/nsfont-openstep.m
+new file mode 100644
+index 0000000..4f6b95f
+--- /dev/null
++++ b/src/nsfont-openstep.m
+@@ -0,0 +1,217 @@
++/* Native OPENSTEP font backend, using NSFont and NSString drawing.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++   This file is part of GNU Emacs, distributed under the GNU GPL version
++   3 or later.  See COPYING.  */
++#include <config.h>
++#include "lisp.h"
++#include "blockinput.h"
++#include "dispextern.h"
++#include "frame.h"
++#include "font.h"
++#include "nsterm.h"
++#include "pdumper.h"
++#include <math.h>
++
++static Lisp_Object
++osfont_cache (struct frame *f)
++{ return FRAME_DISPLAY_INFO (f)->name_list_element; }
++
++static Lisp_Object
++osfont_entity (NSFont *font)
++{
++  Lisp_Object e = font_make_entity ();
++  unsigned traits = [[NSFontManager sharedFontManager] traitsOfFont:font];
++  ASET (e, FONT_TYPE_INDEX, Qns);
++  ASET (e, FONT_FOUNDRY_INDEX, intern ("next"));
++  ASET (e, FONT_FAMILY_INDEX, intern ([[font familyName] UTF8String]));
++  ASET (e, FONT_REGISTRY_INDEX, Qiso10646_1);
++  FONT_SET_STYLE (e, FONT_WEIGHT_INDEX, traits & NSBoldFontMask ? Qbold : Qnormal);
++  FONT_SET_STYLE (e, FONT_SLANT_INDEX, traits & NSItalicFontMask ? Qitalic : Qnormal);
++  FONT_SET_STYLE (e, FONT_WIDTH_INDEX, Qnormal);
++  ASET (e, FONT_SIZE_INDEX, make_fixnum (0));
++  ASET (e, FONT_AVGWIDTH_INDEX, make_fixnum (0));
++  ASET (e, FONT_SPACING_INDEX, make_fixnum ([font isFixedPitch] ? 100 : 0));
++  ASET (e, FONT_EXTRA_INDEX, list1 (Fcons (QCname, [[font fontName] lispString])));
++  ASET (e, FONT_OBJLIST_INDEX, Qnil);
++  return e;
++}
++
++static Lisp_Object
++osfont_list (struct frame *f, Lisp_Object spec)
++{
++  Lisp_Object family = AREF (spec, FONT_FAMILY_INDEX), result = Qnil;
++  NSString *wanted = NILP (family) ? nil : [NSString stringWithLispString:SYMBOL_NAME(family)];
++  NSEnumerator *names = [[[NSFontManager sharedFontManager] availableFonts] objectEnumerator];
++  NSString *name;
++  block_input ();
++  while ((name = [names nextObject]))
++    {
++      NSFont *font = [NSFont fontWithName:name size:12];
++      if (font && (!wanted || [wanted caseInsensitiveCompare:[font familyName]] == NSOrderedSame
++                   || [wanted caseInsensitiveCompare:name] == NSOrderedSame
++                   || (([wanted isEqualToString:@"monospace"] || [wanted isEqualToString:@"Monospace"])
++                       && [font isFixedPitch])))
++        result = Fcons (osfont_entity (font), result);
++    }
++  unblock_input ();
++  return result;
++}
++
++static Lisp_Object
++osfont_match (struct frame *f, Lisp_Object spec)
++{
++  Lisp_Object family = AREF (spec, FONT_FAMILY_INDEX);
++  NSString *name = NILP (family) ? @"Courier" : [NSString stringWithLispString:SYMBOL_NAME(family)];
++  unsigned traits = 0;
++  NSFont *font;
++  int weight = FONT_WEIGHT_NUMERIC (spec);
++  if (weight >= 180) traits |= NSBoldFontMask;
++  if (FONT_SLANT_NUMERIC (spec) > 100) traits |= NSItalicFontMask;
++  if ([name caseInsensitiveCompare:@"Monospace"] == NSOrderedSame
++      || [name caseInsensitiveCompare:@"fixed"] == NSOrderedSame) name = @"Courier";
++  font = [[NSFontManager sharedFontManager] fontWithFamily:name traits:traits
++                            weight:weight >= 180 ? 9 : 5 size:12];
++  if (!font) font = [NSFont fontWithName:name size:12];
++  if (!font) return Qnil;
++  return osfont_entity (font);
++}
++
++static Lisp_Object
++osfont_families (struct frame *f)
++{
++  Lisp_Object result = Qnil, family;
++  NSEnumerator *names = [[[NSFontManager sharedFontManager] availableFonts] objectEnumerator];
++  NSString *name;
++  while ((name = [names nextObject]))
++    {
++      NSFont *font = [NSFont fontWithName:name size:12];
++      if (!font) continue;
++      family = intern ([[font familyName] UTF8String]);
++      if (NILP (Fmemq (family, result))) result = Fcons (family, result);
++    }
++  return result;
++}
++
++static Lisp_Object
++osfont_open (struct frame *f, Lisp_Object e, int size)
++{
++  Lisp_Object entry = Fassq (QCname, AREF (e, FONT_EXTRA_INDEX));
++  NSFont *nf;
++  struct nsfont_info *info;
++  struct font *font;
++  Lisp_Object obj;
++  if (!CONSP (entry)) return Qnil;
++  if (size <= 0) size = 12;
++  nf = [NSFont fontWithName:[NSString stringWithLispString:XCDR(entry)] size:size];
++  if (!nf) return Qnil;
++  obj = font_make_object (VECSIZE (struct nsfont_info), e, size);
++  info = (struct nsfont_info *) XFONT_OBJECT (obj);
++  font = &info->font;
++  /* font_make_object initializes Lisp slots only.  In particular,
++     baseline_offset and default_ascent must not contain allocator data. */
++  memset (&font->min_width, 0,
++          sizeof *info - offsetof (struct font, min_width));
++  info->nsfont = [nf retain];
++  info->name = xstrdup ([[nf fontName] UTF8String]);
++  info->width = [nf widthOfString:@"0"];
++  info->size = size;
++  font->driver = &nsfont_driver;
++  font->pixel_size = size;
++  font->encoding_charset = font->repertory_charset = -1;
++  font->ascent = (int)ceil ([nf ascender]);
++  font->descent = (int)ceil (-[nf descender]);
++  font->height = font->ascent + font->descent;
++  font->space_width = max (1, (int)lrint([nf widthOfString:@" "]));
++  font->average_width = max (1, (int)lrint(info->width));
++  font->min_width = font->space_width;
++  font->max_width = max(font->average_width, (int)ceil([nf maximumAdvancement].width));
++  font->underline_position = (int)lrint(-[nf underlinePosition]);
++  font->underline_thickness = max(1, (int)lrint([nf underlineThickness]));
++  info->height = font->height;
++  info->bold = ([[NSFontManager sharedFontManager] traitsOfFont:nf] & NSBoldFontMask) != 0;
++  info->ital = ([[NSFontManager sharedFontManager] traitsOfFont:nf] & NSItalicFontMask) != 0;
++  font->props[FONT_NAME_INDEX] = Ffont_xlfd_name (obj, Qnil, Qnil);
++  font->props[FONT_FULLNAME_INDEX] = build_string (info->name);
++  return obj;
++}
++
++static void osfont_close (struct font *font)
++{
++  struct nsfont_info *info = (struct nsfont_info *)font;
++  [info->nsfont release]; info->nsfont = nil;
++  xfree(info->name); info->name = NULL;
++}
++
++static int osfont_has_char (Lisp_Object font, int c) { return c < 0x10000 ? -1 : 0; }
++
++static unsigned osfont_encode (struct font *font, int c)
++{
++  struct nsfont_info *info = (struct nsfont_info *)font;
++  unichar ch = c;
++  NSString *s;
++  if (c < 0 || c > 0xffff) return FONT_INVALID_CODE;
++  s = [NSString stringWithCharacters:&ch length:1];
++  return [s canBeConvertedToEncoding:[info->nsfont mostCompatibleStringEncoding]]
++    ? c : FONT_INVALID_CODE;
++}
++
++static void osfont_extents (struct font *font, const unsigned *code, int n,
++                            struct font_metrics *metrics)
++{
++  NSFont *nf = ((struct nsfont_info *)font)->nsfont;
++  int i, width = 0;
++  for (i=0; i<n; ++i)
++    {
++      unichar ch = code[i];
++      width += lrint([nf widthOfString:[NSString stringWithCharacters:&ch length:1]]);
++    }
++  metrics->lbearing = 0; metrics->rbearing = metrics->width = width;
++  metrics->ascent = font->ascent; metrics->descent = font->descent;
++}
++
++static int osfont_draw (struct glyph_string *s, int from, int to, int x, int y,
++                       bool with_background)
++{
++  struct nsfont_info *info = (struct nsfont_info *)s->font;
++  NSColor *fg = s->hl == DRAW_CURSOR ? FRAME_BACKGROUND_COLOR(s->f)
++    : [NSColor colorWithUnsignedLong:NS_FACE_FOREGROUND(s->face)];
++  NSDictionary *attrs = [NSDictionary dictionaryWithObjectsAndKeys:
++                         info->nsfont, NSFontAttributeName, fg, NSForegroundColorAttributeName, nil];
++  int i;
++  if (with_background && s->first_glyph->type != COMPOSITE_GLYPH)
++    {
++      NSColor *bg = s->hl == DRAW_CURSOR ? FRAME_CURSOR_COLOR(s->f)
++        : [NSColor colorWithUnsignedLong:NS_FACE_BACKGROUND(s->face)];
++      [bg set];
++      NSRectFill(NSMakeRect(x,y-s->font->ascent,s->width,s->font->height));
++    }
++  for (i=from; i<to; ++i)
++    {
++      unichar ch = s->char2b[i];
++      NSString *text = [NSString stringWithCharacters:&ch length:1];
++      [text drawAtPoint:NSMakePoint(x,y-s->font->ascent) withAttributes:attrs];
++      x += lrint([info->nsfont widthOfString:text]);
++    }
++  return to-from;
++}
++
++struct font_driver const nsfont_driver = {
++  .type = LISPSYM_INITIALLY (Qns), .case_sensitive = false,
++  .get_cache = osfont_cache, .list = osfont_list, .match = osfont_match,
++  .list_family = osfont_families, .open_font = osfont_open, .close_font = osfont_close,
++  .has_char = osfont_has_char, .encode_char = osfont_encode,
++  .text_extents = osfont_extents, .draw = osfont_draw
++};
++static void osfont_register (void) { register_font_driver (&nsfont_driver, NULL); }
++void syms_of_nsfont (void)
++{
++  DEFSYM (Qcondensed, "condensed");
++  DEFSYM (Qmedium, "medium");
++  DEFSYM (Qreverse_italic, "reverse-italic");
++  DEFSYM (Qreverse_oblique, "reverse-oblique");
++  DEFSYM (Qexpanded, "expanded");
++  DEFVAR_LISP ("ns-reg-to-script", Vns_reg_to_script,
++              doc: /* Internal map of font registry to Unicode script. */);
++  Vns_reg_to_script = Qnil;
++  pdumper_do_now_and_after_load (osfont_register);
++}
+diff --git a/src/nsgui.h b/src/nsgui.h
+index b7fa74e..4165db2 100644
+--- a/src/nsgui.h
++++ b/src/nsgui.h
+@@ -30,6 +30,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
+ #endif  /* NS_IMPL_COCOA */
+ 
+ #import <AppKit/AppKit.h>
++#ifdef NeXT
++#import "nsopenstep.h"
++#endif
+ 
+ #ifdef NS_IMPL_COCOA
+ #undef Cursor
+diff --git a/src/nsimage.m b/src/nsimage.m
+index 426ce20..42c3dde 100644
+--- a/src/nsimage.m
++++ b/src/nsimage.m
+@@ -64,6 +64,13 @@ Updated by Christian Limpach (chris@nice.ch)
+ 
+   NSTRACE ("ns_can_use_native_image_api");
+ 
++#ifdef NeXT
++  /* OPENSTEP's built-in raster decoder supports TIFF.  Asking NSImage
++     for its registered types contacts the pasteboard server, even while
++     bootstrapping the portable dump or running without a display.  */
++  return EQ (type, Qnative_image) || EQ (type, Qtiff);
++#endif
++
+   if (EQ (type, Qnative_image))
+     return YES;
+ 
+diff --git a/src/nsmenu.m b/src/nsmenu.m
+index 2b785a8..afae45a 100644
+--- a/src/nsmenu.m
++++ b/src/nsmenu.m
+@@ -424,9 +424,18 @@
+   fprintf (stderr, "Menu update took %ld msec.\n", t);
+ #endif
+ 
++#ifdef NeXT
++  [menu sizeToFit];
++#endif
+   /* set main menu */
+   if (needsSet)
+-    [NSApp setMainMenu: menu];
++    {
++      [NSApp setMainMenu: menu];
++#ifdef NeXT
++      /* The first Lisp menu is installed after finishLaunching. */
++      if ([NSApp isActive]) [menu orderFront:nil];
++#endif
++    }
+ 
+ #ifdef NS_IMPL_GNUSTEP
+   inside--;
+@@ -443,7 +452,11 @@
+ void
+ set_frame_menubar (struct frame *f, bool deep_p)
+ {
++#ifdef NeXT
++  ns_update_menubar (f, true);
++#else
+   ns_update_menubar (f, deep_p);
++#endif
+ }
+ 
+ 
+@@ -458,14 +471,45 @@
+    update itself when user clicked.  Based on Carbon/AppKit implementation
+    by Yamamoto Mitsuharu.  */
+ @implementation EmacsMenu
++#ifdef NeXT
++/* The original AppKit stores submenus as unretained cell targets. */
++- (void)setSubmenu:(NSMenu *)menu forItem:(id)item
++{
++  NSMenu *previous = [item submenu];
++  if (!ownedSubmenus) ownedSubmenus = [[NSMutableArray alloc] init];
++  if (menu) [ownedSubmenus addObject:menu];
++  [super setSubmenu:menu forItem:item];
++  if (previous) [ownedSubmenus removeObjectIdenticalTo:previous];
++}
++- (void)removeItem:(id)item
++{
++  NSMenu *submenu = [[item submenu] retain];
++  if (submenu) [submenu close];
++  [super removeItem:item];
++  if (submenu) [ownedSubmenus removeObjectIdenticalTo:submenu];
++  [submenu release];
++}
++- (void)dealloc
++{
++  [self removeAllItems];
++  [ownedSubmenus release];
++  ownedSubmenus = nil;
++  [super dealloc];
++}
++#endif
+ 
+ /* override designated initializer */
+ - (instancetype)initWithTitle: (NSString *)title
+ {
+   if ((self = [super initWithTitle: title]))
+     [self setAutoenablesItems: NO];
++#ifndef NeXT
+   [self setDelegate: self];
++#endif
+ 
++#ifdef NeXT
++  [self setReleasedWhenClosed:NO];
++#endif
+   needsUpdate = YES;
+ 
+   return self;
+@@ -533,7 +577,12 @@ - (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr
+ 
+   if (menu_separator_name_p (wv->name))
+     {
++#ifdef NeXT
++      item = (NSMenuItem *)[self addItemWithTitle:@"----------------" action:NULL keyEquivalent:@""];
++      [item setEnabled:NO];
++#else
+       item = (NSMenuItem *)[NSMenuItem separatorItem];
++#endif
+     }
+   else
+     {
+@@ -541,7 +590,11 @@ - (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr
+       if (title == nil)
+         title = @"< ? >";  /* (get out in the open so we know about it) */
+ 
++#ifdef NeXT
++      item = (NSMenuItem *)[self addItemWithTitle:title action:@selector(menuDown:) keyEquivalent:@""];
++#else
+       item = [[[NSMenuItem alloc] init] autorelease];
++#endif
+       if (wv->key)
+         {
+           NSString *key = [NSString stringWithUTF8String: wv->key];
+@@ -560,7 +613,11 @@ - (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr
+                                              attributes: attributes]
+                                      autorelease];
+       [item setAction: @selector (menuDown:)];
++#ifdef NeXT
++      [item setTitle: title];
++#else
+       [item setAttributedTitle: atitle];
++#endif
+       [item setEnabled: wv->enabled];
+ 
+       /* Draw radio buttons and tickboxes.  */
+@@ -573,7 +630,9 @@ - (NSMenuItem *)addItemWithWidgetValue: (void *)wvptr
+       [item setTag: (NSInteger)wv->call_data];
+     }
+ 
++#ifndef NeXT
+   [self addItem: item];
++#endif
+   return item;
+ }
+ 
+@@ -719,11 +778,16 @@ - (void)fillWithWidgetValue: (void *)wvptr
+           [self setSubmenu: submenu forItem: item];
+           [submenu fillWithWidgetValue: wv->contents];
+           [submenu release];
++#ifndef NeXT
+           [item setAction: (SEL)nil];
++#endif
+         }
+     }
+ 
+   needsUpdate = NO;
++#ifdef NeXT
++  [self sizeToFit];
++#endif
+ 
+ #ifdef NS_IMPL_GNUSTEP
+   if ([[self window] isVisible])
+@@ -1092,6 +1156,11 @@ - (NSRect)confinementRectForMenu:(NSMenu *)menu
+ 
+    ========================================================================== */
+ 
++#ifdef NeXT
++void free_frame_tool_bar (struct frame *f) {}
++void update_frame_tool_bar (struct frame *f) {}
++void update_frame_tool_bar_1 (struct frame *f, EmacsToolbar *toolbar) {}
++#else
+ void
+ free_frame_tool_bar (struct frame *f)
+ /* --------------------------------------------------------------------------
+@@ -1272,7 +1341,9 @@ - (instancetype)initForView: (EmacsView *)view withIdentifier: (NSString *)ident
+   emacsView = view;
+   [self setDisplayMode: NSToolbarDisplayModeIconOnly];
+   [self setSizeMode: NSToolbarSizeModeSmall];
++#ifndef NeXT
+   [self setDelegate: self];
++#endif
+   identifierToItem = [[NSMutableDictionary alloc] initWithCapacity: 10];
+   activeIdentifiers = [[NSMutableArray alloc] initWithCapacity: 8];
+   prevIdentifiers = nil;
+@@ -1409,6 +1480,7 @@ - (void)setVisible:(BOOL)shown
+ /* - (NSArray *)toolbarSelectableItemIdentifiers: (NSToolbar *)toolbar */
+ 
+ @end  /* EmacsToolbar */
++#endif /* !NeXT */
+ 
+ 
+ 
+diff --git a/src/nsopenstep.h b/src/nsopenstep.h
+new file mode 100644
+index 0000000..dbc3b53
+--- /dev/null
++++ b/src/nsopenstep.h
+@@ -0,0 +1,170 @@
++/* OPENSTEP 4.2 AppKit compatibility, local to the NS backend. */
++#ifndef EMACS_NSOPENSTEP_H
++#define EMACS_NSOPENSTEP_H
++/* Do not rename the AppKit -close selector via gnulib's C wrapper. */
++#ifdef close
++#undef close
++#define close(fd) rpl_close(fd)
++#endif
++typedef float CGFloat;
++typedef int NSInteger;
++typedef unsigned int NSUInteger;
++typedef unsigned int NSDragOperation;
++
++typedef unsigned int NSEventModifierFlags;
++typedef BOOL NSApplicationTerminateReply;
++#define NSTerminateCancel 0
++#define NSTerminateNow 1
++#define NSApplicationDelegateReplySuccess 0
++#define NSBackspaceCharacter 8
++#define NSDeleteCharacter 127
++#define NSTabCharacter 9
++#define NSCarriageReturnCharacter 13
++#define NSNewlineCharacter 10
++#define NSEnterCharacter 3
++#define NSScrollWheel 22
++#define NSOtherMouseDown 25
++#define NSOtherMouseUp 26
++#define NSOtherMouseDragged 27
++#define NSImageNameCaution @"NXAlert"
++#define NSImageInterpolationNone 0
++#define NSImageInterpolationDefault 0
++#define NSGraphicsContext NSDPSContext
++#import <AppKit/psopsNeXT.h>
++#import <AppKit/dpsops.h>
++@class NSToolbarItem, NSToolbar, NSAffineTransform, NSBezierPath;
++@interface NSURL : NSObject
++{ NSString *urlString; }
+++ (id)URLWithString:(NSString *)s;
+++ (id)URLFromPasteboard:(NSPasteboard *)pb;
++- (NSString *)absoluteString;
++- (NSString *)path;
++@end
++@interface NSString (EmacsOPENSTEP)
+++ (id)stringWithUTF8String:(const char *)s;
++- (const char *)UTF8String;
++- (id)initWithUTF8String:(const char *)s;
++- (const char *)cStringUsingEncoding:(NSStringEncoding)e;
++@end
++@interface NSScreen (EmacsOPENSTEP)
++- (NSRect)visibleFrame;
++@end
++@interface NSWindow (EmacsOPENSTEP)
++- (NSRect)convertRectToScreen:(NSRect)r;
++- (NSRect)convertRectFromScreen:(NSRect)r;
++- (NSRect)frameRectForContentRect:(NSRect)r;
++- (NSRect)contentRectForFrameRect:(NSRect)r;
++- (CGFloat)userSpaceScaleFactor;
++- (id)toolbar;
++- (NSWindow *)parentWindow;
++- (NSArray *)childWindows;
++- (void)addChildWindow:(NSWindow *)w ordered:(int)order;
++- (void)removeChildWindow:(NSWindow *)w;
++- (void)zoom:(id)sender;
++- (void)setToolbar:(id)t;
++- (void)setOpaque:(BOOL)b;
++- (void)setIsVisible:(BOOL)b;
++- (void)setAlphaValue:(CGFloat)a;
++- (void)setHasShadow:(BOOL)b;
++- (void)setFrame:(NSRect)r display:(BOOL)d animate:(BOOL)a;
++- (void)performZoom:(id)sender;
++- (NSInteger)orderedIndex;
++@end
++@interface NSEvent (EmacsOPENSTEP)
++- (NSInteger)buttonNumber;
++- (CGFloat)deltaX;
++- (CGFloat)deltaY;
++@end
++@interface NSDPSContext (EmacsOPENSTEP)
+++ (void)saveGraphicsState;
+++ (void)restoreGraphicsState;
++- (void)saveGraphicsState;
++- (void)restoreGraphicsState;
++- (void)setShouldAntialias:(BOOL)b;
++- (void)setImageInterpolation:(int)i;
++@end
++#define NSURLPboardType @"Apple URL pasteboard type"
++#define NSHTMLPboardType @"Apple HTML pasteboard type"
++#define NSPDFPboardType @"Apple PDF pasteboard type"
++#define NSImageFrameCount @"NSImageFrameCount"
++#define NSImageCurrentFrame @"NSImageCurrentFrame"
++#define NSImageCurrentFrameDuration @"NSImageCurrentFrameDuration"
++#define NSDragOperationMove 16
++#define NSOnState 1
++#define NSOffState 0
++#define NSPopUpMenuWindowLevel NSFloatingWindowLevel
++#define NSUtilityWindowMask 0
++#define NSRoundedBezelStyle 0
++#define NSInformationalRequest 10
++#define NSCriticalRequest 0
++#define NSActivityUserInitiated 0
++#define NSActivityIdleSystemSleepDisabled 0
++#define NSActivityIdleDisplaySleepDisabled 0
++typedef struct { CGFloat m11,m12,m21,m22,tX,tY; } NSAffineTransformStruct;
++@interface NSAffineTransform : NSObject <NSCopying>
++{ NSAffineTransformStruct matrix; }
+++ (id)transform;
++- (void)setTransformStruct:(NSAffineTransformStruct)t;
++- (void)translateXBy:(CGFloat)x yBy:(CGFloat)y;
++- (void)scaleXBy:(CGFloat)x yBy:(CGFloat)y;
++- (void)concat;
++- (void)invert;
++- (void)appendTransform:(NSAffineTransform *)t;
++- (NSPoint)transformPoint:(NSPoint)p;
++@end
++@interface NSBezierPath : NSObject <NSCopying>
++{ NSMutableData *elements; CGFloat lineWidth; NSData *dashPattern; CGFloat dashPhase; }
+++ (id)bezierPath;
+++ (void)fillRect:(NSRect)r;
+++ (void)strokeRect:(NSRect)r;
+++ (void)strokeLineFromPoint:(NSPoint)a toPoint:(NSPoint)b;
++- (void)moveToPoint:(NSPoint)p;
++- (void)lineToPoint:(NSPoint)p;
++- (void)curveToPoint:(NSPoint)p controlPoint1:(NSPoint)a controlPoint2:(NSPoint)b;
++- (void)closePath;
++- (void)appendBezierPathWithRect:(NSRect)r;
++- (void)transformUsingAffineTransform:(NSAffineTransform *)t;
++- (void)setLineWidth:(CGFloat)w;
++- (void)setLineDash:(const CGFloat *)d count:(NSInteger)n phase:(CGFloat)p;
++- (void)fill;
++- (void)stroke;
++- (void)removeAllPoints;
++@end
++@interface NSEvent (EmacsOPENSTEPMouse)
+++ (NSPoint)mouseLocation;
++@end
++@interface NSString (EmacsOPENSTEPEncoding)
+++ (id)stringWithCString:(const char *)s encoding:(NSStringEncoding)e;
++- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)e;
++@end
++@interface NSApplication (EmacsOPENSTEP)
++- (BOOL)_isRunningModal;
++- (NSWindow *)modalWindow;
++- (NSArray *)orderedWindows;
++- (int)requestUserAttention:(int)n;
++@end
++@interface NSMenu (EmacsOPENSTEP)
+++ (void)popUpContextMenu:(NSMenu *)menu withEvent:(NSEvent *)event forView:(NSView *)view;
++- (NSMatrix *)itemMatrix;
++- (void)mouseDown:(NSEvent *)event;
++- (NSInteger)numberOfItems;
++- (id)itemAtIndex:(NSInteger)i;
++- (void)removeItemAtIndex:(NSInteger)i;
++@end
++@interface NSMenuItem (EmacsOPENSTEP)
++- (NSMenu *)submenu;
++@end
++@interface NSButtonCell (EmacsOPENSTEP)
++- (void)setBezelStyle:(int)style;
++@end
++@interface NSColor (EmacsOPENSTEP)
++- (NSColor *)highlightWithLevel:(CGFloat)level;
++- (NSColor *)shadowWithLevel:(CGFloat)level;
++@end
++@interface NSImage (EmacsOPENSTEP)
++- (void)drawInRect:(NSRect)dest fromRect:(NSRect)src operation:(NSCompositingOperation)op
++          fraction:(CGFloat)fraction respectFlipped:(BOOL)flipped hints:(NSDictionary *)hints;
++@end
++extern BOOL ns_openstep_popup_tracking;
++void NSRectFillUsingOperation(NSRect r, int op);
++#endif
+diff --git a/src/nsopenstep.m b/src/nsopenstep.m
+new file mode 100644
+index 0000000..c996371
+--- /dev/null
++++ b/src/nsopenstep.m
+@@ -0,0 +1,321 @@
++/* OPENSTEP equivalents of later AppKit conveniences used by the NS port.
++   Copyright (C) 2026 Free Software Foundation, Inc.
++   This file is part of GNU Emacs, under the GNU GPL version 3 or later.
++   See COPYING. */
++#include <config.h>
++#import <AppKit/AppKit.h>
++#import "nsopenstep.h"
++#include <string.h>
++#include <math.h>
++
++@implementation NSString (EmacsOPENSTEP)
+++ (id)stringWithUTF8String:(const char *)s
++{ return [[[self alloc] initWithUTF8String:s] autorelease]; }
++- (id)initWithUTF8String:(const char *)s
++{ return [self initWithData:[NSData dataWithBytes:s length:strlen(s)] encoding:NSUTF8StringEncoding]; }
++- (const char *)UTF8String { return [self cStringUsingEncoding:NSUTF8StringEncoding]; }
++- (const char *)cStringUsingEncoding:(NSStringEncoding)e
++{
++  NSData *d = [self dataUsingEncoding:e];
++  NSMutableData *z;
++  char nul=0;
++  if (!d) return NULL;
++  z=[NSMutableData dataWithData:d];
++  [z appendBytes:&nul length:1];
++  return [z bytes];
++}
+++ (id)stringWithCString:(const char *)s encoding:(NSStringEncoding)e
++{ return [[[self alloc] initWithData:[NSData dataWithBytes:s length:strlen(s)] encoding:e] autorelease]; }
++- (NSUInteger)lengthOfBytesUsingEncoding:(NSStringEncoding)e
++{ return [[self dataUsingEncoding:e] length]; }
++@end
++
++@implementation NSScreen (EmacsOPENSTEP)
++- (NSRect)visibleFrame { return [self frame]; }
++@end
++
++@implementation NSWindow (EmacsOPENSTEP)
++- (NSRect)convertRectToScreen:(NSRect)r { r.origin=[self convertBaseToScreen:r.origin]; return r; }
++- (NSRect)convertRectFromScreen:(NSRect)r { r.origin=[self convertScreenToBase:r.origin]; return r; }
++- (NSRect)frameRectForContentRect:(NSRect)r
++{ return [[self class] frameRectForContentRect:r styleMask:[self styleMask]]; }
++- (NSRect)contentRectForFrameRect:(NSRect)r
++{ return [[self class] contentRectForFrameRect:r styleMask:[self styleMask]]; }
++- (CGFloat)userSpaceScaleFactor { return 1; }
++- (id)toolbar { return nil; }
++- (void)setToolbar:(id)t {}
++- (NSWindow *)parentWindow { return nil; }
++- (NSArray *)childWindows { return [NSArray array]; }
++- (void)addChildWindow:(NSWindow *)w ordered:(int)order
++{ [w orderWindow:order relativeTo:[self windowNumber]]; }
++- (void)removeChildWindow:(NSWindow *)w {}
++- (void)setIsVisible:(BOOL)b { if(b) [self orderFront:nil]; else [self orderOut:nil]; }
++- (void)setOpaque:(BOOL)b {}
++- (void)setAlphaValue:(CGFloat)a {}
++- (void)setHasShadow:(BOOL)b {}
++- (void)setFrame:(NSRect)r display:(BOOL)d animate:(BOOL)a { [self setFrame:r display:d]; }
++- (void)performZoom:(id)sender
++{
++  static NSMutableDictionary *savedFrames;
++  NSNumber *key=[NSNumber numberWithInt:[self windowNumber]];
++  NSValue *saved;
++  if(!savedFrames) savedFrames=[[NSMutableDictionary alloc] init];
++  saved=[savedFrames objectForKey:key];
++  if(saved) {
++    [self setFrame:[saved rectValue] display:YES];
++    [savedFrames removeObjectForKey:key];
++  } else {
++    [savedFrames setObject:[NSValue valueWithRect:[self frame]] forKey:key];
++    [self setFrame:NSInsetRect([[self screen] frame],32,32) display:YES];
++  }
++}
++- (void)zoom:(id)sender { [self performZoom:sender]; }
++- (NSInteger)orderedIndex { return [[NSApp windows] indexOfObjectIdenticalTo:self]; }
++@end
++
++@implementation NSEvent (EmacsOPENSTEP)
++- (NSInteger)buttonNumber { return [self type] == NSRightMouseDown || [self type] == NSRightMouseUp || [self type] == NSRightMouseDragged ? 1 : 0; }
++- (CGFloat)deltaX { return 0; }
++- (CGFloat)deltaY { return 0; }
++@end
++@implementation NSEvent (EmacsOPENSTEPMouse)
+++ (NSPoint)mouseLocation { NSPoint p; PScurrentmouse(0,&p.x,&p.y); return p; }
++@end
++
++@implementation NSDPSContext (EmacsOPENSTEP)
+++ (void)saveGraphicsState { PSgsave(); }
+++ (void)restoreGraphicsState { PSgrestore(); }
++- (void)saveGraphicsState { DPSgsave([self DPSContext]); }
++- (void)restoreGraphicsState { DPSgrestore([self DPSContext]); }
++- (void)setShouldAntialias:(BOOL)b {}
++- (void)setImageInterpolation:(int)i {}
++@end
++
++@implementation NSAffineTransform
+++ (id)transform { return [[[self alloc] init] autorelease]; }
++- (id)init { self=[super init]; matrix=(NSAffineTransformStruct){1,0,0,1,0,0}; return self; }
++- (id)copyWithZone:(NSZone *)zone
++{ NSAffineTransform *t=[[[self class] allocWithZone:zone] init]; t->matrix=matrix; return t; }
++- (void)setTransformStruct:(NSAffineTransformStruct)t { matrix=t; }
++- (NSPoint)transformPoint:(NSPoint)p
++{ return NSMakePoint(p.x*matrix.m11+p.y*matrix.m21+matrix.tX,p.x*matrix.m12+p.y*matrix.m22+matrix.tY); }
++- (void)translateXBy:(CGFloat)x yBy:(CGFloat)y
++{ matrix.tX+=matrix.m11*x+matrix.m21*y; matrix.tY+=matrix.m12*x+matrix.m22*y; }
++- (void)scaleXBy:(CGFloat)x yBy:(CGFloat)y
++{ matrix.m11*=x; matrix.m12*=x; matrix.m21*=y; matrix.m22*=y; }
++- (void)concat { PSconcat((float *)&matrix); }
++- (void)appendTransform:(NSAffineTransform *)t
++{
++  NSAffineTransformStruct a=matrix,b=t->matrix;
++  matrix=(NSAffineTransformStruct){a.m11*b.m11+a.m12*b.m21,a.m11*b.m12+a.m12*b.m22,
++    a.m21*b.m11+a.m22*b.m21,a.m21*b.m12+a.m22*b.m22,
++    a.tX*b.m11+a.tY*b.m21+b.tX,a.tX*b.m12+a.tY*b.m22+b.tY};
++}
++- (void)invert
++{
++  NSAffineTransformStruct a=matrix; float d=a.m11*a.m22-a.m12*a.m21;
++  if(d==0) return;
++  matrix=(NSAffineTransformStruct){a.m22/d,-a.m12/d,-a.m21/d,a.m11/d,
++    (a.m21*a.tY-a.m22*a.tX)/d,(a.m12*a.tX-a.m11*a.tY)/d};
++}
++@end
++
++typedef struct { int op; NSPoint p[3]; } OSEmacsPathElement;
++@implementation NSBezierPath
+++ (id)bezierPath { return [[[self alloc] init] autorelease]; }
++- (id)init { self=[super init]; elements=[[NSMutableData alloc] init]; lineWidth=1; return self; }
++- (void)dealloc { [elements release]; [dashPattern release]; [super dealloc]; }
++- (id)copyWithZone:(NSZone *)zone
++{ NSBezierPath *p=[[[self class] allocWithZone:zone] init]; [p->elements appendData:elements]; p->lineWidth=lineWidth; p->dashPattern=[dashPattern copy]; p->dashPhase=dashPhase; return p; }
++- (void)moveToPoint:(NSPoint)p { OSEmacsPathElement e={0,{p}}; [elements appendBytes:&e length:sizeof e]; }
++- (void)lineToPoint:(NSPoint)p { OSEmacsPathElement e={1,{p}}; [elements appendBytes:&e length:sizeof e]; }
++- (void)curveToPoint:(NSPoint)p controlPoint1:(NSPoint)a controlPoint2:(NSPoint)b
++{ OSEmacsPathElement e={2,{a,b,p}}; [elements appendBytes:&e length:sizeof e]; }
++- (void)closePath { OSEmacsPathElement e={3}; [elements appendBytes:&e length:sizeof e]; }
++- (void)appendBezierPathWithRect:(NSRect)r
++{ [self moveToPoint:r.origin]; [self lineToPoint:NSMakePoint(NSMaxX(r),NSMinY(r))];
++  [self lineToPoint:NSMakePoint(NSMaxX(r),NSMaxY(r))]; [self lineToPoint:NSMakePoint(NSMinX(r),NSMaxY(r))]; [self closePath]; }
++- (void)transformUsingAffineTransform:(NSAffineTransform *)t
++{ unsigned i,j,n=[elements length]/sizeof(OSEmacsPathElement); OSEmacsPathElement *e=[elements mutableBytes];
++  for(i=0;i<n;i++) for(j=0;j<3;j++) e[i].p[j]=[t transformPoint:e[i].p[j]]; }
++- (void)setLineWidth:(CGFloat)w { lineWidth=w; }
++- (void)setLineDash:(const CGFloat *)d count:(NSInteger)n phase:(CGFloat)p
++{ [dashPattern release]; dashPattern=[[NSData alloc] initWithBytes:d length:n*sizeof(CGFloat)]; dashPhase=p; }
++- (void)removeAllPoints { [elements setLength:0]; }
++- (void)sendPath
++{ unsigned i,n=[elements length]/sizeof(OSEmacsPathElement); const OSEmacsPathElement *e=[elements bytes];
++  PSnewpath(); PSsetlinewidth(lineWidth);
++  for(i=0;i<n;i++) switch(e[i].op) {
++    case 0: PSmoveto(e[i].p[0].x,e[i].p[0].y); break;
++    case 1: PSlineto(e[i].p[0].x,e[i].p[0].y); break;
++    case 2: PScurveto(e[i].p[0].x,e[i].p[0].y,e[i].p[1].x,e[i].p[1].y,e[i].p[2].x,e[i].p[2].y); break;
++    case 3: PSclosepath(); break;
++  }
++}
++- (void)fill { [self sendPath]; PSfill(); }
++- (void)stroke
++{ PSgsave(); [self sendPath]; PSsetdash([dashPattern bytes],[dashPattern length]/sizeof(CGFloat),dashPhase); PSstroke(); PSgrestore(); }
+++ (void)fillRect:(NSRect)r { NSRectFill(r); }
+++ (void)strokeRect:(NSRect)r { NSBezierPath *p=[self bezierPath]; [p appendBezierPathWithRect:r]; [p stroke]; }
+++ (void)strokeLineFromPoint:(NSPoint)a toPoint:(NSPoint)b
++{ NSBezierPath *p=[self bezierPath]; [p moveToPoint:a]; [p lineToPoint:b]; [p stroke]; }
++@end
++
++@implementation NSColor (EmacsOPENSTEP)
++- (NSColor *)highlightWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor whiteColor]]; }
++- (NSColor *)shadowWithLevel:(CGFloat)level { return [self blendedColorWithFraction:level ofColor:[NSColor blackColor]]; }
++@end
++
++@implementation NSCursor (EmacsOPENSTEP)
+++ (NSCursor *)pointingHandCursor { return [self arrowCursor]; }
+++ (NSCursor *)disappearingItemCursor { return [self arrowCursor]; }
+++ (NSCursor *)resizeLeftRightCursor { return [self arrowCursor]; }
+++ (NSCursor *)resizeUpDownCursor { return [self arrowCursor]; }
++@end
++
++/* Fast enumeration was added later, but its compiler ABI is independent
++   of the Objective-C runtime. Keep mutation checks for mutable arrays. */
++typedef struct { unsigned long state; id *itemsPtr; unsigned long *mutationsPtr; unsigned long extra[5]; } OSEmacsEnumerationState;
++void objc_enumerationMutation(id object)
++{ [NSException raise:NSGenericException format:@"Collection mutated during enumeration: %@",object]; }
++@implementation NSArray (EmacsOPENSTEP)
++- (id)firstObject { return [self count] ? [self objectAtIndex:0] : nil; }
++- (NSUInteger)countByEnumeratingWithState:(OSEmacsEnumerationState *)s objects:(id *)objects count:(NSUInteger)n
++{
++  NSUInteger i=0,total=[self count];
++  if(!s->state) s->extra[0]=total;
++  else if(s->extra[0]!=total) [NSException raise:NSGenericException format:@"Collection mutated during enumeration"];
++  s->mutationsPtr=&s->extra[0]; s->itemsPtr=objects;
++  while(i<n && s->state<total) objects[i++]=[self objectAtIndex:s->state++];
++  return i;
++}
++@end
++@implementation NSEnumerator (EmacsOPENSTEP)
++- (NSUInteger)countByEnumeratingWithState:(OSEmacsEnumerationState *)s objects:(id *)objects count:(NSUInteger)n
++{ NSUInteger i=0; id obj; s->itemsPtr=objects; s->mutationsPtr=&s->extra[0]; while(i<n && (obj=[self nextObject])) objects[i++]=obj; return i; }
++@end
++@implementation NSDictionary (EmacsOPENSTEP)
++- (id)valueForKey:(NSString *)key { return [self objectForKey:key]; }
++@end
++
++@implementation NSApplication (EmacsOPENSTEP)
++- (NSWindow *)modalWindow { return [self _isRunningModal] ? [self keyWindow] : nil; }
++- (NSArray *)orderedWindows { return [self windows]; }
++- (void)replyToOpenOrPrint:(int)reply {}
++- (void)cancelUserAttentionRequest:(int)n {}
++- (int)requestUserAttention:(int)n { NSBeep(); return -1; }
++- (void)orderFrontStandardAboutPanel:(id)sender
++{ NSRunAlertPanel(@"GNU Emacs",@"GNU Emacs 31.1 for OPENSTEP",@"OK",nil,nil); }
++- (void)orderFrontCharacterPalette:(id)sender { NSBeep(); }
++- (id)dockTile { return nil; }
++@end
++
++BOOL ns_openstep_popup_tracking;
++
++@implementation NSMenu (EmacsOPENSTEP)
+++ (void)popUpContextMenu:(NSMenu *)menu withEvent:(NSEvent *)event forView:(NSView *)view
++{
++  /* Native NSMenu instances are NSMenuPanel windows.  Let AppKit track
++     their matrix, including submenus, and dispatch the selected action. */
++  NSWindow *window = (NSWindow *)menu;
++  NSMatrix *matrix;
++  NSRect cell, frame, screen;
++  NSPoint point, location;
++  NSEvent *down;
++  if (![menu numberOfItems]) return;
++  [menu sizeToFit];
++  matrix = [menu itemMatrix];
++  cell = [matrix cellFrameAtRow:0 column:0];
++  location = [matrix convertPoint:NSMakePoint(NSMinX(cell)+8, NSMidY(cell)) toView:nil];
++  point = [[view window] convertBaseToScreen:[event locationInWindow]];
++  frame = [window frame];
++  frame.origin = NSMakePoint(point.x-location.x, point.y-location.y);
++  screen = [[view window] screen] ? [[[view window] screen] frame] : [[NSScreen mainScreen] frame];
++  frame.origin.x = MAX(NSMinX(screen), MIN(frame.origin.x, NSMaxX(screen)-NSWidth(frame)));
++  frame.origin.y = MAX(NSMinY(screen), MIN(frame.origin.y, NSMaxY(screen)-NSHeight(frame)));
++  [window setFrame:frame display:NO];
++  [window orderFront:nil];
++  location = [window convertScreenToBase:point];
++  down = [NSEvent mouseEventWithType:NSLeftMouseDown location:location
++    modifierFlags:[event modifierFlags] timestamp:[event timestamp]
++    windowNumber:[window windowNumber] context:nil eventNumber:0 clickCount:1 pressure:1];
++  ns_openstep_popup_tracking = YES;
++  NS_DURING
++    [menu mouseDown:down];
++  NS_HANDLER
++    ns_openstep_popup_tracking = NO;
++    [window orderOut:nil];
++    [localException raise];
++  NS_ENDHANDLER
++  ns_openstep_popup_tracking = NO;
++  [window orderOut:nil];
++}
++- (NSInteger)numberOfItems { return [[self itemArray] count]; }
++- (id)itemAtIndex:(NSInteger)i { return [[self itemArray] objectAtIndex:i]; }
++- (void)removeItemAtIndex:(NSInteger)i { [self removeItem:[self itemAtIndex:i]]; }
+++ (void)setMenuBarVisible:(BOOL)b {}
++@end
++
++@implementation NSBitmapImageRep (EmacsOPENSTEP)
++- (id)valueForProperty:(NSString *)p { return nil; }
++- (void)setProperty:(NSString *)p withValue:(id)v {}
++@end
++
++@implementation NSImage (EmacsOPENSTEP)
++- (void)drawInRect:(NSRect)dest fromRect:(NSRect)src operation:(NSCompositingOperation)op
++          fraction:(CGFloat)fraction respectFlipped:(BOOL)flipped hints:(NSDictionary *)hints
++{
++  NSSize original=[self size];
++  NSSize scaled=NSMakeSize(original.width*dest.size.width/src.size.width,
++                           original.height*dest.size.height/src.size.height);
++  BOOL oldScales=[self scalesWhenResized];
++  [self setScalesWhenResized:YES];
++  [self setSize:scaled];
++  PSgsave();
++  if(flipped && [[NSView focusView] isFlipped]) {
++    PStranslate(dest.origin.x,dest.origin.y+dest.size.height);
++    PSscale(1,-1);
++  } else PStranslate(dest.origin.x,dest.origin.y);
++  [self compositeToPoint:NSZeroPoint fromRect:NSMakeRect(0,0,scaled.width,scaled.height) operation:op];
++  PSgrestore();
++  [self setSize:original];
++  [self setScalesWhenResized:oldScales];
++}
++@end
++
++@implementation NSMenuItem (EmacsOPENSTEP)
++- (NSMenu *)submenu
++{ return [self hasSubmenu] ? [self target] : nil; }
++@end
++@implementation NSURL
+++ (id)URLWithString:(NSString *)s
++{ NSURL *u; if(!s) return nil; u=[[[self alloc] init] autorelease]; u->urlString=[s copy]; return u; }
+++ (id)URLFromPasteboard:(NSPasteboard *)pb { return [self URLWithString:[pb stringForType:NSURLPboardType]]; }
++- (NSString *)absoluteString { return urlString; }
++- (NSString *)path
++{
++  NSString *path=urlString;
++  if([path hasPrefix:@"file://localhost/"]) path=[path substringFromIndex:16];
++  else if([path hasPrefix:@"file:///"]) path=[path substringFromIndex:7];
++  else if([path hasPrefix:@"file:/"]) path=[path substringFromIndex:5];
++  /* Percent-decode UTF-8 bytes without relying on a later Foundation API. */
++  const unsigned char *s=(const unsigned char *)[path UTF8String];
++  NSMutableData *bytes=[NSMutableData data];
++  while(*s) {
++    unsigned char c=*s++;
++    if(c=='%' && s[0] && s[1]) { unsigned v; char h[3]={(char)s[0],(char)s[1],0};
++      if(sscanf(h,"%2x",&v)==1) {c=v;s+=2;} }
++    [bytes appendBytes:&c length:1];
++  }
++  return [[[NSString alloc] initWithData:bytes encoding:NSUTF8StringEncoding] autorelease];
++}
++- (void)dealloc { [urlString release]; [super dealloc]; }
++@end
++
++void NSRectFillUsingOperation(NSRect r, int op)
++{ PScompositerect(r.origin.x,r.origin.y,r.size.width,r.size.height,op); }
++
++@implementation NSButtonCell (EmacsOPENSTEP)
++/* OPENSTEP buttons use the standard native bezel. */
++- (void)setBezelStyle:(int)style {}
++@end
+diff --git a/src/nsselect.m b/src/nsselect.m
+index 1b17a64..e4acca4 100644
+--- a/src/nsselect.m
++++ b/src/nsselect.m
+@@ -285,12 +285,17 @@ Updated by Christian Limpach (chris@nice.ch)
+         availableTypes = [NSArray arrayWithObject:NSPasteboardTypeString];
+ 
+       t = [pb availableTypeFromArray:availableTypes];
++      /* OPENSTEP rejects nil pasteboard types with an exception. */
++      if (t == nil)
++        return Qnil;
+ 
+       result = [pb stringForType:t];
+       if (result)
+         return [result lispString];
+ 
+       d = [pb dataForType:t];
++      if (d == nil)
++        return Qnil;
+       return make_string ([d bytes], [d length]);
+     }
+ }
+diff --git a/src/nsterm.h b/src/nsterm.h
+index b21dd51..ca4e4ce 100644
+--- a/src/nsterm.h
++++ b/src/nsterm.h
+@@ -387,6 +387,9 @@ typedef id instancetype;
+ @public
+   int nextappdefined;
+ }
++#ifdef NeXT
++- (void)openstepSelectTick:(NSTimer *)timer;
++#endif
+ - (void)logNotification: (NSNotification *)notification;
+ - (void)antialiasThresholdDidChange:(NSNotification *)notification;
+ - (void)sendEvent: (NSEvent *)theEvent;
+@@ -537,9 +540,15 @@ enum ns_return_frame_mode
+ 
+    ========================================================================== */
+ 
+-@interface EmacsMenu : NSMenu  <NSMenuDelegate>
++@interface EmacsMenu : NSMenu
++#ifndef NeXT
++  <NSMenuDelegate>
++#endif
+ {
+   BOOL needsUpdate;
++#ifdef NeXT
++  NSMutableArray *ownedSubmenus;
++#endif
+ }
+ 
+ - (void)menuNeedsUpdate: (NSMenu *)menu; /* (delegate method) */
+@@ -561,6 +570,7 @@ enum ns_return_frame_mode
+ 
+ @class EmacsImage;
+ 
++#ifndef NeXT
+ #ifdef NS_IMPL_COCOA
+ @interface EmacsToolbar : NSToolbar <NSToolbarDelegate>
+ #else
+@@ -591,6 +601,7 @@ enum ns_return_frame_mode
+ - (NSArray *)toolbarDefaultItemIdentifiers: (NSToolbar *)toolbar;
+ - (NSArray *)toolbarAllowedItemIdentifiers: (NSToolbar *)toolbar;
+ @end
++#endif /* !NeXT */
+ 
+ 
+ /* ==========================================================================
+@@ -819,7 +830,7 @@ struct ns_bitmap_record
+   int height, width, depth;
+ };
+ 
+-#ifdef NS_IMPL_GNUSTEP
++#if defined NS_IMPL_GNUSTEP || defined NeXT
+ /* this extends font backend font */
+ struct nsfont_info
+ {
+@@ -1062,12 +1073,15 @@ struct x_output
+ #define FRAME_NS_TITLEBAR_HEIGHT(f)                                     \
+   (NSHeight([FRAME_NS_VIEW (f) frame]) == 0 ?                           \
+    0                                                                    \
+-   : (int)(NSHeight([FRAME_NS_VIEW (f) window].frame)                   \
++   : (int)(NSHeight([[FRAME_NS_VIEW (f) window] frame])                   \
+            - NSHeight([NSWindow contentRectForFrameRect:                \
+                        [[FRAME_NS_VIEW (f) window] frame]               \
+                        styleMask:[[FRAME_NS_VIEW (f) window] styleMask]])))
+ 
+ /* Compute pixel height of the toolbar.  */
++#ifdef NeXT
++#define FRAME_TOOLBAR_HEIGHT(f) 0
++#else
+ #define FRAME_TOOLBAR_HEIGHT(f)                                         \
+   (([[FRAME_NS_VIEW (f) window] toolbar] == nil                         \
+     || ! [[FRAME_NS_VIEW (f) window] toolbar].isVisible) ?		\
+@@ -1076,6 +1090,7 @@ struct x_output
+                      [[FRAME_NS_VIEW (f) window] frame]                 \
+                      styleMask:[[FRAME_NS_VIEW (f) window] styleMask]]) \
+            - NSHeight([[[FRAME_NS_VIEW (f) window] contentView] frame])))
++#endif
+ 
+ /* Difference between char-column-calculated and actual SB widths.
+    This is only a concern for rendering when SB on left.  */
+diff --git a/src/nsterm.m b/src/nsterm.m
+index a5273e9..d076c2c 100644
+--- a/src/nsterm.m
++++ b/src/nsterm.m
+@@ -32,7 +32,9 @@ Updated by Christian Limpach (chris@nice.ch)
+ 
+ #include <fcntl.h>
+ #include <math.h>
++#ifndef NeXT
+ #include <pthread.h>
++#endif
+ #include <sys/types.h>
+ #include <time.h>
+ #include <signal.h>
+@@ -179,7 +181,11 @@ - (NSColor *)colorUsingDefaultColorSpace
+       && NSAppKitVersionNumber >= NSAppKitVersionNumber10_7)
+     return [self colorUsingColorSpace: [NSColorSpace sRGBColorSpace]];
+ #endif
++  #ifdef NeXT
++  return [self colorUsingColorSpaceName:NSCalibratedRGBColorSpace];
++#else
+   return [self colorUsingColorSpace: [NSColorSpace genericRGBColorSpace]];
++#endif
+ }
+ 
+ + (NSColor *)colorWithUnsignedLong:(unsigned long)c
+@@ -323,8 +329,22 @@ - (unsigned long)unsignedLong
+ enum { SELECT_HAVE_READ = 1, SELECT_HAVE_WRITE = 2, SELECT_HAVE_TMO = 4 };
+ static int select_nfds = 0, select_valid = 0;
+ static struct timespec select_timeout = { 0, 0 };
++#ifdef NeXT
++static fd_set openstep_select_exceptfds;
++static bool openstep_select_has_exceptfds;
++static NSTimeInterval openstep_select_deadline;
++static bool openstep_select_has_deadline;
++static int openstep_select_result;
++#endif
+ static int selfds[2] = { -1, -1 };
++#ifdef NeXT
++static NSLock *select_mutex;
++#define pthread_mutex_init(m, a) (*(m) = [[NSLock alloc] init])
++#define pthread_mutex_lock(m) [*(m) lock]
++#define pthread_mutex_unlock(m) [*(m) unlock]
++#else
+ static pthread_mutex_t select_mutex;
++#endif
+ static NSAutoreleasePool *outerpool;
+ static struct input_event *emacs_event = NULL;
+ static struct input_event *q_event_ptr = NULL;
+@@ -561,7 +581,20 @@ - (unsigned long)unsignedLong
+ /* Initialize the 'outerpool' autorelease pool.  This should be called
+    from main before any Objective C code is run.  */
+ {
++#ifdef NeXT
++  /* Foundation 4.2 parses command-line values as property lists.  Lisp
++     expressions passed to --eval are not property lists.  Emacs owns
++     argument processing; initialize Foundation with the executable name
++     alone, leaving the original argv available to Emacs.  */
++  extern int _NXArgc;
++  int saved_argc = _NXArgc;
++  _NXArgc = 1;
++#endif
+   outerpool = [[NSAutoreleasePool alloc] init];
++#ifdef NeXT
++  [NSUserDefaults standardUserDefaults];
++  _NXArgc = saved_argc;
++#endif
+ }
+ 
+ 
+@@ -574,6 +607,7 @@ - (unsigned long)unsignedLong
+ 
+   /* Either use LANG, if set, or try to construct LANG from
+      NSLocale.  */
++#ifndef NeXT
+   const char *lang = getenv ("LANG");
+   if (lang == NULL || *lang == 0)
+     {
+@@ -596,6 +630,7 @@ - (unsigned long)unsignedLong
+     }
+ 
+   setenv ("LANG", lang, 1);
++#endif
+ }
+ 
+ void
+@@ -1265,7 +1300,7 @@ Convert a CGRect from Cocoa screen coordinates (origin at bottom-left
+     {
+       NSGraphicsContext *ctx = [NSGraphicsContext currentContext];
+       [ctx saveGraphicsState];
+-#ifdef NS_IMPL_COCOA
++#if defined NS_IMPL_COCOA || defined NeXT
+       if (n == 2)
+         NSRectClipList (r, 2);
+       else
+@@ -2419,6 +2454,10 @@ Hide the window (X11 semantics)
+                 f->top_pos + pix_y +
+                 FRAME_NS_TITLEBAR_HEIGHT(f) + FRAME_TOOLBAR_HEIGHT(f));
+   CGWarpMouseCursorPosition (mouse_pos);
++#elif defined NeXT
++  NSPoint p = [FRAME_NS_VIEW (f) convertPoint:NSMakePoint(pix_x,pix_y) toView:nil];
++  p = [[FRAME_NS_VIEW (f) window] convertBaseToScreen:p];
++  PSsetmouse (p.x, p.y);
+ #else
+   GSDisplayServer *server = GSServerForWindow ([FRAME_NS_VIEW (f) window]);
+   [server setMouseLocation: NSMakePoint (f->left_pos + pix_x,
+@@ -5013,6 +5052,7 @@ Function modeled after x_draw_glyph_string_box ().
+ 
+   // GNUstep needs postEvent to happen on the main thread.
+   // Cocoa needs nextEventMatchingMask to happen on the main thread too.
++  #ifndef NeXT
+   if (! [[NSThread currentThread] isMainThread])
+     {
+       EmacsApp *app = (EmacsApp *)NSApp;
+@@ -5023,6 +5063,7 @@ Function modeled after x_draw_glyph_string_box ().
+       return;
+     }
+ 
++  #endif
+   /* Only post this event if we haven't already posted one.  This will end
+      the [NXApp run] main loop after having processed all events queued at
+      this moment.  */
+@@ -5114,7 +5155,11 @@ Function modeled after x_draw_glyph_string_box ().
+       return i;
+     }
+ 
++#ifdef NeXT
++  if (true)
++#else
+   if ([NSThread isMainThread])
++#endif
+     {
+       block_input ();
+       n_emacs_events_pending = 0;
+@@ -5212,7 +5257,9 @@ Function modeled after x_draw_glyph_string_box ().
+     }
+ 
+   if (NSApp == nil
++#ifndef NeXT
+       || ![NSThread isMainThread]
++#endif
+       || (timeout && timeout->tv_sec == 0 && timeout->tv_nsec == 0))
+     return thread_select (pselect, nfds, readfds, writefds,
+ 			  exceptfds, timeout, sigmask);
+@@ -5222,6 +5269,44 @@ Function modeled after x_draw_glyph_string_box ().
+       thread_select (pselect, 0, NULL, NULL, NULL, &t, sigmask);
+     }
+ 
++#ifdef NeXT
++  /* OPENSTEP has no pthreads or performSelectorOnMainThread. Poll the
++     descriptors from a timer in AppKit's own thread. A ten millisecond
++     slice keeps subprocess I/O live while menus and keyboard events run. */
++  {
++    NSTimer *poller;
++    select_nfds = nfds;
++    select_valid = (readfds ? SELECT_HAVE_READ : 0) | (writefds ? SELECT_HAVE_WRITE : 0);
++    if (readfds) select_readfds = *readfds;
++    if (writefds) select_writefds = *writefds;
++    openstep_select_has_exceptfds = exceptfds != NULL;
++    if (exceptfds) openstep_select_exceptfds = *exceptfds;
++    openstep_select_has_deadline = timeout != NULL;
++    openstep_select_deadline = [NSDate timeIntervalSinceReferenceDate]
++      + (timeout ? timespectod (*timeout) : 0);
++    openstep_select_result = -1;
++    send_appdefined = YES;
++    last_appdefined_event_data = NO_APPDEFINED_DATA;
++    poller = [[NSTimer scheduledTimerWithTimeInterval:0.01 target:NSApp
++                  selector:@selector(openstepSelectTick:) userInfo:nil repeats:YES] retain];
++    block_input ();
++    ns_init_events (&event);
++    [NSApp run];
++    ns_finish_events ();
++    [poller invalidate]; [poller release];
++    unblock_input ();
++    result = openstep_select_result;
++    if (result > 0)
++      { if (readfds) *readfds = select_readfds; if (writefds) *writefds = select_writefds;
++        if (exceptfds) *exceptfds = openstep_select_exceptfds; }
++    else if (result == 0)
++      { if (readfds) FD_ZERO(readfds); if (writefds) FD_ZERO(writefds);
++        if (exceptfds) FD_ZERO(exceptfds); }
++    else errno = EINTR;
++    return result;
++  }
++#endif
++
+   /* FIXME: This draining of outerpool causes a crash when a buffer
+      running over tramp is displayed and the user tries to use the
+      menus.  I believe some other autorelease pool's lifetime
+@@ -6000,10 +6085,12 @@ Needs to be here because ns_initialize_display_info () uses AppKit classes.
+     return NULL;
+   [NSApp setDelegate: NSApp];
+ 
++  #ifndef NeXT
+   /* Start the select thread.  */
+   [NSThread detachNewThreadSelector:@selector (fd_handler:)
+                            toTarget:NSApp
+                          withObject:nil];
++  #endif
+ 
+   /* debugging: log all notifications */
+   /*   [[NSNotificationCenter defaultCenter] addObserver: NSApp
+@@ -6071,18 +6158,30 @@ Needs to be here because ns_initialize_display_info () uses AppKit classes.
+                           action: @selector (orderFrontStandardAboutPanel:)
+                    keyEquivalent: @""
+                          atIndex: 0];
++#ifndef NeXT
+     [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 1];
++#else
++    [[appMenu insertItemWithTitle:@"----------------" action:NULL keyEquivalent:@"" atIndex:1] setEnabled:NO];
++#endif
+     [appMenu insertItemWithTitle: @"Preferences..."
+                           action: @selector (showPreferencesWindow:)
+                    keyEquivalent: @","
+                          atIndex: 2];
++#ifndef NeXT
+     [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 3];
++#else
++    [[appMenu insertItemWithTitle:@"----------------" action:NULL keyEquivalent:@"" atIndex:3] setEnabled:NO];
++#endif
+     item = [appMenu insertItemWithTitle: @"Services"
+                                  action: @selector (menuDown:)
+                           keyEquivalent: @""
+                                 atIndex: 4];
+     [appMenu setSubmenu: svcsMenu forItem: item];
++#ifndef NeXT
+     [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 5];
++#else
++    [[appMenu insertItemWithTitle:@"----------------" action:NULL keyEquivalent:@"" atIndex:5] setEnabled:NO];
++#endif
+     [appMenu insertItemWithTitle: @"Hide Emacs"
+                           action: @selector (hide:)
+                    keyEquivalent: @"h"
+@@ -6092,7 +6191,11 @@ Needs to be here because ns_initialize_display_info () uses AppKit classes.
+                    keyEquivalent: @"h"
+                          atIndex: 7];
+     [item setKeyEquivalentModifierMask: NSEventModifierFlagCommand | NSEventModifierFlagOption];
++#ifndef NeXT
+     [appMenu insertItem: [NSMenuItem separatorItem] atIndex: 8];
++#else
++    [[appMenu insertItemWithTitle:@"----------------" action:NULL keyEquivalent:@"" atIndex:8] setEnabled:NO];
++#endif
+     [appMenu insertItemWithTitle: @"Quit Emacs"
+                           action: @selector (terminate:)
+                    keyEquivalent: @"q"
+@@ -6196,6 +6299,47 @@ Needs to be here because ns_initialize_display_info () uses AppKit classes.
+ 
+ 
+ @implementation EmacsApp
++#ifdef NeXT
++/* OPENSTEP NSMenu tracks left-button events even when a context menu was
++   invoked with the right button.  Translate only within that tracking loop. */
++- (NSEvent *)nextEventMatchingMask:(unsigned int)mask untilDate:(NSDate *)date
++                           inMode:(NSString *)mode dequeue:(BOOL)dequeue
++{
++  NSEvent *event;
++  if (ns_openstep_popup_tracking)
++    {
++      if (mask & NSLeftMouseUpMask) mask |= NSRightMouseUpMask;
++      if (mask & NSLeftMouseDraggedMask) mask |= NSRightMouseDraggedMask;
++    }
++  event = [super nextEventMatchingMask:mask untilDate:date inMode:mode dequeue:dequeue];
++  if (ns_openstep_popup_tracking && event
++      && ([event type] == NSRightMouseUp || [event type] == NSRightMouseDragged))
++    return [NSEvent mouseEventWithType:[event type] == NSRightMouseUp ? NSLeftMouseUp : NSLeftMouseDragged
++      location:[event locationInWindow] modifierFlags:[event modifierFlags]
++      timestamp:[event timestamp] windowNumber:[event windowNumber] context:[event context]
++      eventNumber:[event eventNumber] clickCount:[event clickCount] pressure:[event pressure]];
++  return event;
++}
++
++- (void)openstepSelectTick:(NSTimer *)timer
++{
++  struct timespec zero = {0,0};
++  fd_set r = select_readfds, w = select_writefds, e = openstep_select_exceptfds;
++  int status = thread_select(pselect, select_nfds,
++                select_valid & SELECT_HAVE_READ ? &r : NULL,
++                select_valid & SELECT_HAVE_WRITE ? &w : NULL,
++                openstep_select_has_exceptfds ? &e : NULL, &zero, NULL);
++  if (status != 0)
++    {
++      select_readfds = r; select_writefds = w; openstep_select_exceptfds = e;
++      openstep_select_result = status;
++      ns_send_appdefined(status);
++    }
++  else if (openstep_select_has_deadline &&
++           [NSDate timeIntervalSinceReferenceDate] >= openstep_select_deadline)
++    { openstep_select_result = 0; ns_send_appdefined(-2); }
++}
++#endif
+ 
+ - (id)init
+ {
+@@ -6609,7 +6753,7 @@ - (void) terminate: (id)sender
+               NSString *defaultButton,
+               NSString *alternateButton)
+ {
+-#ifdef NS_IMPL_GNUSTEP
++#if defined NS_IMPL_GNUSTEP || defined NeXT
+   return NSRunAlertPanel(title, msgFormat, defaultButton, alternateButton, nil)
+     == NSAlertDefaultReturn;
+ #else
+@@ -6885,8 +7029,16 @@ - (BOOL)fulfillService: (NSString *)name withArg: (NSString *)arg
+ @end  /* EmacsApp */
+ 
+ static Lisp_Object
+-ns_font_desc_to_font_spec (NSFontDescriptor *desc, NSFont *font)
+-{
++ns_font_desc_to_font_spec (id desc, NSFont *font)
++{
++#ifdef NeXT
++  unsigned traits = [[NSFontManager sharedFontManager] traitsOfFont:font];
++  return CALLN (Ffont_spec, QCfamily, [[font familyName] lispString],
++                QCsize, make_float([font pointSize]),
++                QCweight, traits & NSBoldFontMask ? Qbold : Qnormal,
++                QCslant, traits & NSItalicFontMask ? Qitalic : Qnormal);
++#else
++
+   NSFontSymbolicTraits traits = [desc symbolicTraits];
+   NSDictionary *dict = [desc objectForKey: NSFontTraitsAttribute];
+   NSString *family = [font familyName];
+@@ -6958,6 +7110,8 @@ - (BOOL)fulfillService: (NSString *)name withArg: (NSString *)arg
+ 		QCfamily, (family
+ 			   ? [family lispString]
+ 			   : Qnil));
++#endif
++
+ }
+ 
+ #ifdef NS_IMPL_COCOA
+@@ -7055,7 +7209,7 @@ - (void) changeFont: (id) sender
+   struct font *font = FRAME_OUTPUT_DATA (emacsframe)->font;
+   NSFont *nsfont;
+ 
+-#ifdef NS_IMPL_GNUSTEP
++#if defined NS_IMPL_GNUSTEP || defined NeXT
+   nsfont = ((struct nsfont_info *) font)->nsfont;
+ #else
+   nsfont = (NSFont *) macfont_get_nsctfont (font);
+@@ -7121,7 +7275,7 @@ - (Lisp_Object) showFontPanel
+   BOOL canceled;
+ #endif
+ 
+-#ifdef NS_IMPL_GNUSTEP
++#if defined NS_IMPL_GNUSTEP || defined NeXT
+   nsfont = ((struct nsfont_info *) font)->nsfont;
+ #else
+   nsfont = (NSFont *) macfont_get_nsctfont (font);
+@@ -7168,7 +7322,12 @@ - (Lisp_Object) showFontPanel
+   font_panel_active = NO;
+ 
+   if (result)
+-    return ns_font_desc_to_font_spec ([result fontDescriptor],
++    return ns_font_desc_to_font_spec (
++#ifdef NeXT
++                                     nil,
++#else
++                                     [result fontDescriptor],
++#endif
+ 				      result);
+ 
+   return Qnil;
+@@ -7583,6 +7742,13 @@ - (NSRange)markedRange
+ }
+ 
+ 
++#ifdef NeXT
++- (void)getMarkedText:(NSString **)text selectedRange:(NSRange *)range
++{
++  *text = workingText ? workingText : @"";
++  *range = NSMakeRange(0, [*text length]);
++}
++#endif
+ - (void)unmarkText
+ {
+   NSTRACE ("[EmacsView unmarkText]");
+@@ -7669,7 +7835,7 @@ - (NSRect)firstRectForCharacterRange: (NSRange)theRange
+ }
+ 
+ 
+-- (NSInteger)conversationIdentifier
++- (long) conversationIdentifier
+ {
+   return (NSInteger)self;
+ }
+@@ -9837,6 +10003,10 @@ - (instancetype) initWithEmacsFrame: (struct frame *) f
+ 
+ - (void)createToolbar: (struct frame *)f
+ {
++#ifdef NeXT
++  /* OPENSTEP has no NSToolbar; commands remain available in the menu. */
++#else
++
+   if (FRAME_UNDECORATED (f)
+       || [self styleMask] == NSWindowStyleMaskBorderless
+       || !FRAME_EXTERNAL_TOOL_BAR (f)
+@@ -9867,6 +10037,8 @@ - (void)createToolbar: (struct frame *)f
+     [toggleButton setAction:@selector (toggleToolbar:)];
+   }
+ #endif
++#endif
++
+ }
+ 
+ - (void)dealloc
+diff --git a/src/process.c b/src/process.c
+index 383e56d..1ecd649 100644
 --- a/src/process.c
 +++ b/src/process.c
-@@ -52,7 +52,9 @@
+@@ -52,8 +52,10 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
  /* If NOFILE_LIMIT.rlim_cur is greater than FD_SETSIZE, then
     NOFILE_LIMIT is the initial limit on the number of open files,
     which should be restored in child processes.  */
 +#ifdef RLIMIT_NOFILE
  static struct rlimit nofile_limit;
-+#endif
  #endif
++#endif
  
  #ifdef subprocesses
-@@ -2106,6 +2108,14 @@
+ 
+@@ -2106,6 +2108,14 @@ start_process_unwind (Lisp_Object proc)
  
  /* If *FD_ADDR is nonnegative, close it, and mark it as closed.  */
  
@@ -2013,7 +3674,7 @@
  static void
  close_process_fd (int *fd_addr)
  {
-@@ -2310,8 +2320,26 @@
+@@ -2310,8 +2320,26 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
        /* vfork succeeded.  */
  
        /* Close the pipe ends that the child uses, or the child's pty.  */
@@ -2040,7 +3701,7 @@
  
  #ifdef WINDOWSNT
        register_child (pid, inchannel);
-@@ -8666,7 +8694,7 @@
+@@ -8666,7 +8694,7 @@ catch_child_signal (void)
  void
  restore_nofile_limit (void)
  {
@@ -2049,7 +3710,7 @@
    if (FD_SETSIZE < nofile_limit.rlim_cur)
      setrlimit (RLIMIT_NOFILE, &nofile_limit);
  #endif
-@@ -8734,7 +8762,7 @@
+@@ -8734,7 +8762,7 @@ init_process_emacs (int sockfd)
    catch_child_signal ();
  #endif
  
@@ -2058,9 +3719,11 @@
    /* Don't allocate more than FD_SETSIZE file descriptors for Emacs itself.  */
    if (getrlimit (RLIMIT_NOFILE, &nofile_limit) != 0)
      nofile_limit.rlim_cur = 0;
+diff --git a/src/sysdep.c b/src/sysdep.c
+index 10269e4..9261978 100644
 --- a/src/sysdep.c
 +++ b/src/sysdep.c
-@@ -3017,7 +3017,7 @@
+@@ -3017,7 +3017,7 @@ cfsetspeed (struct termios *termios_p, speed_t vitesse)
  
  struct speed_struct
  {
@@ -2069,7 +3732,7 @@
    speed_t internal;
  };
  
-@@ -3135,7 +3135,7 @@
+@@ -3135,7 +3135,7 @@ static const struct speed_struct speeds[] =
  /* Convert a numerical speed (e.g., 9600) to a Bnnn constant (e.g.,
     B9600); see bug#49524.  */
  static speed_t
@@ -2078,7 +3741,7 @@
  {
    for (size_t i = 0; i < ARRAYELTS (speeds); i++)
      {
-@@ -3144,6 +3144,9 @@
+@@ -3144,6 +3144,9 @@ convert_speed (speed_t speed)
        else if (speed == speeds[i].value)
  	return speeds[i].internal;
      }

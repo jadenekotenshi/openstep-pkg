@@ -7,3 +7,5 @@ gawk
 gzip
 curl
 ncurses
+jpeg
+libpng
