@@ -155,6 +155,11 @@ typedef int ssize_t;
 #ifndef HAVE_WINT_T
 # define HAVE_WINT_T	1
 #endif
+/* Likewise pid_t, which is a macro for int here: the fallback typedef would read
+   "typedef signed int int". */
+#ifndef HAVE_PID_T
+# define HAVE_PID_T	1
+#endif
 /* <net/if.h> hides the interface flags unless _POSIX_SOURCE is undefined (the
    4.3BSD values). */
 #ifndef IFF_UP
