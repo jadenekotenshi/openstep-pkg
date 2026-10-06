@@ -1,6 +1,6 @@
 diff -ruN a/CPP/7zip/UI/Console/ConsoleClose.cpp b/CPP/7zip/UI/Console/ConsoleClose.cpp
---- a/CPP/7zip/UI/Console/ConsoleClose.cpp	2008-08-05 09:48:32.000000000 +0000
-+++ b/CPP/7zip/UI/Console/ConsoleClose.cpp	2026-10-06 04:01:52.244138534 +0000
+--- a/CPP/7zip/UI/Console/ConsoleClose.cpp	2026-10-06 04:22:58.307316846 +0000
++++ b/CPP/7zip/UI/Console/ConsoleClose.cpp	2026-10-06 04:22:58.349281158 +0000
 @@ -33,10 +33,10 @@
  CCtrlHandlerSetter::CCtrlHandlerSetter()
  {
@@ -14,9 +14,21 @@ diff -ruN a/CPP/7zip/UI/Console/ConsoleClose.cpp b/CPP/7zip/UI/Console/ConsoleCl
      throw "SetConsoleCtrlHandler fails (SIGTERM)";
  }
  
+diff -ruN a/CPP/Common/MyString.cpp b/CPP/Common/MyString.cpp
+--- a/CPP/Common/MyString.cpp	2026-10-06 04:22:58.312014064 +0000
++++ b/CPP/Common/MyString.cpp	2026-10-06 04:22:58.354712175 +0000
+@@ -1713,7 +1713,7 @@
+ 	return twoway_wcsstr(h, n);
+ }
+ 
+-#if defined(__DJGPP__)
++#if defined(__DJGPP__) || defined(ENV_OPENSTEP)
+ wchar_t *wcscpy(wchar_t * d, const wchar_t * s)
+ {
+ 	wchar_t *a = d;
 diff -ruN a/CPP/Common/MyString.h b/CPP/Common/MyString.h
---- a/CPP/Common/MyString.h	2016-02-17 18:39:30.000000000 +0000
-+++ b/CPP/Common/MyString.h	2026-10-06 04:01:52.244297684 +0000
+--- a/CPP/Common/MyString.h	2026-10-06 04:22:58.312399015 +0000
++++ b/CPP/Common/MyString.h	2026-10-06 04:22:58.353571398 +0000
 @@ -12,7 +12,7 @@
  #ifdef ENV_HAVE_WCTYPE_H
  #include <wctype.h>
@@ -27,8 +39,8 @@ diff -ruN a/CPP/Common/MyString.h b/CPP/Common/MyString.h
  wchar_t * wmemcpy(wchar_t *dest, const wchar_t *src, size_t num);
  wchar_t * wcsstr(const wchar_t *wcs1, const wchar_t *wcs2);
 diff -ruN a/CPP/myWindows/StdAfx.h b/CPP/myWindows/StdAfx.h
---- a/CPP/myWindows/StdAfx.h	2015-10-03 18:34:40.000000000 +0000
-+++ b/CPP/myWindows/StdAfx.h	2026-10-06 04:01:57.081040110 +0000
+--- a/CPP/myWindows/StdAfx.h	2026-10-06 04:22:58.310849924 +0000
++++ b/CPP/myWindows/StdAfx.h	2026-10-06 04:22:58.353151421 +0000
 @@ -29,8 +29,185 @@
  #include <stddef.h>
  #include <ctype.h>
@@ -216,8 +228,8 @@ diff -ruN a/CPP/myWindows/StdAfx.h b/CPP/myWindows/StdAfx.h
  #ifdef __NETWARE__
  #include <sys/types.h>
 diff -ruN a/CPP/myWindows/config.h b/CPP/myWindows/config.h
---- a/CPP/myWindows/config.h	2016-03-23 19:12:45.000000000 +0000
-+++ b/CPP/myWindows/config.h	2026-10-06 04:01:52.244579902 +0000
+--- a/CPP/myWindows/config.h	2026-10-06 04:22:58.311126846 +0000
++++ b/CPP/myWindows/config.h	2026-10-06 04:22:58.352925232 +0000
 @@ -5,7 +5,10 @@
    #define FILESYSTEM_IS_CASE_SENSITIVE 1
  #endif
@@ -241,7 +253,7 @@ diff -ruN a/CPP/myWindows/config.h b/CPP/myWindows/config.h
  
 diff -ruN a/makefile.openstep b/makefile.openstep
 --- a/makefile.openstep	1970-01-01 00:00:00.000000000 +0000
-+++ b/makefile.openstep	2026-10-06 04:01:52.244640322 +0000
++++ b/makefile.openstep	2026-10-06 04:22:58.356276210 +0000
 @@ -0,0 +1,23 @@
 +#
 +# makefile.machine for OPENSTEP (i386, sparc) with gcc-4.2, single-threaded.
@@ -268,7 +280,7 @@ diff -ruN a/makefile.openstep b/makefile.openstep
 +OBJ_AES=
 diff -ruN a/openstep/dirent.h b/openstep/dirent.h
 --- a/openstep/dirent.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/dirent.h	2026-10-06 04:01:52.244874692 +0000
++++ b/openstep/dirent.h	2026-10-06 04:22:58.366846514 +0000
 @@ -0,0 +1,13 @@
 +/* OPENSTEP's libc returns the BSD "struct direct" from readdir() (d_name at a
 +   different offset from SVID "struct dirent"), so use <sys/dir.h> and rename
@@ -285,7 +297,7 @@ diff -ruN a/openstep/dirent.h b/openstep/dirent.h
 +#endif
 diff -ruN a/openstep/pthread.h b/openstep/pthread.h
 --- a/openstep/pthread.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/pthread.h	2026-10-06 04:01:52.244904870 +0000
++++ b/openstep/pthread.h	2026-10-06 04:22:58.366861754 +0000
 @@ -0,0 +1,54 @@
 +/* Single-thread stand-in for <pthread.h> on OPENSTEP, which has none.
 +   p7zip is built with -D_7ZIP_ST, so no second thread ever exists: mutexes are
@@ -343,7 +355,7 @@ diff -ruN a/openstep/pthread.h b/openstep/pthread.h
 +#endif
 diff -ruN a/openstep/wchar.h b/openstep/wchar.h
 --- a/openstep/wchar.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/wchar.h	2026-10-06 04:01:52.244950627 +0000
++++ b/openstep/wchar.h	2026-10-06 04:22:58.366873628 +0000
 @@ -0,0 +1,8 @@
 +/* OPENSTEP has no <wchar.h>.  p7zip (ENV_OPENSTEP) supplies its own wcslen(),
 +   wcscmp(), wmemcpy() and friends, so this only has to exist; wchar_t itself
@@ -355,7 +367,7 @@ diff -ruN a/openstep/wchar.h b/openstep/wchar.h
 +#endif
 diff -ruN a/openstep/wctype.h b/openstep/wctype.h
 --- a/openstep/wctype.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/wctype.h	2026-10-06 04:01:52.244974964 +0000
++++ b/openstep/wctype.h	2026-10-06 04:22:58.366886478 +0000
 @@ -0,0 +1,5 @@
 +/* OPENSTEP has no <wctype.h>; p7zip (ENV_OPENSTEP) does not include it. */
 +#ifndef P7ZIP_OPENSTEP_WCTYPE_H
