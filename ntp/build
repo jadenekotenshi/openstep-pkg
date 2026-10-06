@@ -93,6 +93,54 @@ struct timespec {
 };
 /* libntp's realpath and work_fork code use ssize_t, which OPENSTEP lacks. */
 typedef int ssize_t;
+/* <sys/stat.h> hides the POSIX permission and file-type macros unless
+   _POSIX_SOURCE is defined (the standard BSD values). */
+#include <sys/stat.h>
+#ifndef S_IRUSR
+# define S_IRUSR	0000400
+# define S_IWUSR	0000200
+# define S_IXUSR	0000100
+#endif
+#ifndef S_IRWXU
+# define S_IRWXU	0000700
+#endif
+#ifndef S_IRGRP
+# define S_IRGRP	0000040
+# define S_IWGRP	0000020
+# define S_IXGRP	0000010
+#endif
+#ifndef S_IRWXG
+# define S_IRWXG	0000070
+#endif
+#ifndef S_IROTH
+# define S_IROTH	0000004
+# define S_IWOTH	0000002
+# define S_IXOTH	0000001
+#endif
+#ifndef S_IRWXO
+# define S_IRWXO	0000007
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m)	(((m) & 0170000) == 0040000)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m)	(((m) & 0170000) == 0100000)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m)	(((m) & 0170000) == 0120000)
+#endif
+#ifndef S_ISCHR
+# define S_ISCHR(m)	(((m) & 0170000) == 0020000)
+#endif
+#ifndef S_ISBLK
+# define S_ISBLK(m)	(((m) & 0170000) == 0060000)
+#endif
+#ifndef S_ISFIFO
+# define S_ISFIFO(m)	(((m) & 0170000) == 0010000)
+#endif
+#ifndef S_ISSOCK
+# define S_ISSOCK(m)	(((m) & 0170000) == 0140000)
+#endif
 #endif
 SEOF
 # ntp's copy of ISC expects an isc/ipv6.h to supply the IPv6 types on systems
