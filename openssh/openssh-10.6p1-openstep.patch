@@ -1,3 +1,29 @@
+diff -ruN a/channels.c b/channels.c
+--- a/channels.c	2026-10-06 08:45:31.000000000 +0000
++++ b/channels.c	2026-10-06 22:55:02.172700137 +0000
+@@ -515,19 +515,19 @@
+ 		 * with other programs that follow.
+ 		 */
+ 		if (rfd != -1 && !isatty(rfd) &&
+-		    (val = fcntl(rfd, F_GETFL)) != -1 && !(val & O_NONBLOCK)) {
++		    (val = fcntl(rfd, F_GETFL, 0)) != -1 && !(val & O_NONBLOCK)) {
+ 			c->restore_flags[0] = val;
+ 			c->restore_block |= CHANNEL_RESTORE_RFD;
+ 			set_nonblock(rfd);
+ 		}
+ 		if (wfd != -1 && !isatty(wfd) &&
+-		    (val = fcntl(wfd, F_GETFL)) != -1 && !(val & O_NONBLOCK)) {
++		    (val = fcntl(wfd, F_GETFL, 0)) != -1 && !(val & O_NONBLOCK)) {
+ 			c->restore_flags[1] = val;
+ 			c->restore_block |= CHANNEL_RESTORE_WFD;
+ 			set_nonblock(wfd);
+ 		}
+ 		if (efd != -1 && !isatty(efd) &&
+-		    (val = fcntl(efd, F_GETFL)) != -1 && !(val & O_NONBLOCK)) {
++		    (val = fcntl(efd, F_GETFL, 0)) != -1 && !(val & O_NONBLOCK)) {
+ 			c->restore_flags[2] = val;
+ 			c->restore_block |= CHANNEL_RESTORE_EFD;
+ 			set_nonblock(efd);
 diff -ruN a/defines.h b/defines.h
 --- a/defines.h	2026-10-06 08:45:31.000000000 +0000
 +++ b/defines.h	2026-10-06 21:59:56.600909935 +0000
@@ -396,6 +422,18 @@ diff -ruN a/openbsd-compat/bsd-misc.h b/openbsd-compat/bsd-misc.h
  # define fflush(x)	(_ssh_compat_fflush(x))
  #endif
  
+diff -ruN a/openbsd-compat/bsd-pselect.c b/openbsd-compat/bsd-pselect.c
+--- a/openbsd-compat/bsd-pselect.c	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/bsd-pselect.c	2026-10-06 22:55:02.171049691 +0000
+@@ -59,7 +59,7 @@
+ {
+ 	int val;
+ 
+-	if ((val = fcntl(fd, F_GETFL)) == -1 ||
++	if ((val = fcntl(fd, F_GETFL, 0)) == -1 ||
+ 	     fcntl(fd, F_SETFL, val|O_NONBLOCK) == -1)
+ 		error_f("fcntl: %s", strerror(errno));
+ }
 diff -ruN a/openbsd-compat/bsd-statvfs.c b/openbsd-compat/bsd-statvfs.c
 --- a/openbsd-compat/bsd-statvfs.c	2026-10-06 08:45:31.000000000 +0000
 +++ b/openbsd-compat/bsd-statvfs.c	2026-10-06 21:59:56.607600497 +0000
@@ -464,6 +502,17 @@ diff -ruN a/openbsd-compat/openbsd-compat.h b/openbsd-compat/openbsd-compat.h
  #ifndef HAVE_SETPROCTITLE
  void setproctitle(const char *fmt, ...);
  void compat_init_setproctitle(int argc, char *argv[]);
+diff -ruN a/openbsd-compat/sigact.h b/openbsd-compat/sigact.h
+--- a/openbsd-compat/sigact.h	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/sigact.h	2026-10-06 22:55:02.176398479 +0000
+@@ -84,6 +84,7 @@
+ int sigsuspend (sigset_t *mask);
+ int sigdelset (sigset_t *mask, int sig);
+ int sigaddset (sigset_t *mask, int sig);
++int sigismember (sigset_t *mask, int sig);
+ 
+ #endif /* !defined(HAVE_SIGACTION) && defined(HAVE_SIGVEC) */
+ 
 diff -ruN a/readconf.c b/readconf.c
 --- a/readconf.c	2026-10-06 08:45:31.000000000 +0000
 +++ b/readconf.c	2026-10-06 21:59:56.604640832 +0000
@@ -492,7 +541,7 @@ diff -ruN a/servconf.c b/servconf.c
  #endif
 diff -ruN a/ssh-agent.c b/ssh-agent.c
 --- a/ssh-agent.c	2026-10-06 08:45:31.000000000 +0000
-+++ b/ssh-agent.c	2026-10-06 22:00:01.520614255 +0000
++++ b/ssh-agent.c	2026-10-06 22:55:02.171740235 +0000
 @@ -2267,6 +2267,7 @@
  #ifdef HAVE_SETRLIMIT
  	struct rlimit rlim;
@@ -529,6 +578,15 @@ diff -ruN a/ssh-agent.c b/ssh-agent.c
  
  	parent_pid = getpid();
  
+@@ -2462,7 +2469,7 @@
+ 			fatal("unexpected LISTEN_FDS contents "
+ 			    "(want: \"1\" got\"%s\"", fdstr);
+ 		}
+-		if (fcntl(3, F_GETFL) == -1)
++		if (fcntl(3, F_GETFL, 0) == -1)
+ 			fatal("LISTEN_FDS set but fd 3 unavailable");
+ 		pid = (int)strtonum(pidstr, 1, INT_MAX, &errstr);
+ 		if (errstr != NULL)
 diff -ruN a/uidswap.c b/uidswap.c
 --- a/uidswap.c	2026-10-06 08:45:31.000000000 +0000
 +++ b/uidswap.c	2026-10-06 21:59:56.608749383 +0000
