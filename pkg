@@ -91,6 +91,154 @@ load_config() {
     export PKG_CONF_FILE HAVE_X11
 }
 
+# A package's optional `requires` file names the pkg.conf options it needs:
+#   HAVE_X11     required; build and install are refused when it is not 1
+#   ?HAVE_X11    optional; the build script enables extra features when it is 1
+# Comments (#) and blank lines are allowed.
+option_value() {
+    case $1 in
+        HAVE_X11)
+            echo "$HAVE_X11"
+        ;;
+        *)
+            return 1
+        ;;
+    esac
+}
+
+# Print "required" or "optional" lines for each entry in DIR/requires, as
+# "<kind> <option>"; dies on an unknown option.
+read_requires() {
+    rr_file=$1/requires
+    rr_pkg=$2
+
+    [ -f "$rr_file" ] || return 0
+
+    while read rr_entry rr_extra || [ -n "$rr_entry" ]; do
+        case $rr_entry in
+            ''|\#*)
+                continue
+            ;;
+            \?*)
+                rr_kind=optional
+                rr_opt=`echo "$rr_entry" | sed 's/^?//'`
+            ;;
+            *)
+                rr_kind=required
+                rr_opt=$rr_entry
+            ;;
+        esac
+
+        option_value "$rr_opt" > /dev/null ||
+            die "unknown option in $rr_pkg requires: $rr_entry"
+        echo "$rr_kind $rr_opt"
+    done < "$rr_file"
+}
+
+# Check the requires files of a package and everything it would pull in via
+# depends, before anything is built.  Dependencies that are already installed
+# are skipped.
+check_requires_tree() {
+    rq_top=$1
+    rq_root=`path_parent "$rq_top"`
+    rq_todo=$rq_top
+    rq_seen=:
+    rq_bad=
+
+    while [ -n "$rq_todo" ]; do
+        set -- $rq_todo
+        rq_cur=$1
+        shift
+        rq_todo="$*"
+
+        rq_name=`path_leaf "$rq_cur"`
+        case $rq_seen in
+            *:$rq_name:*)
+                continue
+            ;;
+        esac
+        rq_seen=$rq_seen$rq_name:
+
+        rq_list=`read_requires "$rq_cur" "$rq_name"` || exit 1
+        while read rq_kind rq_opt; do
+            [ "x$rq_kind" = xrequired ] || continue
+            rq_val=`option_value "$rq_opt"`
+            if [ "x$rq_val" != x1 ]; then
+                rq_bad="$rq_bad
+  $rq_name needs $rq_opt=1"
+            fi
+        done <<EOF
+$rq_list
+EOF
+
+        [ -f "$rq_cur/depends" ] || continue
+
+        while read rq_dep rq_extra || [ -n "$rq_dep" ]; do
+            case $rq_dep in
+                ''|\#*|!*)
+                    continue
+                ;;
+            esac
+            [ -d "$DB_ROOT/installed/$rq_dep" ] && continue
+            for rq_cand in "$rq_root/$rq_dep" "$rq_dep"
+            do
+                if [ -d "$rq_cand" ]; then
+                    rq_todo="$rq_todo $rq_cand"
+                    break
+                fi
+            done
+        done < "$rq_cur/depends"
+    done
+
+    if [ -n "$rq_bad" ]; then
+        die "cannot build $PKG_NAME with the current configuration ($PKG_CONF_FILE):$rq_bad"
+    fi
+}
+
+# Tell the person which optional features this build will use.
+log_optional_features() {
+    rq_list=`read_requires "$PKG_DIR" "$PKG_NAME"` || exit 1
+    while read rq_kind rq_opt; do
+        [ "x$rq_kind" = xoptional ] || continue
+        rq_val=`option_value "$rq_opt"`
+        if [ "x$rq_val" = x1 ]; then
+            log "optional feature $rq_opt: enabled"
+        else
+            log "optional feature $rq_opt: disabled"
+        fi
+    done <<EOF
+$rq_list
+EOF
+}
+
+# Record the optional options this build saw, so a later change to pkg.conf can
+# be noticed ("built without HAVE_X11; reinstall to enable").
+write_features() {
+    rq_list=`read_requires "$PKG_DIR" "$PKG_NAME"` || exit 1
+    rm -f "$INST_DIR/features"
+    while read rq_kind rq_opt; do
+        [ "x$rq_kind" = xoptional ] || continue
+        rq_val=`option_value "$rq_opt"`
+        echo "$rq_opt=$rq_val" >> "$INST_DIR/features"
+    done <<EOF
+$rq_list
+EOF
+}
+
+# Print the optional options whose value now differs from the recorded build.
+stale_features() {
+    sf_dir=$1
+    [ -f "$sf_dir/features" ] || return 0
+    while read sf_line; do
+        sf_opt=`echo "$sf_line" | sed 's/=.*//'`
+        sf_old=`echo "$sf_line" | sed 's/.*=//'`
+        sf_now=`option_value "$sf_opt"` || continue
+        if [ "x$sf_now" != "x$sf_old" ]; then
+            echo "$sf_opt (built with $sf_old, now $sf_now)"
+        fi
+    done < "$sf_dir/features"
+}
+
 usage() {
     cat <<'EOF'
 usage:
@@ -125,6 +273,7 @@ package layout:
   build         required build script
   version       required, contains version
   depends       optional, one package name per line
+  requires      optional, pkg.conf options: HAVE_X11 (needed) or ?HAVE_X11 (extra features)
   sources       optional, one source per line
   post-install  optional shell hook
   pre-remove    optional shell hook
@@ -531,6 +680,7 @@ run_build() {
     prepare_build_root
 
     log "building $PKG_NAME $PKG_VERSION"
+    log_optional_features
     log "build directory $BUILD_CWD"
     log "image directory $IMAGE_DIR"
     log "build shell $build_shell"
@@ -763,6 +913,7 @@ write_manifest() {
     ) > "$INST_DIR/manifest"
 
     echo "$PKG_VERSION" > "$INST_DIR/version"
+    write_features
 
     for hook in pre-remove post-install test; do
         if [ -f "$PKG_DIR/$hook" ]; then
@@ -850,6 +1001,10 @@ install_pkg() {
         ;;
     esac
 
+    if [ -z "$PKG_INSTALL_STACK" ]; then
+        check_requires_tree "$PKG_DIR"
+    fi
+
     PKG_INSTALL_STACK=$PKG_INSTALL_STACK:$PKG_NAME
     export PKG_INSTALL_STACK
 
@@ -859,6 +1014,11 @@ install_pkg() {
 
     if installed_same_version; then
         log "already installed: $PKG_NAME $PKG_VERSION"
+        stale=`stale_features "$INST_DIR"`
+        if [ -n "$stale" ]; then
+            log "note: $PKG_NAME was built with different options: $stale"
+            log "      remove and reinstall it to pick up the current configuration"
+        fi
         restore_install_context
         return 0
     fi
@@ -973,7 +1133,12 @@ list_pkgs() {
         [ -d "$dir" ] || continue
         name=`path_leaf "$dir"`
         read version extra < "$dir/version" || version=unknown
-        echo "$name $version"
+        stale=`stale_features "$dir"`
+        if [ -n "$stale" ]; then
+            echo "$name $version  [rebuild to apply: $stale]"
+        else
+            echo "$name $version"
+        fi
     done
 }
 
@@ -1050,6 +1215,7 @@ case $ACTION in
     build)
         [ "$ARGC" -eq 2 ] || die "build requires <package-dir>"
         load_pkg "$ARG2"
+        check_requires_tree "$PKG_DIR"
         run_build
     ;;
 

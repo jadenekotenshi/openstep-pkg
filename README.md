@@ -29,6 +29,36 @@ adapt to them.
 
 An environment variable of the same name sets the default, and the file overrides it.
 
+### Declaring what a package needs
+
+A package may have an optional `requires` file listing the options it cares about, one per
+line (`#` comments and blank lines are allowed):
+
+```
+HAVE_X11      # required: refuse to build or install without it
+?HAVE_X11     # optional: build extra features when it is 1
+```
+
+* **Required** (`HAVE_X11`): `pkg build` and `pkg install` check the package and every
+  not-yet-installed dependency up front and stop, before anything is built, with a message
+  such as `cannot build xclock ...: libfoo needs HAVE_X11=1`.
+* **Optional** (`?HAVE_X11`): nothing is refused.  `pkg` logs whether the feature is enabled,
+  and the `build` script tests `$HAVE_X11` to add or omit the X11 configure options.  The value
+  used is recorded in the package database; if `pkg.conf` changes later, `pkg list` shows
+  `[rebuild to apply: HAVE_X11 (built with 0, now 1)]` and `pkg install` prints a note.  Remove
+  and reinstall the package to pick up the change.
+* An option name `pkg` does not know is an error, so typos are caught.
+
+A `build` script typically does:
+
+```sh
+if [ "$HAVE_X11" = 1 ]; then
+    X11_OPTS="--with-x --x-includes=/usr/X11R6/include --x-libraries=/usr/X11R6/lib"
+else
+    X11_OPTS=--without-x
+fi
+```
+
 ## Architecture
 
 `pkg` detects the machine with `arch(1)` (`i386`, `sparc`, `m68k` or `hppa`; i386 if
