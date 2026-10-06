@@ -13,6 +13,27 @@ export PATH CC CFLAGS CONFIG_SHELL GREP EGREP AWK
 if test -d "neXtaw-$VERSION"; then cd "neXtaw-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 
+# Misc.h has been missing from the build tree.  Compare the tree against the
+# tarball's file list at two points (right after extraction and after
+# configure), say which files are absent, and restore them, so the log shows
+# where one disappears.
+nx_tarball=`dirname "$PKG_BUILD_HELPERS"`/neXtaw/neXtaw-$VERSION.tar.gz
+check_tree() {
+    nx_missing=0
+    (cd ..; gnutar -tzf "$nx_tarball") > ../nx-files.list
+    while read nx_f; do
+        case $nx_f in
+            */) continue ;;
+        esac
+        if test ! -f "../$nx_f"; then
+            echo "neXtaw: $1: missing $nx_f; restoring it from the tarball"
+            (cd ..; gnutar -xzf "$nx_tarball" "$nx_f")
+        fi
+    done < ../nx-files.list
+    /bin/rm -f ../nx-files.list
+}
+check_tree "after extraction"
+
 # neXtaw needs the X11 development files (Xt, Xmu, Xext, X11 headers and
 # libraries).  X11_PREFIX in pkg.conf says where they live (default
 # /usr/X11R6, where CubXWindow installs).
@@ -50,6 +71,7 @@ touch X11/neXtaw/laygram.c X11/neXtaw/laygram.h X11/neXtaw/laylex.c
 run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
     --disable-shared --disable-dependency-tracking --x-includes="$x11_prefix/include" \
     --x-libraries="$x11_prefix/lib"
+check_tree "after configure"
 /bin/gnumake SHELL="$CONFIG_SHELL"
 /bin/gnumake install SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR"
 
