@@ -210,11 +210,46 @@ sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 }
 SIGEOF
 $CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
+
+# The build also makes a helper program, gethost, from gethost.c alone: it links
+# against nothing but libc, yet calls tcsh's renamed allocator (tcsh_calloc,
+# tcsh_free) and snprintf().  Give it a small object defining them.
+/bin/cat > openstep_gethost.c <<'SIGEOF'
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+void *tcsh_malloc(size_t n) { return malloc(n); }
+void *tcsh_calloc(size_t n, size_t m) { return calloc(n, m); }
+void *tcsh_realloc(void *p, size_t n) { return realloc(p, n); }
+void tcsh_free(void *p) { free(p); }
+
+int
+snprintf(char *buf, size_t size, const char *fmt, ...)
+{
+    static char tmp[8192];
+    va_list ap;
+    int n;
+
+    va_start(ap, fmt);
+    n = vsprintf(tmp, fmt, ap);
+    va_end(ap);
+    if (n >= 0 && size > 0) {
+	size_t m = ((size_t)n < size - 1) ? (size_t)n : size - 1;
+	memcpy(buf, tmp, m);
+	buf[m] = 0;
+    }
+    return n;
+}
+SIGEOF
+$CC $CFLAGS -c openstep_gethost.c -o openstep_gethost.o
+GETHOST_OBJ=`pwd`/openstep_gethost.o
 CPPFLAGS="$CPPFLAGS -include $sig_h"
 LIBS="`pwd`/openstep_sig.o $LIBS"
 export CPPFLAGS LIBS
 run_configure --prefix=/usr/local --build=$PKG_TARGET --host=$PKG_TARGET \
     --disable-nls --disable-nls-catalogs --disable-rpath
-/bin/gnumake
+/bin/gnumake LDFLAGS_FOR_BUILD="$LDFLAGS $GETHOST_OBJ"
 /usr/local/bin/mkdir -p "$DESTDIR/usr/local/bin" "$DESTDIR/usr/local/man/man1"
 /bin/gnumake install DESTDIR="$DESTDIR"
