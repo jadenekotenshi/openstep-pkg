@@ -86,7 +86,7 @@ has not been attempted.
 | top | validated | validated |
 | unzip | validated | validated |
 | utf8proc | validated | — |
-| vim | validated | — |
+| vim | validated | validated |
 | wget | validated | validated |
 | xxhash | validated | fix pushed (manual build); no result recorded |
 | xz | being tested | — |
