@@ -5,13 +5,21 @@ set -e
 DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
-CC="/bin/cc $PKG_SYSCC_ARCH_FLAGS"
+# OpenSSH 8.x and later insist on C99 (variadic macros), which the system cc
+# (gcc 2.x) lacks, so build with gcc 4.2.  On SPARC gcc 4.2 miscompiles at -O2
+# and above, so stay unoptimised there; PKG_SSH_OPT overrides.
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+case $PKG_ARCH in
+    sparc) ssh_opt=-O0 ;;
+    *)     ssh_opt=-O2 ;;
+esac
+CFLAGS="${PKG_SSH_OPT-$ssh_opt}"
 AWK=/usr/local/bin/gawk
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 PATCHFILE="openssh-$VERSION-openstep.patch"
 
-export DESTDIR VERSION PATH CC AWK CPPFLAGS LDFLAGS
+export DESTDIR VERSION PATH CC CFLAGS AWK CPPFLAGS LDFLAGS
 . "$PKG_BUILD_HELPERS"
 
 patch -p1 < "$PATCHFILE"
