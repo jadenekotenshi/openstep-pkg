@@ -1,4 +1,4 @@
-OpenSSH 7.9p1 for OPENSTEP
+OpenSSH 10.6p1 for OPENSTEP
 
 This package installs the OpenSSH binaries and config files, but it does
 not create host keys or the privilege-separation account automatically.

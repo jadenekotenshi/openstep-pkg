@@ -1,18 +1,17 @@
-diff --git a/defines.h b/defines.h
-index 8f42130..334f282 100644
---- a/defines.h
-+++ b/defines.h
-@@ -56,7 +56,9 @@ enum
+diff -ruN a/defines.h b/defines.h
+--- a/defines.h	2026-10-06 08:45:31.000000000 +0000
++++ b/defines.h	2026-10-06 21:59:56.600909935 +0000
+@@ -55,7 +55,9 @@
+ /*
   * Definitions for IP type of service (ip_tos)
   */
- #include <netinet/in_systm.h>
 +#ifndef HAVE_NEXT
  #include <netinet/ip.h>
 +#endif
  #ifndef IPTOS_LOWDELAY
  # define IPTOS_LOWDELAY          0x10
  # define IPTOS_THROUGHPUT        0x08
-@@ -115,6 +117,10 @@ enum
+@@ -127,6 +129,10 @@
  # endif /* PATH_MAX */
  #endif /* MAXPATHLEN */
  
@@ -23,7 +22,7 @@ index 8f42130..334f282 100644
  #ifndef HOST_NAME_MAX
  # include "netdb.h" /* for MAXHOSTNAMELEN */
  # if defined(_POSIX_HOST_NAME_MAX)
-@@ -126,6 +132,30 @@ enum
+@@ -138,6 +144,30 @@
  # endif
  #endif /* HOST_NAME_MAX */
  
@@ -54,7 +53,7 @@ index 8f42130..334f282 100644
  #if defined(HAVE_DECL_MAXSYMLINKS) && HAVE_DECL_MAXSYMLINKS == 0
  # define MAXSYMLINKS 5
  #endif
-@@ -266,7 +296,7 @@ typedef unsigned long long int u_int64_t;
+@@ -295,7 +325,7 @@
  # endif
  #endif
  
@@ -63,7 +62,7 @@ index 8f42130..334f282 100644
  typedef u_int8_t uint8_t;
  typedef u_int16_t uint16_t;
  typedef u_int32_t uint32_t;
-@@ -367,7 +397,7 @@ struct	sockaddr_un {
+@@ -403,7 +433,7 @@
  };
  #endif /* HAVE_SYS_UN_H */
  
@@ -72,7 +71,7 @@ index 8f42130..334f282 100644
  typedef u_int32_t	in_addr_t;
  #endif
  #ifndef HAVE_IN_PORT_T
-@@ -506,13 +536,23 @@ struct winsize {
+@@ -582,13 +612,23 @@
  # define __P(x) x
  #endif
  
@@ -97,7 +96,7 @@ index 8f42130..334f282 100644
  # define __attribute__(x)
  #endif /* !defined(__GNUC__) || (__GNUC__ < 2) */
  
-@@ -635,7 +675,7 @@ struct winsize {
+@@ -762,7 +802,7 @@
  # define memmove(s1, s2, n) bcopy((s2), (s1), (n))
  #endif /* !defined(HAVE_MEMMOVE) && defined(HAVE_BCOPY) */
  
@@ -106,11 +105,10 @@ index 8f42130..334f282 100644
  # include <unistd.h>
  # define getpgrp() getpgrp(0)
  #endif
-diff --git a/includes.h b/includes.h
-index 0fd7179..a0e9d90 100644
---- a/includes.h
-+++ b/includes.h
-@@ -110,7 +110,9 @@
+diff -ruN a/includes.h b/includes.h
+--- a/includes.h	2026-10-06 08:45:31.000000000 +0000
++++ b/includes.h	2026-10-06 21:59:25.895760752 +0000
+@@ -115,7 +115,9 @@
  #endif
  
  #include <netinet/in.h>
@@ -120,7 +118,7 @@ index 0fd7179..a0e9d90 100644
  #ifdef HAVE_RPC_TYPES_H
  # include <rpc/types.h> /* For INADDR_LOOPBACK */
  #endif
-@@ -166,6 +168,9 @@
+@@ -171,6 +173,9 @@
  
  #ifdef WITH_OPENSSL
  #include <openssl/opensslv.h> /* For OPENSSL_VERSION_NUMBER */
@@ -130,11 +128,10 @@ index 0fd7179..a0e9d90 100644
  #endif
  
  #include "defines.h"
-diff --git a/loginrec.c b/loginrec.c
-index 9a427de..1885fa9 100644
---- a/loginrec.c
-+++ b/loginrec.c
-@@ -458,10 +458,10 @@ login_write(struct logininfo *li)
+diff -ruN a/loginrec.c b/loginrec.c
+--- a/loginrec.c	2026-10-06 08:45:31.000000000 +0000
++++ b/loginrec.c	2026-10-06 21:59:25.895866320 +0000
+@@ -441,10 +441,10 @@
  #ifdef USE_WTMP
  	wtmp_write_entry(li);
  #endif
@@ -146,8 +143,8 @@ index 9a427de..1885fa9 100644
 +#if defined(USE_WTMPX) && defined(HAVE_UTMPX_H)
  	wtmpx_write_entry(li);
  #endif
- #ifdef CUSTOM_SYS_AUTH_RECORD_LOGIN
-@@ -491,10 +491,10 @@ login_utmp_only(struct logininfo *li)
+ #ifdef USE_WTMPDB
+@@ -477,10 +477,10 @@
  # ifdef USE_WTMP
  	wtmp_write_entry(li);
  # endif
@@ -160,7 +157,7 @@ index 9a427de..1885fa9 100644
  	wtmpx_write_entry(li);
  # endif
  	return (0);
-@@ -513,7 +513,7 @@ getlast_entry(struct logininfo *li)
+@@ -499,7 +499,7 @@
  #ifdef USE_LASTLOG
  	return(lastlog_get_entry(li));
  #else /* !USE_LASTLOG */
@@ -169,7 +166,7 @@ index 9a427de..1885fa9 100644
      defined(UTXDB_LASTLOGIN) && defined(HAVE_GETUTXUSER)
  	return (utmpx_get_entry(li));
  #endif
-@@ -526,7 +526,7 @@ getlast_entry(struct logininfo *li)
+@@ -512,7 +512,7 @@
      (defined(HAVE_TIME_IN_UTMP) || defined(HAVE_TV_IN_UTMP))
  	/* retrieve last login time from utmp */
  	return (wtmp_get_entry(li));
@@ -178,7 +175,7 @@ index 9a427de..1885fa9 100644
      (defined(HAVE_TIME_IN_UTMPX) || defined(HAVE_TV_IN_UTMPX))
  	/* If wtmp isn't available, try wtmpx */
  	return (wtmpx_get_entry(li));
-@@ -722,7 +722,7 @@ construct_utmp(struct logininfo *li,
+@@ -714,7 +714,7 @@
   ** variations.
   **/
  
@@ -187,8 +184,8 @@ index 9a427de..1885fa9 100644
  /* build the utmpx structure */
  void
  set_utmpx_time(struct logininfo *li, struct utmpx *utx)
-@@ -799,7 +799,7 @@ construct_utmpx(struct logininfo *li, struct utmpx *utx)
- 	utx->ut_syslen = MIN(strlen(li->hostname), sizeof(utx->ut_host));
+@@ -794,7 +794,7 @@
+ 	utx->ut_syslen = MINIMUM(strlen(li->hostname), sizeof(utx->ut_host));
  # endif
  }
 -#endif /* USE_UTMPX || USE_WTMPX */
@@ -196,16 +193,16 @@ index 9a427de..1885fa9 100644
  
  /**
   ** Low-level utmp functions
-@@ -981,7 +981,7 @@ utmp_write_entry(struct logininfo *li)
+@@ -976,7 +976,7 @@
   **/
  
  /* not much point if we don't want utmpx entries */
 -#ifdef USE_UTMPX
 +#if defined(USE_UTMPX) && defined(HAVE_UTMPX_H)
  
- /* if we have the wherewithall, use pututxline etc. */
+ /* if we have the wherewithal, use pututxline etc. */
  # if !defined(DISABLE_PUTUTXLINE) && defined(HAVE_SETUTXENT) && \
-@@ -1070,7 +1070,7 @@ utmpx_write_entry(struct logininfo *li)
+@@ -1065,7 +1065,7 @@
  		return (0);
  	}
  }
@@ -214,7 +211,7 @@ index 9a427de..1885fa9 100644
  
  
  /**
-@@ -1249,7 +1249,7 @@ wtmp_get_entry(struct logininfo *li)
+@@ -1244,7 +1244,7 @@
   ** Low-level wtmpx functions
   **/
  
@@ -223,16 +220,16 @@ index 9a427de..1885fa9 100644
  /*
   * Write a wtmpx entry direct to the end of the file
   * This is a slight modification of code in OpenBSD's logwtmp.c
-@@ -1401,7 +1401,7 @@ wtmpx_get_entry(struct logininfo *li)
+@@ -1396,7 +1396,7 @@
  	close(fd);
  	return (1);
  }
 -#endif /* USE_WTMPX */
 +#endif /* USE_WTMPX && HAVE_UTMPX_H */
  
- /**
-  ** Low-level libutil login() functions
-@@ -1618,7 +1618,7 @@ lastlog_get_entry(struct logininfo *li)
+ #ifdef USE_WTMPDB
+ static int
+@@ -1671,7 +1671,7 @@
  #endif /* HAVE_GETLASTLOGXBYNAME */
  #endif /* USE_LASTLOG */
  
@@ -241,7 +238,7 @@ index 9a427de..1885fa9 100644
      defined(UTXDB_LASTLOGIN) && defined(HAVE_GETUTXUSER)
  int
  utmpx_get_entry(struct logininfo *li)
-@@ -1642,7 +1642,7 @@ utmpx_get_entry(struct logininfo *li)
+@@ -1695,7 +1695,7 @@
  	endutxent();
  	return (1);
  }
@@ -249,40 +246,39 @@ index 9a427de..1885fa9 100644
 +#endif /* HAVE_UTMPX_H && USE_UTMPX && HAVE_SETUTXDB && UTXDB_LASTLOGIN && HAVE_GETUTXUSER */
  
  #ifdef USE_BTMP
-   /*
-diff --git a/misc.c b/misc.c
-index bdc06fd..4ac627f 100644
---- a/misc.c
-+++ b/misc.c
-@@ -47,7 +47,9 @@
+ /*
+diff -ruN a/misc.c b/misc.c
+--- a/misc.c	2026-10-06 08:45:31.000000000 +0000
++++ b/misc.c	2026-10-06 21:59:56.608179036 +0000
+@@ -43,7 +43,9 @@
  #include <unistd.h>
  
  #include <netinet/in.h>
 +#ifndef HAVE_NEXT
- #include <netinet/in_systm.h>
-+#endif
  #include <netinet/ip.h>
++#endif
  #include <netinet/tcp.h>
  #include <arpa/inet.h>
-@@ -94,7 +96,7 @@ set_nonblock(int fd)
+ 
+@@ -154,7 +156,7 @@
  {
  	int val;
  
 -	val = fcntl(fd, F_GETFL);
 +	val = fcntl(fd, F_GETFL, 0);
- 	if (val < 0) {
+ 	if (val == -1) {
  		error("fcntl(%d, F_GETFL): %s", fd, strerror(errno));
  		return (-1);
-@@ -118,7 +120,7 @@ unset_nonblock(int fd)
+@@ -178,7 +180,7 @@
  {
  	int val;
  
 -	val = fcntl(fd, F_GETFL);
 +	val = fcntl(fd, F_GETFL, 0);
- 	if (val < 0) {
+ 	if (val == -1) {
  		error("fcntl(%d, F_GETFL): %s", fd, strerror(errno));
  		return (-1);
-@@ -1118,7 +1120,7 @@ sanitise_stdfd(void)
+@@ -1616,7 +1618,7 @@
  	}
  	while (++dupfd <= STDERR_FILENO) {
  		/* Only populate closed fds. */
@@ -291,8 +287,8 @@ index bdc06fd..4ac627f 100644
  			if (dup2(nullfd, dupfd) == -1) {
  				fprintf(stderr, "dup2: %s\n", strerror(errno));
  				exit(1);
-@@ -2034,6 +2036,19 @@ format_absolute_time(uint64_t t, char *buf, size_t len)
- 	time_t tt = t > INT_MAX ? INT_MAX : t; /* XXX revisit in 2038 :P */
+@@ -2621,10 +2623,24 @@
+ 	time_t tt = t > SSH_TIME_T_MAX ? SSH_TIME_T_MAX : t;
  	struct tm tm;
  
 +#ifdef HAVE_NEXT
@@ -306,15 +302,19 @@ index bdc06fd..4ac627f 100644
 +			tm = *tmp;
 +		}
 +	}
++	strftime(buf, len, "%Y-%m-%dT%H:%M:%S", &tm);
 +#else
- 	localtime_r(&tt, &tm);
+ 	if (localtime_r(&tt, &tm) == NULL)
+ 		strlcpy(buf, "UNKNOWN-TIME", len);
+ 	else
+ 		strftime(buf, len, "%Y-%m-%dT%H:%M:%S", &tm);
 +#endif
- 	strftime(buf, len, "%Y-%m-%dT%H:%M:%S", &tm);
  }
-diff --git a/openbsd-compat/bsd-misc.c b/openbsd-compat/bsd-misc.c
-index 5d7540a..9e712e6 100644
---- a/openbsd-compat/bsd-misc.c
-+++ b/openbsd-compat/bsd-misc.c
+ 
+ /*
+diff -ruN a/openbsd-compat/bsd-misc.c b/openbsd-compat/bsd-misc.c
+--- a/openbsd-compat/bsd-misc.c	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/bsd-misc.c	2026-10-06 21:59:25.896879007 +0000
 @@ -32,10 +32,18 @@
  #include <time.h>
  #include <unistd.h>
@@ -334,7 +334,7 @@ index 5d7540a..9e712e6 100644
  /*
   * NB. duplicate __progname in case it is an alias for argv[0]
   * Otherwise it may get clobbered by setproctitle()
-@@ -239,7 +247,9 @@ isblank(int c)
+@@ -390,7 +398,9 @@
  pid_t
  getpgid(pid_t pid)
  {
@@ -345,7 +345,7 @@ index 5d7540a..9e712e6 100644
  	return getpgrp(pid);
  #elif defined(HAVE_GETPGRP)
  	if (pid == 0)
-@@ -304,7 +314,11 @@ raise(int sig)
+@@ -463,7 +473,11 @@
  pid_t
  getsid(pid_t pid)
  {
@@ -357,11 +357,10 @@ index 5d7540a..9e712e6 100644
  	return -1;
  }
  #endif
-diff --git a/openbsd-compat/bsd-misc.h b/openbsd-compat/bsd-misc.h
-index 52ec528..69d7b1a 100644
---- a/openbsd-compat/bsd-misc.h
-+++ b/openbsd-compat/bsd-misc.h
-@@ -154,6 +154,7 @@ int flock(int, int);
+diff -ruN a/openbsd-compat/bsd-misc.h b/openbsd-compat/bsd-misc.h
+--- a/openbsd-compat/bsd-misc.h	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/bsd-misc.h	2026-10-06 21:59:25.896999044 +0000
+@@ -199,6 +199,7 @@
  #endif
  
  #ifdef FFLUSH_NULL_BUG
@@ -369,24 +368,22 @@ index 52ec528..69d7b1a 100644
  # define fflush(x)	(_ssh_compat_fflush(x))
  #endif
  
-diff --git a/openbsd-compat/bsd-statvfs.c b/openbsd-compat/bsd-statvfs.c
-index e3bd87d..dc5dd95 100644
---- a/openbsd-compat/bsd-statvfs.c
-+++ b/openbsd-compat/bsd-statvfs.c
-@@ -19,7 +19,7 @@
+diff -ruN a/openbsd-compat/bsd-statvfs.c b/openbsd-compat/bsd-statvfs.c
+--- a/openbsd-compat/bsd-statvfs.c	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/bsd-statvfs.c	2026-10-06 21:59:56.607600497 +0000
+@@ -18,7 +18,7 @@
+ 
  #if !defined(HAVE_STATVFS) || !defined(HAVE_FSTATVFS)
  
- #include <sys/param.h>
 -#ifdef HAVE_SYS_MOUNT_H
 +#if defined(HAVE_SYS_MOUNT_H) && !defined(HAVE_NEXT)
  # include <sys/mount.h>
  #endif
  
-diff --git a/openbsd-compat/explicit_bzero.c b/openbsd-compat/explicit_bzero.c
-index 6ef9825..8dd7a60 100644
---- a/openbsd-compat/explicit_bzero.c
-+++ b/openbsd-compat/explicit_bzero.c
-@@ -27,6 +27,18 @@ explicit_bzero(void *p, size_t n)
+diff -ruN a/openbsd-compat/explicit_bzero.c b/openbsd-compat/explicit_bzero.c
+--- a/openbsd-compat/explicit_bzero.c	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/explicit_bzero.c	2026-10-06 21:59:25.897191874 +0000
+@@ -35,6 +35,18 @@
  
  #else /* HAVE_MEMSET_S */
  
@@ -405,7 +402,7 @@ index 6ef9825..8dd7a60 100644
  /*
   * Indirect bzero through a volatile pointer to hopefully avoid
   * dead-store optimisation eliminating the call.
-@@ -52,6 +64,8 @@ explicit_bzero(void *p, size_t n)
+@@ -60,6 +72,8 @@
  	ssh_bzero(p, n);
  }
  
@@ -414,11 +411,10 @@ index 6ef9825..8dd7a60 100644
  #endif /* HAVE_MEMSET_S */
  
  #endif /* HAVE_EXPLICIT_BZERO */
-diff --git a/openbsd-compat/openbsd-compat.h b/openbsd-compat/openbsd-compat.h
-index f5c833b..028d03e 100644
---- a/openbsd-compat/openbsd-compat.h
-+++ b/openbsd-compat/openbsd-compat.h
-@@ -100,6 +100,10 @@ int rresvport_af(int *alport, sa_family_t af);
+diff -ruN a/openbsd-compat/openbsd-compat.h b/openbsd-compat/openbsd-compat.h
+--- a/openbsd-compat/openbsd-compat.h	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/openbsd-compat.h	2026-10-06 21:59:25.897230466 +0000
+@@ -119,6 +119,10 @@
  size_t strlcpy(char *dst, const char *src, size_t siz);
  #endif
  
@@ -429,7 +425,7 @@ index f5c833b..028d03e 100644
  #ifndef HAVE_STRLCAT
  size_t strlcat(char *dst, const char *src, size_t siz);
  #endif
-@@ -160,6 +164,10 @@ int inet_aton(const char *cp, struct in_addr *addr);
+@@ -190,6 +194,10 @@
  char *strsep(char **stringp, const char *delim);
  #endif
  
@@ -440,98 +436,75 @@ index f5c833b..028d03e 100644
  #ifndef HAVE_SETPROCTITLE
  void setproctitle(const char *fmt, ...);
  void compat_init_setproctitle(int argc, char *argv[]);
-diff --git a/readconf.c b/readconf.c
-index 4338115..9ebcf2b 100644
---- a/readconf.c
-+++ b/readconf.c
-@@ -21,7 +21,9 @@
- #include <sys/un.h>
+diff -ruN a/readconf.c b/readconf.c
+--- a/readconf.c	2026-10-06 08:45:31.000000000 +0000
++++ b/readconf.c	2026-10-06 21:59:56.604640832 +0000
+@@ -22,7 +22,9 @@
  
+ #include <net/if.h>
  #include <netinet/in.h>
 +#ifndef HAVE_NEXT
- #include <netinet/in_systm.h>
-+#endif
  #include <netinet/ip.h>
++#endif
  #include <arpa/inet.h>
  
-diff --git a/servconf.c b/servconf.c
-index 932d363..dda310a 100644
---- a/servconf.c
-+++ b/servconf.c
-@@ -20,7 +20,9 @@
+ #include <ctype.h>
+diff -ruN a/servconf.c b/servconf.c
+--- a/servconf.c	2026-10-06 08:45:31.000000000 +0000
++++ b/servconf.c	2026-10-06 21:59:56.606310583 +0000
+@@ -21,7 +21,9 @@
  #endif
  
  #include <netinet/in.h>
 +#ifndef HAVE_NEXT
- #include <netinet/in_systm.h>
-+#endif
  #include <netinet/ip.h>
++#endif
  #ifdef HAVE_NET_ROUTE_H
  #include <net/route.h>
-diff --git a/sftp-server.c b/sftp-server.c
-index ab1b063..0b4d10c 100644
---- a/sftp-server.c
-+++ b/sftp-server.c
-@@ -22,7 +22,7 @@
- #ifdef HAVE_SYS_TIME_H
- # include <sys/time.h>
  #endif
--#ifdef HAVE_SYS_MOUNT_H
-+#if defined(HAVE_SYS_MOUNT_H) && !defined(HAVE_NEXT)
- #include <sys/mount.h>
- #endif
- #ifdef HAVE_SYS_STATVFS_H
-diff --git a/ssh-agent.c b/ssh-agent.c
-index d8a8260..a906010 100644
---- a/ssh-agent.c
-+++ b/ssh-agent.c
-@@ -1071,6 +1071,7 @@ main(int ac, char **av)
+diff -ruN a/ssh-agent.c b/ssh-agent.c
+--- a/ssh-agent.c	2026-10-06 08:45:31.000000000 +0000
++++ b/ssh-agent.c	2026-10-06 22:00:01.520614255 +0000
+@@ -2267,6 +2267,7 @@
  #ifdef HAVE_SETRLIMIT
  	struct rlimit rlim;
  #endif
 +	long fdlim;
  	extern int optind;
  	extern char *optarg;
- 	pid_t pid;
-@@ -1092,8 +1093,15 @@ main(int ac, char **av)
- 
- 	platform_disable_tracing(0);	/* strict=no */
- 
-+#ifdef RLIMIT_NOFILE
+ 	size_t len;
+@@ -2295,6 +2296,12 @@
+ #ifdef RLIMIT_NOFILE
  	if (getrlimit(RLIMIT_NOFILE, &rlim) == -1)
  		fatal("%s: getrlimit: %s", __progname, strerror(errno));
++	fdlim = rlim.rlim_cur;
 +#else
 +	fdlim = SSH_SYSFDMAX;
 +	if (fdlim <= 0)
 +		fatal("%s: invalid file descriptor limit %ld",
 +		    __progname, fdlim);
-+#endif
+ #endif
  
- #ifdef WITH_OPENSSL
- 	OpenSSL_add_all_algorithms();
-@@ -1198,10 +1206,17 @@ main(int ac, char **av)
+ 	__progname = ssh_get_progname(av[0]);
+@@ -2447,10 +2454,10 @@
  	 * a few spare for libc / stack protectors / sanitisers, etc.
  	 */
  #define SSH_AGENT_MIN_FDS (3+1+1+1+4)
-+#ifdef RLIMIT_NOFILE
- 	if (rlim.rlim_cur < SSH_AGENT_MIN_FDS)
- 		fatal("%s: file descriptior rlimit %lld too low (minimum %u)",
- 		    __progname, (long long)rlim.rlim_cur, SSH_AGENT_MIN_FDS);
- 	maxfds = rlim.rlim_cur - SSH_AGENT_MIN_FDS;
-+#else
-+	if ((u_int)fdlim < SSH_AGENT_MIN_FDS)
-+		fatal("%s: file descriptor limit %ld too low (minimum %u)",
+-	if (rlim.rlim_cur < SSH_AGENT_MIN_FDS)
+-		fatal("%s: file descriptor rlimit %lld too low (minimum %u)",
+-		    __progname, (long long)rlim.rlim_cur, SSH_AGENT_MIN_FDS);
+-	maxfds = rlim.rlim_cur - SSH_AGENT_MIN_FDS;
++	if (fdlim < SSH_AGENT_MIN_FDS)
++		fatal("%s: file descriptor rlimit %ld too low (minimum %u)",
 +		    __progname, fdlim, SSH_AGENT_MIN_FDS);
 +	maxfds = (u_int)fdlim - SSH_AGENT_MIN_FDS;
-+#endif
  
  	parent_pid = getpid();
  
-diff --git a/uidswap.c b/uidswap.c
-index 49f76d8..085d79c 100644
---- a/uidswap.c
-+++ b/uidswap.c
-@@ -53,6 +53,37 @@ static uid_t	user_groups_uid;
+diff -ruN a/uidswap.c b/uidswap.c
+--- a/uidswap.c	2026-10-06 08:45:31.000000000 +0000
++++ b/uidswap.c	2026-10-06 21:59:56.608749383 +0000
+@@ -52,6 +52,37 @@
  static gid_t	*saved_egroups = NULL, *user_groups = NULL;
  static int	saved_egroupslen = -1, user_groupslen = -1;
  
@@ -569,17 +542,17 @@ index 49f76d8..085d79c 100644
  /*
   * Temporarily changes to the given uid.  If the effective user
   * id is not root, this does nothing.  This call cannot be nested.
-@@ -83,18 +114,7 @@ temporarily_use_uid(struct passwd *pw)
+@@ -82,18 +113,7 @@
  	privileged = 1;
  	temporarily_use_uid_effective = 1;
  
 -	saved_egroupslen = getgroups(0, NULL);
--	if (saved_egroupslen < 0)
+-	if (saved_egroupslen == -1)
 -		fatal("getgroups: %.100s", strerror(errno));
 -	if (saved_egroupslen > 0) {
 -		saved_egroups = xreallocarray(saved_egroups,
 -		    saved_egroupslen, sizeof(gid_t));
--		if (getgroups(saved_egroupslen, saved_egroups) < 0)
+-		if (getgroups(saved_egroupslen, saved_egroups) == -1)
 -			fatal("getgroups: %.100s", strerror(errno));
 -	} else { /* saved_egroupslen == 0 */
 -		free(saved_egroups);
@@ -589,17 +562,17 @@ index 49f76d8..085d79c 100644
  
  	/* set and save the user's groups */
  	if (user_groupslen == -1 || user_groups_uid != pw->pw_uid) {
-@@ -102,18 +122,7 @@ temporarily_use_uid(struct passwd *pw)
+@@ -101,18 +121,7 @@
  			fatal("initgroups: %s: %.100s", pw->pw_name,
  			    strerror(errno));
  
 -		user_groupslen = getgroups(0, NULL);
--		if (user_groupslen < 0)
+-		if (user_groupslen == -1)
 -			fatal("getgroups: %.100s", strerror(errno));
 -		if (user_groupslen > 0) {
 -			user_groups = xreallocarray(user_groups,
 -			    user_groupslen, sizeof(gid_t));
--			if (getgroups(user_groupslen, user_groups) < 0)
+-			if (getgroups(user_groupslen, user_groups) == -1)
 -				fatal("getgroups: %.100s", strerror(errno));
 -		} else { /* user_groupslen == 0 */
 -			free(user_groups);
