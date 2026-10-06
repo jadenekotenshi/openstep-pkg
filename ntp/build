@@ -64,6 +64,21 @@ SEOF
 #define PRIx64 "llx"
 #endif
 SEOF
+# OPENSTEP's <dirent.h> does not provide DIR, and its readdir() returns the BSD
+# "struct direct" (d_name at a different offset from SVID "struct dirent"), so
+# give ntp a <dirent.h> built on <sys/dir.h> that renames the type.
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#undef _POSIX_SOURCE
+#ifndef _NEXT_SOURCE
+# define _NEXT_SOURCE 1
+#endif
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
 # <time.h> only forward-declares struct timespec here, and ntp needs the real
 # thing (configure's "struct timespec" test fails for the same reason), so
 # define it in a header forced into every compile.

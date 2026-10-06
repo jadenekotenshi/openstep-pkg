@@ -90,7 +90,7 @@ has not been attempted.
 | vim | validated | validated |
 | wget | validated | validated |
 | xxhash | validated | fix pushed (manual build); no result recorded |
-| xz | being tested | — |
+| xz | being tested | validated |
 | zip | validated | — |
 | zlib | validated | validated |
 | zsh | validated | validated |
