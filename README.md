@@ -82,6 +82,32 @@ Optional:
 - `pre-remove`
 - `test`
 
+## Resuming a failed build
+
+A failed build leaves its tree in `<cache>/build/<package>`.  Set `PKG_RESUME=1`
+to carry on in that tree instead of extracting, patching and configuring again:
+
+```sh
+PKG_RESUME=1 pkg install sudo
+```
+
+The package's `build` script decides what can be skipped, using two helpers from
+`build-helpers.sh`:
+
+- `pkg_step NAME COMMAND [ARG...]` runs COMMAND and records NAME as done in the
+  build directory; on a resumed build a step already done is skipped.  List
+  steps to run again in `PKG_REDO`, e.g. `PKG_RESUME=1 PKG_REDO=configure pkg
+  install sudo`.  Steps are only recorded when they succeed.
+- `pkg_apply_patch PATCHFILE [STRIP]` applies a patch and keeps a copy; on a
+  resumed build an unchanged patch is skipped, and an edited one has the old
+  version reversed and the new one applied, so patches can be tweaked and the
+  same tree rebuilt (make then only recompiles what changed).
+
+Plain `make` steps are already incremental, so they need no wrapping.  Without
+`PKG_RESUME`, or with no build tree to resume, the build starts from scratch.
+Packages that do not use the helpers simply run all their steps again in the
+kept tree.  `sudo` is the first to use them.
+
 ## `version`
 
 Contains the package version as a single field.

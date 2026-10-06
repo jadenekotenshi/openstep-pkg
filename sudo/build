@@ -24,7 +24,7 @@ if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 
 # OPENSTEP's <signal.h> declares sigaction() and friends but libc lacks them;
 # sudo's sigvec(2) emulation is renamed so it cannot clash with the headers.
-patch -p1 < "sudo-$VERSION-openstep.patch"
+pkg_apply_patch "sudo-$VERSION-openstep.patch"
 
 # OPENSTEP's headers hide some POSIX types without feature macros.  Probe each
 # with the real compiler and flags, and typedef only the missing ones into a
@@ -85,22 +85,29 @@ export LIBS
 # backticks, so configure's library searches end up with -l"-lsocket".  This
 # system has no libsocket, libinet, libnsl or libresolv (the socket calls are
 # in libc), so the loops that search for them are emptied.
-/bin/sed -e 's/echo \\"\$\([A-Za-z_]*\)\\"|/echo $\1|/' \
-    -e 's/^\([ 	]*for _*libs in\) "-lsocket".*; do$/\1 ; do/' configure > configure.new
-/bin/mv configure.new configure
-/bin/chmod 755 configure
-
+# Rewriting configure and running it is one step: a resumed build (PKG_RESUME=1)
+# skips it unless PKG_REDO=configure, since touching configure would make the
+# Makefile re-run config.status and rebuild everything.
 # zlib comes from the zlib package (a dependency), always from /usr/local, so
 # I/O logging and sudoreplay never depend on whatever else is on the system.
-# No shared libraries or dlopen() here, so no noexec support; hardening
-# (-fstack-protector, PIE) needs runtime support this system lacks.
-# sudo defaults sysconfdir to /etc even with a prefix; keep everything under
-# /usr/local (sudoers is then /usr/local/etc/sudoers).
-run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
-    --build=$PKG_TARGET --host=$PKG_TARGET \
-    --disable-shared --with-noexec=no --disable-hardening --without-pam \
-    --without-sendmail --with-timedir=/usr/local/var/run/sudo \
-    --enable-zlib=/usr/local --with-iologdir=/usr/local/var/log/sudo-io
+sudo_configure() {
+    /bin/sed -e 's/echo \\"\$\([A-Za-z_]*\)\\"|/echo $\1|/' \
+        -e 's/^\([ 	]*for _*libs in\) "-lsocket".*; do$/\1 ; do/' configure > configure.new
+    /bin/mv configure.new configure
+    /bin/chmod 755 configure
+
+    # No shared libraries or dlopen() here, so no noexec support; hardening
+    # (-fstack-protector, PIE) needs runtime support this system lacks.
+    # sudo defaults sysconfdir to /etc even with a prefix; keep everything under
+    # /usr/local (sudoers is then /usr/local/etc/sudoers).
+    run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
+        --build=$PKG_TARGET --host=$PKG_TARGET \
+        --disable-shared --with-noexec=no --disable-hardening --without-pam \
+        --without-sendmail --with-timedir=/usr/local/var/run/sudo \
+        --enable-zlib=/usr/local --with-iologdir=/usr/local/var/log/sudo-io
+}
+pkg_step configure sudo_configure
+
 /bin/gnumake
 
 # Install owned by whoever is building (post-install makes it root's).

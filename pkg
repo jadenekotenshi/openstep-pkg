@@ -441,12 +441,26 @@ stage_source() {
 }
 
 prepare_build_root() {
-    log "preparing build root $BUILD_ROOT"
-    rm -rf "$BUILD_ROOT" "$IMAGE_DIR"
-    ensure_dir "$BUILD_ROOT"
+    # PKG_RESUME=1 keeps the build tree of an earlier, failed run (sources
+    # already extracted, patched and configured, objects already built) instead
+    # of starting over; the package's build script skips the steps it has
+    # already completed (see pkg_step and pkg_apply_patch in build-helpers.sh).
+    resume_build=
+    if [ -n "${PKG_RESUME-}" ] && [ -d "$BUILD_ROOT" ]; then
+        resume_build=1
+    fi
+
+    if [ -n "$resume_build" ]; then
+        log "resuming build in $BUILD_ROOT"
+        rm -rf "$IMAGE_DIR"
+    else
+        log "preparing build root $BUILD_ROOT"
+        rm -rf "$BUILD_ROOT" "$IMAGE_DIR"
+        ensure_dir "$BUILD_ROOT"
+    fi
     ensure_dir "$IMAGE_DIR"
 
-    if [ -f "$PKG_DIR/sources" ]; then
+    if [ -z "$resume_build" ] && [ -f "$PKG_DIR/sources" ]; then
         while read src dest || [ -n "$src" ]; do
             case $src in
                 ''|\#*)

@@ -39,3 +39,52 @@ pkg_arch_flags() {
         ;;
     esac
 }
+
+# pkg_step NAME COMMAND [ARG...]
+# Run COMMAND, then record NAME as done in the build directory.  With
+# PKG_RESUME set (pkg resumes the build tree of a failed run), a step that
+# already completed is skipped, unless it is listed in PKG_REDO:
+#   PKG_RESUME=1 pkg install sudo                      # pick up where it stopped
+#   PKG_RESUME=1 PKG_REDO=configure pkg install sudo   # ...but configure again
+pkg_step() {
+    pkg_step_name=$1
+    shift
+
+    if [ -n "${PKG_RESUME-}" ] && [ -f ".pkg-step-$pkg_step_name" ]; then
+        case " ${PKG_REDO-} " in
+            *" $pkg_step_name "*)
+                :
+            ;;
+            *)
+                echo "==> resuming: step $pkg_step_name already done, skipping"
+                return 0
+            ;;
+        esac
+    fi
+
+    "$@"
+    : > ".pkg-step-$pkg_step_name"
+}
+
+# pkg_apply_patch PATCHFILE [STRIP]
+# Apply PATCHFILE (default -p1) and keep a copy of what was applied.  When the
+# build is resumed and PATCHFILE has changed since, the old patch is reversed
+# first, so a patch can be edited and the same tree rebuilt incrementally.
+pkg_apply_patch() {
+    pkg_patch_file=$1
+    pkg_patch_strip=${2-1}
+    pkg_patch_copy=.pkg-patch-`basename "$pkg_patch_file"`
+
+    if [ -f "$pkg_patch_copy" ]; then
+        if cmp -s "$pkg_patch_copy" "$pkg_patch_file"; then
+            echo "==> resuming: $pkg_patch_file already applied, skipping"
+            return 0
+        fi
+        echo "==> resuming: $pkg_patch_file changed, reversing the old version"
+        patch -R -p$pkg_patch_strip < "$pkg_patch_copy"
+        /bin/rm -f "$pkg_patch_copy"
+    fi
+
+    patch -p$pkg_patch_strip < "$pkg_patch_file"
+    /bin/cp "$pkg_patch_file" "$pkg_patch_copy"
+}
