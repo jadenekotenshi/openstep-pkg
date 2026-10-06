@@ -18,7 +18,7 @@ rc=0
 # checks packet encoding and decoding end to end on this machine's byte order.
 WORK=/tmp/pkg-roboclient.$$
 mkdir "$WORK"
-trap 'rm -rf "$WORK"; kill $SRV 2>/dev/null; :' 0 1 2 3 15
+trap 'rm -rf "$WORK"; kill $SRV 2>/dev/null || :' 0 1 2 3 15
 LOG="$WORK/script.log"
 cat > "$WORK/script" <<SEOF
 echo "\$1 \$interface \$ip \$subnet \$broadcast \$router \$dns \$domain \$lease" >> "$LOG"
