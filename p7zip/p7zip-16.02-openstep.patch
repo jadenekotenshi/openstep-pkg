@@ -28,8 +28,8 @@ diff -ruN p7a/p7zip_16.02/CPP/Common/MyString.h p7b/p7zip_16.02/CPP/Common/MyStr
  wchar_t * wcsstr(const wchar_t *wcs1, const wchar_t *wcs2);
 diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/StdAfx.h
 --- a/CPP/myWindows/StdAfx.h	2015-10-03 18:34:40.000000000 +0000
-+++ b/CPP/myWindows/StdAfx.h	2026-10-06 02:47:54.803708508 +0000
-@@ -29,8 +29,47 @@
++++ b/CPP/myWindows/StdAfx.h	2026-10-06 03:09:04.827310844 +0000
+@@ -29,8 +29,168 @@
  #include <stddef.h>
  #include <ctype.h>
  #include <unistd.h>
@@ -73,6 +73,127 @@ diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/S
 +  return n;
 +}
 +#define snprintf openstep_snprintf
++
++/* File type and permission macros that OPENSTEP's <sys/stat.h> hides without
++   _POSIX_SOURCE (the standard BSD values). */
++#ifndef S_ISDIR
++# define S_ISDIR(m)	(((m) & 0170000) == 0040000)
++#endif
++#ifndef S_ISREG
++# define S_ISREG(m)	(((m) & 0170000) == 0100000)
++#endif
++#ifndef S_ISLNK
++# define S_ISLNK(m)	(((m) & 0170000) == 0120000)
++#endif
++#ifndef S_ISCHR
++# define S_ISCHR(m)	(((m) & 0170000) == 0020000)
++#endif
++#ifndef S_ISBLK
++# define S_ISBLK(m)	(((m) & 0170000) == 0060000)
++#endif
++#ifndef S_ISFIFO
++# define S_ISFIFO(m)	(((m) & 0170000) == 0010000)
++#endif
++#ifndef S_ISSOCK
++# define S_ISSOCK(m)	(((m) & 0170000) == 0140000)
++#endif
++#ifndef S_IRUSR
++# define S_IRUSR	0000400
++# define S_IWUSR	0000200
++# define S_IXUSR	0000100
++#endif
++#ifndef S_IRWXU
++# define S_IRWXU	0000700
++#endif
++#ifndef S_IRGRP
++# define S_IRGRP	0000040
++# define S_IWGRP	0000020
++# define S_IXGRP	0000010
++# define S_IRWXG	0000070
++#endif
++#ifndef S_IROTH
++# define S_IROTH	0000004
++# define S_IWOTH	0000002
++# define S_IXOTH	0000001
++# define S_IRWXO	0000007
++#endif
++
++/* No getcwd() in libc; the BSD getwd() does the job. */
++extern "C" char *getwd(char *);
++static inline char *openstep_getcwd(char *buf, size_t size)
++{
++  char path[2048];
++  size_t len;
++  if (buf != 0 && size == 0)
++  {
++    errno = EINVAL;
++    return 0;
++  }
++  if (getwd(path) == 0)
++  {
++    errno = EACCES;
++    return 0;
++  }
++  len = strlen(path) + 1;
++  if (buf == 0)
++  {
++    if (size < len)
++      size = len;
++    buf = (char *)malloc(size);
++    if (buf == 0)
++      return 0;
++  }
++  else if (size < len)
++  {
++    errno = ERANGE;
++    return 0;
++  }
++  memcpy(buf, path, len);
++  return buf;
++}
++#define getcwd openstep_getcwd
++
++/* No putenv() or setenv() either. */
++extern "C" { extern char **environ; }
++static inline int openstep_putenv(char *str)
++{
++  char *eq = strchr(str, '=');
++  size_t nlen, n = 0;
++  char **e, **newenv;
++  if (eq == 0)
++    return -1;
++  nlen = (size_t)(eq - str);
++  for (e = environ; e != 0 && *e != 0; e++, n++)
++    if (strncmp(*e, str, nlen) == 0 && (*e)[nlen] == '=')
++    {
++      *e = str;
++      return 0;
++    }
++  newenv = (char **)malloc((n + 2) * sizeof(char *));
++  if (newenv == 0)
++    return -1;
++  if (n != 0)
++    memcpy(newenv, environ, n * sizeof(char *));
++  newenv[n] = str;
++  newenv[n + 1] = 0;
++  environ = newenv;
++  return 0;
++}
++#define putenv openstep_putenv
++static inline int openstep_setenv(const char *name, const char *value, int overwrite)
++{
++  char *str;
++  if (!overwrite && getenv(name) != 0)
++    return 0;
++  str = (char *)malloc(strlen(name) + strlen(value) + 2);
++  if (str == 0)
++    return -1;
++  strcpy(str, name);
++  strcat(str, "=");
++  strcat(str, value);
++  return openstep_putenv(str);
++}
++#define setenv openstep_setenv
 +#endif
  
  #ifdef __NETWARE__

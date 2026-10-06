@@ -12,3 +12,19 @@ diff -ruN tca/tcsh-6.24.13/configure tcb/tcsh-6.24.13/configure
    *) :
      as_fn_error $? "Tcsh can't guess the configuration file name
  for \`${host}' systems.
+diff -ruN tca/tcsh-6.24.13/sh.types.h tcb/tcsh-6.24.13/sh.types.h
+--- a/sh.types.h	2024-06-12 05:52:47.000000000 +0000
++++ b/sh.types.h	2026-10-06 03:08:52.858316269 +0000
+@@ -166,10 +166,8 @@
+  *** NeXT OS 3.x
+  ***/
+ #ifdef NeXT
+-# ifndef _SPEED_T
+-#  define _SPEED_T
+-   typedef unsigned int speed_t;
+-# endif /* _SPEED_T */
++/* OPENSTEP's headers already define speed_t (with a different type), and
++   redefining it is an error, so there is nothing to do. */
+ #endif /* NeXT */
+ 
+ /***
