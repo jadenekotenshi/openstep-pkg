@@ -4,6 +4,8 @@ set -e
 
 EMACS="$ROOT_DIR/usr/local/bin/emacs"
 test -x "$EMACS"
+test -x "$ROOT_DIR/usr/local/Apps/Emacs.app/Emacs"
+test -f "$ROOT_DIR/usr/local/Apps/Emacs.app/Info.plist"
 test_dir=${TMPDIR-/tmp}/emacs-pkg-test-$$
 umask 077
 mkdir "$test_dir"
@@ -25,6 +27,7 @@ cat > "$test_dir/selftest.el" <<'EMACS_SELFTEST'
        (source (expand-file-name "compiled.el" dir))
        (text (concat "Emacs OPENSTEP\n" (string #xe9 #x3bb #x65e5) "\n")))
   (openstep-check (and (= emacs-major-version 31) (= emacs-minor-version 1)) "version")
+  (openstep-check (featurep 'ns) "compiled native AppKit backend")
   (openstep-check (pdumper-stats) "installed portable dump")
   (openstep-check (= (+ 20 22) 42) "Lisp evaluation")
   (openstep-check (= (expt 2 100) 1267650600228229401496703205376) "bignum arithmetic")
