@@ -544,7 +544,14 @@ $CC $CFLAGS -c openstep_rand.c -o openstep_rand.o
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/file.h>
+/* The header's prototypes for the two speed setters use a parameter type I cannot
+   see from here; declare the header's copies under other names and define ours
+   with a plain integer. */
+#define cfsetispeed hdr_cfsetispeed
+#define cfsetospeed hdr_cfsetospeed
 #include <termios.h>
+#undef cfsetispeed
+#undef cfsetospeed
 #include <errno.h>
 #include <string.h>
 
@@ -621,27 +628,27 @@ tcflush(int fd, int queue)
 
 #ifdef HAVE_TERMIOS_SPEED_FIELDS
 int
-cfsetispeed(struct termios *t, speed_t speed)
+cfsetispeed(struct termios *t, unsigned long speed)
 {
     t->c_ispeed = speed;
     return 0;
 }
 
 int
-cfsetospeed(struct termios *t, speed_t speed)
+cfsetospeed(struct termios *t, unsigned long speed)
 {
     t->c_ospeed = speed;
     return 0;
 }
 #else
 int
-cfsetispeed(struct termios *t, speed_t speed)
+cfsetispeed(struct termios *t, unsigned long speed)
 {
     return 0;
 }
 
 int
-cfsetospeed(struct termios *t, speed_t speed)
+cfsetospeed(struct termios *t, unsigned long speed)
 {
     return 0;
 }
