@@ -49,9 +49,9 @@ echo "sudo: missing types typedef'd:" `/bin/cat "$types_h" | /bin/sed 's/^typede
 CPPFLAGS="-include $types_h"
 export CPPFLAGS
 
-# OPENSTEP's libc has no tcgetpgrp() or tcsetpgrp().  sudo only enables I/O
+# OPENSTEP's libc has no tcgetpgrp(), tcsetpgrp() or setpgid().  sudo only enables I/O
 # logging (log_input/log_output, sudoreplay) when configure finds tcsetpgrp(),
-# and exec_pty.c calls both, so supply them from the BSD ioctls and hand the
+# and exec_pty.c calls both, so supply them from the BSD ioctls and setpgrp(), and hand the
 # object to configure through LIBS, which it uses for every link test and then
 # for the final link.  (No system headers here, so no prototype can clash.)
 /bin/cat > openstep_tc.c <<'TCEOF'
@@ -75,6 +75,17 @@ tcsetpgrp(fd, pgrp)
     int pgrp;
 {
     return ioctl(fd, TIOCSPGRP, (char *)&pgrp);
+}
+
+/* POSIX setpgid() is the BSD two-argument setpgrp(). */
+int
+setpgid(pid, pgrp)
+    int pid;
+    int pgrp;
+{
+    extern int setpgrp();
+
+    return setpgrp(pid, pgrp);
 }
 TCEOF
 $CC $CFLAGS -c openstep_tc.c -o openstep_tc.o

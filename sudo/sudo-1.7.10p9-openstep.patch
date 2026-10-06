@@ -1,3 +1,15 @@
+diff -ruN pa/sudo-1.7.10p9/Makefile.in pc/sudo-1.7.10p9/Makefile.in
+--- a/Makefile.in	2015-02-10 17:09:58.000000000 +0000
++++ b/Makefile.in	2026-10-06 01:06:34.596900924 +0000
+@@ -150,7 +150,7 @@
+ 
+ COMMON_OBJS = alias.o alloc.o defaults.o error.o gram.o list.o match.o \
+ 	      pwutil.o timestr.o toke.o toke_util.o redblack.o \
+-	      secure_path.o term.o zero_bytes.o @COMMON_OBJS@
++	      secure_path.o term.o zero_bytes.o glob.o @COMMON_OBJS@
+ 
+ SUDO_OBJS = $(AUTH_OBJS) @SUDO_OBJS@ audit.o boottime.o check.o env.o \
+ 	    exec.o gettime.o goodpath.o fileops.o find_path.o \
 diff -ruN pa/sudo-1.7.10p9/exec.c pc/sudo-1.7.10p9/exec.c
 --- a/exec.c	2015-02-10 17:05:31.000000000 +0000
 +++ b/exec.c	2026-10-06 00:40:49.512744456 +0000
@@ -22,6 +34,28 @@ diff -ruN pa/sudo-1.7.10p9/exec_pty.c pc/sudo-1.7.10p9/exec_pty.c
  # include <termio.h>
  #endif /* HAVE_TERMIOS_H */
  #include <sys/ioctl.h>
+diff -ruN pa/sudo-1.7.10p9/glob.c pc/sudo-1.7.10p9/glob.c
+--- a/glob.c	2015-02-10 17:05:31.000000000 +0000
++++ b/glob.c	2026-10-06 01:06:34.597680725 +0000
+@@ -99,6 +99,13 @@
+ #include "emul/glob.h"
+ #include "emul/charclass.h"
+ 
++/*
++ * configure never adds glob.o when libc lacks glob(3) (OPENSTEP does), but
++ * match.c then calls the emulation.  Makefile.in always links glob.o, so the
++ * body is only compiled when the system has no glob() of its own.
++ */
++#ifndef HAVE_GLOB
++
+ #define	DOLLAR		'$'
+ #define	DOT		'.'
+ #define	EOS		'\0'
+@@ -951,3 +958,4 @@
+ 	(void)printf("\n");
+ }
+ #endif
++#endif /* !HAVE_GLOB */
 diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 --- a/missing.h	2015-02-10 17:05:31.000000000 +0000
 +++ b/missing.h	2026-10-06 00:54:23.803503445 +0000
