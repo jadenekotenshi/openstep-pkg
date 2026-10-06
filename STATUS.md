@@ -60,8 +60,8 @@ has not been attempted.
 | mktemp | validated | validated |
 | mpg123 | validated | — |
 | nano | validated | — |
-| nethack | not yet built (`?HAVE_X11` adds the X11 interface) | — |
 | ncurses | validated | validated |
+| nethack | not yet built (`?HAVE_X11` adds the X11 interface) | — |
 | netsurf-buildsystem | validated | — |
 | neXtaw | not yet built (needs HAVE_X11=1) | — |
 | nsgenbind | validated | — |
