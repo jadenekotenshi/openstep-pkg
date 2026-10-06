@@ -46,9 +46,10 @@ struct sigaction {
 };
 SIGEOF
 /bin/cat >> "$sig_h" <<'SIGEOF'
-/* sh.c uses environ; OPENSTEP's headers may map it to _environ without
-   declaring that. */
+/* sh.c uses environ; OPENSTEP's headers map it to _environ (after this header
+   is read) without declaring that, so declare both. */
 extern char **environ;
+extern char **_environ;
 #ifndef SA_RESTART
 # define SA_RESTART	0x10000
 #endif

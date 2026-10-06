@@ -14,7 +14,7 @@ diff -ruN tca/tcsh-6.24.13/configure tcb/tcsh-6.24.13/configure
  for \`${host}' systems.
 diff -ruN tca/tcsh-6.24.13/sh.types.h tcb/tcsh-6.24.13/sh.types.h
 --- a/sh.types.h	2024-06-12 05:52:47.000000000 +0000
-+++ b/sh.types.h	2026-10-06 03:08:52.858316269 +0000
++++ b/sh.types.h	2026-10-06 03:17:38.366341686 +0000
 @@ -166,10 +166,8 @@
   *** NeXT OS 3.x
   ***/
@@ -28,3 +28,12 @@ diff -ruN tca/tcsh-6.24.13/sh.types.h tcb/tcsh-6.24.13/sh.types.h
  #endif /* NeXT */
  
  /***
+@@ -361,7 +359,7 @@
+     typedef int pid_t;
+ # endif /* _PID_T */
+ 
+-# ifndef _SPEED_T
++# if !defined(_SPEED_T) && !defined(NeXT)
+ #  define _SPEED_T
+     typedef unsigned int speed_t;
+ # endif /* _SPEED_T */
