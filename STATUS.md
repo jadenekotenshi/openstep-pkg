@@ -79,7 +79,7 @@ has not been attempted.
 | sed | validated | validated |
 | sudo | validated | — |
 | tar | validated | — |
-| tcsh | in progress; fixes pushed, no result yet | — |
+| tcsh | validated | — |
 | termcap | validated | — |
 | texinfo | validated | validated |
 | top | validated | validated |
