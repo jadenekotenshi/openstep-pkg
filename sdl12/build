@@ -5,12 +5,11 @@ set -e
 DESTDIR=$1
 VERSION=$2
 
-if test -d "openstep-sdl12-$VERSION"; then
-    cd "openstep-sdl12-$VERSION"
+if test -d SDL-1.2.15; then
+    cd SDL-1.2.15
 fi
 
 SRCROOT=`pwd`
-BUILDROOT=$SRCROOT/SDL-1.2.15-openstep
 PREFIX=/usr/local
 
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
@@ -45,26 +44,7 @@ ensure_dir() {
     done
 }
 
-/bin/cp -R upstream/SDL-1.2.15 "$BUILDROOT"
-
-/bin/cp port/openstep/include/SDL_config_openstep.h "$BUILDROOT/include/"
-
-ensure_dir "$BUILDROOT/src/video/openstep"
-ensure_dir "$BUILDROOT/src/audio/openstep"
-ensure_dir "$BUILDROOT/src/thread/openstep"
-ensure_dir "$BUILDROOT/src/timer/openstep"
-
-/bin/cp port/openstep/src/video/openstep/* "$BUILDROOT/src/video/openstep/"
-/bin/cp port/openstep/src/audio/openstep/* "$BUILDROOT/src/audio/openstep/"
-/bin/cp port/openstep/src/thread/openstep/* "$BUILDROOT/src/thread/openstep/"
-/bin/cp port/openstep/src/timer/openstep/* "$BUILDROOT/src/timer/openstep/"
-/bin/cp port/openstep/build-openstep.csh "$BUILDROOT/"
-/bin/cp port/openstep/fix-macho-i486-subtype.csh "$BUILDROOT/"
-
-cd "$BUILDROOT"
-/usr/local/bin/patch -p0 < "$SRCROOT/port/openstep/patches/0001-openstep-video-bootstrap.patch"
-/usr/local/bin/patch -p0 < "$SRCROOT/port/openstep/patches/0002-openstep-audio-bootstrap.patch"
-/usr/local/bin/patch -p0 < "$SRCROOT/port/openstep/patches/0003-openstep-thread-bootstrap.patch"
+/usr/local/bin/patch -p1 < sdl12-1.2.15-openstep.patch
 
 /bin/csh -f ./build-openstep.csh
 
@@ -136,5 +116,5 @@ EOF
     "$DESTDIR$PREFIX/share/doc/sdl12/README.md"
 /usr/bin/install -c -m 644 "$SRCROOT/NOTICE" \
     "$DESTDIR$PREFIX/share/doc/sdl12/NOTICE"
-/usr/bin/install -c -m 644 "$SRCROOT/upstream/SDL-1.2.15/COPYING" \
+/usr/bin/install -c -m 644 "$SRCROOT/COPYING" \
     "$DESTDIR$PREFIX/share/doc/sdl12/COPYING"

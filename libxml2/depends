@@ -5,3 +5,4 @@ gawk
 libiconv
 zlib
 gzip
+xz

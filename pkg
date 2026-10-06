@@ -37,6 +37,7 @@ package layout:
   version       required, contains version
   depends       optional, one package name per line
   sources       optional, one source per line
+  checksums     SHA-256 and filename for each remote source
   post-install  optional shell hook
   pre-remove    optional shell hook
   test          optional installed-package test hook
@@ -164,6 +165,7 @@ find_tool() {
 }
 
 is_bootstrap_pkg() {
+    # Only the shell bootstrap must build without package dependencies.
     case $1 in
         pdksh)
             return 0
@@ -245,7 +247,107 @@ load_pkg() {
     INST_DIR=$DB_ROOT/installed/$PKG_NAME
 }
 
-download_one() {
+source_name() {
+    source_leaf=`echo "$1" | sed 's/[?#].*$//; s#.*/##'`
+    case $source_leaf in
+        ''|.|..|*[!A-Za-z0-9._+-]*) die "invalid source filename: $1" ;;
+    esac
+    echo "$source_leaf"
+}
+
+source_checksum() (
+    checksum_name=$1
+    require_file "$PKG_DIR/checksums"
+    # Stock sh runs a redirected loop in a subshell; capture its output.
+    entries=`while read checksum filename extra || [ -n "$checksum" ]; do
+        case $checksum in ''|\#*) continue ;; esac
+        if [ "$filename" = "$checksum_name" ]; then
+            echo "$checksum $filename $extra"
+        fi
+    done < "$PKG_DIR/checksums"`
+    [ -n "$entries" ] || die "missing checksum for $checksum_name"
+    set -f
+    set -- $entries
+    [ $# -eq 2 ] || die "invalid or duplicate checksum entry for $checksum_name"
+    expected=$1
+    case $expected in *[!0-9a-f]*) die "invalid SHA-256 for $checksum_name" ;; esac
+    [ "`expr "$expected" : '.*'`" = 64 ] || die "invalid SHA-256 for $checksum_name"
+    echo "$expected"
+)
+
+install_download_bootstrap() {
+    case :$PKG_INSTALL_STACK:$PKG_NAME: in
+        *:wget-bootstrap:*)
+            die "download tools unavailable while bootstrapping wget-bootstrap; its dependencies must use local sources"
+        ;;
+    esac
+
+    bootstrap_pkg_dir=`resolve_dep_pkg_dir wget-bootstrap` ||
+        die "need to install wget-bootstrap but could not locate its local package directory"
+    log "installing required download tools wget-bootstrap for $PKG_NAME" >&2
+    # A fresh shell keeps install's set -e active inside a download error check.
+    /bin/sh "$bootstrap_pkg_dir/../pkg" install "$bootstrap_pkg_dir" < /dev/null >&2
+}
+
+hash_file() (
+    hash_path=$1
+    PATH=$PATH:${LOCAL_ROOT:-/usr/local}/bin
+    export PATH
+    for attempt in existing bootstrap; do
+        if [ "$attempt" = bootstrap ]; then
+            install_download_bootstrap || exit 1
+        fi
+        hash_tool=`find_tool sha256sum 2>/dev/null || :`
+        if [ -n "$hash_tool" ]; then
+            hash_output=`"$hash_tool" "$hash_path"` || exit 1
+            echo "$hash_output" | sed 's/ .*//'
+            exit 0
+        fi
+        hash_tool=`find_tool openssl 2>/dev/null || :`
+        if [ -n "$hash_tool" ]; then
+            hash_output=`"$hash_tool" dgst -sha256 "$hash_path"` || exit 1
+            echo "$hash_output" | sed 's/^.*= *//'
+            exit 0
+        fi
+    done
+    die "wget-bootstrap did not provide a usable sha256sum or openssl"
+)
+
+fetch_source() (
+    url=$1
+    output=$2
+    scheme=`echo "$url" | sed 's/:.*//'`
+    PATH=$PATH:${LOCAL_ROOT:-/usr/local}/bin
+    export PATH
+    for attempt in existing bootstrap; do
+        if [ "$attempt" = bootstrap ]; then
+            install_download_bootstrap || exit 1
+        fi
+        curl_path=`find_tool curl 2>/dev/null || :`
+        if [ -n "$curl_path" ]; then
+            protocols=`"$curl_path" -V 2>/dev/null | sed -n 's/^Protocols: *//p'`
+            case " $protocols " in
+                *" $scheme "*)
+                    "$curl_path" -fL --connect-timeout 30 -o "$output" "$url"
+                    exit $?
+                ;;
+            esac
+        fi
+        for tool in wget-bootstrap wget; do
+            wget_path=`find_tool "$tool" 2>/dev/null || :`
+            [ -n "$wget_path" ] || continue
+            if [ "$scheme" = https ]; then
+                features=`"$wget_path" --version 2>/dev/null || :`
+                case $features in *+https*) : ;; *) continue ;; esac
+            fi
+            "$wget_path" --timeout=30 --tries=2 -O "$output" "$url"
+            exit $?
+        done
+    done
+    die "wget-bootstrap did not provide a downloader supporting $scheme"
+)
+
+download_one() (
     src=$1
     dest=$2
 
@@ -256,35 +358,37 @@ download_one() {
     esac
 
     case $src in
-        *://*)
-            src_name=`path_leaf "$src"`
-            dest_name=`default_value "$dest" "$src_name"`
-            ensure_dir "$SRC_CACHE/`path_parent "$dest_name"`"
-            out=$SRC_CACHE/$dest_name
+        http://*|https://*|ftp://*)
+            src_name=`source_name "$src"` || exit 1
+            expected=`source_checksum "$src_name"` || exit 1
+            ensure_dir "$SRC_CACHE"
+            out=$SRC_CACHE/$src_name
 
             if [ -f "$out" ]; then
-                log "using cached $src_name"
-                return 0
+                actual=`hash_file "$out"` || exit 1
+                if [ "$actual" = "$expected" ]; then
+                    log "using verified cached $src_name"
+                    exit 0
+                fi
+                log "discarding corrupt cached $src_name"
+                rm -f "$out"
             fi
 
             log "downloading $src"
-
-            curl_path=`find_tool curl 2>/dev/null`
-            if [ -n "$curl_path" ]; then
-                "$curl_path" -L -o "$out" "$src"
-                return 0
-            fi
-
-            wget_path=`find_tool wget 2>/dev/null`
-            if [ -n "$wget_path" ]; then
-                "$wget_path" -O "$out" "$src"
-                return 0
-            fi
-
-            die "need curl or wget to download sources"
+            partial=$out.part-$$
+            # Stock sh can report zero in an EXIT trap after an error.
+            cleanup_status=1
+            trap 'rm -f "$partial"; exit "$cleanup_status"' 0
+            trap 'exit 1' 1 2 3 15
+            fetch_source "$src" "$partial" || die "download failed: $src"
+            actual=`hash_file "$partial"` || exit 1
+            [ "$actual" = "$expected" ] || die "SHA-256 mismatch: $src"
+            mv "$partial" "$out" || die "cannot cache $src_name"
+            cleanup_status=0
         ;;
+        *://*) die "unsupported source URL: $src" ;;
     esac
-}
+)
 
 download_pkg() {
     ensure_dir "$SRC_CACHE"
@@ -359,7 +463,23 @@ extract_archive() {
             gnutar -xf "$archive" -C "$target_dir"
         ;;
         *.tar.bz2|*.tbz2|*.tar.xz|*.txz)
-            die "unsupported archive format on this system: $archive"
+            (
+                case $archive in
+                    *.tar.bz2|*.tbz2) unpacker=bzip2 ;;
+                    *) unpacker=xz ;;
+                esac
+                unpack_path=`find_tool "$unpacker" 2>/dev/null || :`
+                [ -n "$unpack_path" ] ||
+                    die "need $unpacker to extract $archive; declare it in depends"
+                unpack_tmp=$BUILD_ROOT/.unpack-$$.tar
+                cleanup_status=1
+                trap 'rm -f "$unpack_tmp"; exit "$cleanup_status"' 0
+                trap 'exit 1' 1 2 3 15
+                "$unpack_path" -dc "$archive" > "$unpack_tmp" ||
+                    die "decompression failed: $archive"
+                gnutar -xf "$unpack_tmp" -C "$target_dir" || exit 1
+                cleanup_status=0
+            )
         ;;
         *)
             cp "$archive" "$target_dir/"
@@ -376,9 +496,8 @@ stage_source() {
             return 0
         ;;
         *://*)
-            src_name=`path_leaf "$src"`
-            dest_name=`default_value "$dest" "$src_name"`
-            extract_archive "$SRC_CACHE/$dest_name" "$dest"
+            src_name=`source_name "$src"`
+            extract_archive "$SRC_CACHE/$src_name" "$dest"
         ;;
         *)
             copy_local_source "$src" "$dest"

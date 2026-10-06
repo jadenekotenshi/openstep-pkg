@@ -67,9 +67,11 @@ if [ "`"$AWK" 'BEGIN { printf "%d", -1 }'`" != -1 ]; then
 fi
 
 cd "$SRCDIR"
+# Import only the verified GNU runtime subtree, preserving Apple's compiler.
+mv "$BUILDROOT/gcc-runtime/gcc-4.2.1/libstdc++-v3" .
 patch -p1 < "$PATCHFILE"
 
-# The source inputs are assembled on a modern host.  Normalize their mtimes
+# Normalize the upstream source inputs' mtimes
 # after extraction so Automake's clock-sanity check and make dependencies do
 # not inherit UTC/local-time skew from the transported archives.
 /usr/bin/find . -type f -exec /usr/bin/touch {} \;

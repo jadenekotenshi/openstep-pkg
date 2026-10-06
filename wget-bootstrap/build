@@ -1,0 +1,36 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+. "$PKG_BUILD_HELPERS"
+PATH=/usr/ucb:/bin:/usr/bin
+CC='/bin/cc -traditional-cpp'
+CFLAGS='-O0'
+CPPFLAGS='-I/usr/local/include'
+LDFLAGS='-L/usr/local/lib'
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/bin/sed
+PKG_CONFIG=/bin/false
+am_cv_func_iconv=no
+am_cv_lib_iconv=no
+export am_cv_func_iconv am_cv_lib_iconv
+# The function works on OPENSTEP but its BSD headers omit the declaration.
+ac_cv_have_decl_getdtablesize=yes
+export ac_cv_have_decl_getdtablesize
+CONFIG_SHELL=/usr/local/bin/ksh
+export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED PKG_CONFIG CONFIG_SHELL
+/usr/local/bin/patch -p1 < "wget-$VERSION-openstep.patch"
+run_configure --build=i386-next-openstep4 --host=i386-next-openstep4 \
+  --prefix=/usr/local --with-ssl=openssl \
+  --with-libssl-prefix=/usr/local --without-libpsl --without-zlib \
+  --without-metalink --without-cares --without-libuuid --disable-iri \
+  --disable-pcre --disable-nls --disable-ipv6 --disable-ntlm --disable-opie \
+  --disable-xattr --disable-dependency-tracking
+# Both the generated configure files and their inputs carry the port fixes.
+/bin/gnumake ACLOCAL=true AUTOCONF=true AUTOHEADER=true AUTOMAKE=true
+for dir in "$DESTDIR/usr" "$DESTDIR/usr/local" "$DESTDIR/usr/local/bin"; do
+    test -d "$dir" || /bin/mkdir "$dir"
+done
+/usr/bin/install -c -m 755 src/wget "$DESTDIR/usr/local/bin/wget-bootstrap"

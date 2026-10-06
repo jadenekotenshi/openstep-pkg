@@ -2,6 +2,35 @@
 
 A minimal package manager for OPENSTEP.
 
+## First install on OPENSTEP
+
+```sh
+sh ./pkg install zlib
+```
+
+`pkg` automatically installs `pdksh` when it needs the build shell, and
+`wget-bootstrap` when a remote source needs a downloader or SHA-256 tool.
+You can also run `sh ./pkg install wget-bootstrap` explicitly. It builds with
+stock `/bin/cc`, using only inputs kept in this repository.
+Its offline dependency set is `pdksh`, `patch`,
+`texinfo`, `grep`, `gawk`, `openssl`, and `ca-certificates`. Keep these package
+directories beside `wget-bootstrap`, `pkg`, and `build-helpers.sh` when transferring
+the bootstrap to a machine without an HTTP client.
+
+The downloader is installed as `/usr/local/bin/wget-bootstrap`. It uses the
+OpenSSL port and its CA bundle; certificate verification stays enabled. Set the
+machine's clock correctly before downloading over HTTPS. `pkg` prefers a curl
+that supports the requested protocol, then `wget-bootstrap`, then a suitable
+ordinary wget. The existing HTTP-only wget package remains usable for HTTP.
+Unlike the dependency-free shell bootstrap, `wget-bootstrap` installs its
+declared dependencies normally and builds under pdksh. Local-only packages
+do not trigger downloader installation.
+
+Other package archives are fetched on demand from their upstream releases or
+source repositories, with SHA-256 hashes pinned in each package's `checksums`.
+Only the bootstrap archives and local port patches/helpers are kept in Git.
+This changes the current tree; old archives remain in Git history.
+
 ## Usage
 
 ```sh
@@ -34,6 +63,7 @@ bash/
   version
   depends
   sources
+  checksums
   post-install
   pre-remove
   test
@@ -48,6 +78,7 @@ Optional:
 
 - `depends`
 - `sources`
+- `checksums` (required for remote sources)
 - `post-install`
 - `pre-remove`
 - `test`
@@ -76,13 +107,28 @@ files/site.h patches
 
 Rules:
 
-- remote URLs are downloaded into the source cache
+- remote URLs are downloaded into the source cache and verified before use
 - local paths are copied from the package directory
 - `.tar.gz`, `.tgz`, and `.tar` archives are extracted into the build root
 - non-archive files are copied as plain files
-- `.tar.bz2`, `.tbz2`, `.tar.xz`, and `.txz` are rejected
+- `.tar.bz2` and `.tbz2` require `bzip2` in `depends`
+- `.tar.xz` and `.txz` require `xz` in `depends`
 
-The optional second field is the destination directory inside the build root.
+The optional second field is the destination directory inside the build root,
+for local files and URLs alike. It does not rename the cached download.
+
+## `checksums`
+
+One lowercase SHA-256 digest and URL filename per line, separated by whitespace.
+Blank lines and `#` comments are ignored. Generate hashes from the exact upstream
+download, including its compression format; do not repack it first. Every remote
+source needs exactly one entry. Missing, malformed, or duplicate entries fail.
+
+`pkg` verifies with `sha256sum` or the bootstrap's `openssl dgst -sha256`.
+Verified downloads are renamed into the cache only after transfer and hash
+verification succeed. Existing cache files are rechecked before reuse; corrupt
+ones are discarded and fetched again. Local sources remain usable offline.
+
 
 ## `depends`
 
