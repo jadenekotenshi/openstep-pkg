@@ -1,6 +1,6 @@
 diff -ruN a/include/unixconf.h b/include/unixconf.h
---- a/include/unixconf.h	2026-10-06 17:08:12.022907374 +0000
-+++ b/include/unixconf.h	2026-10-06 17:08:13.120309593 +0000
+--- a/include/unixconf.h	2026-10-06 17:55:39.787840112 +0000
++++ b/include/unixconf.h	2026-10-06 17:55:40.224364272 +0000
 @@ -26,14 +26,28 @@
  /* #define ULTRIX */ /* define for Ultrix v3.0 or higher (but not lower) */
                       /* Use BSD for < v3.0 */
@@ -63,3 +63,14 @@ diff -ruN a/include/unixconf.h b/include/unixconf.h
  
  /* #define OPENWINBUG */  /* avoid a problem using OpenWindows 3.0 for
                               X11 on SunOS 4.1.x, x>= 2.  Do not define
+diff -ruN a/win/X11/winmenu.c b/win/X11/winmenu.c
+--- a/win/X11/winmenu.c	2026-10-06 17:55:40.051550390 +0000
++++ b/win/X11/winmenu.c	2026-10-06 17:55:40.518901228 +0000
+@@ -12,6 +12,7 @@
+ #define PRESERVE_NO_SYSV /* X11 include files may define SYSV */
+ #endif
+ 
++#include <X11/Xlib.h> /* this X11's Xresource.h needs Xlib.h before it */
+ #include <X11/Xresource.h>
+ #include <X11/Intrinsic.h>
+ #include <X11/StringDefs.h>
