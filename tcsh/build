@@ -50,6 +50,13 @@ SIGEOF
    is read) without declaring that, so declare both. */
 extern char **environ;
 extern char **_environ;
+/* No multibyte locales here: one byte per character. */
+#ifndef MB_CUR_MAX
+# define MB_CUR_MAX	1
+#endif
+#ifndef MB_LEN_MAX
+# define MB_LEN_MAX	1
+#endif
 #ifndef SA_RESTART
 # define SA_RESTART	0x10000
 #endif
