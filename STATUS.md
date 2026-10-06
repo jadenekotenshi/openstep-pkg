@@ -21,7 +21,7 @@ has not been attempted.
 | duktape | validated | — |
 | emacs | queued for testing | — |
 | expat | validated | validated |
-| ffmpeg | compiling | — |
+| ffmpeg | validated | — |
 | findutils | validated | validated |
 | flex | validated | validated |
 | freetype | validated | — |
