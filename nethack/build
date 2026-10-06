@@ -61,6 +61,8 @@ if test "$HAVE_X11" = 1; then
     /usr/local/bin/mkdir -p openstep-inc/X11
     /bin/ln -s /usr/local/include/X11/neXtaw openstep-inc/X11/Xaw
     xaw_inc="-I`pwd`/openstep-inc"
+    # (Static archives: each library must come before the ones it needs, so libXpm
+    # goes ahead of libX11.)
     # libSM and libICE are only there when the X11 install has session
     # management; libXpm only when it has pixmap support (tiles and the tombstone).
     sm_libs=
@@ -79,7 +81,7 @@ LFLAGS=-L/usr/local/lib -L$x11/lib
 WINSRC = \$(WINTTYSRC) \$(WINX11SRC)
 WINOBJ = \$(WINTTYOBJ) \$(WINX11OBJ)
 WINLIB = \$(WINTTYLIB) \$(WINX11LIB)
-WINX11LIB = -lneXtaw -lXmu -lXt $sm_libs -lXext -lX11 $xpm_lib
+WINX11LIB = -lneXtaw $xpm_lib -lXmu -lXt $sm_libs -lXext -lX11
 VARDATND = x11tiles NetHack.ad pet_mark.xbm pilemark.xbm
 HEOF
     if test -n "$xpm_def"; then
