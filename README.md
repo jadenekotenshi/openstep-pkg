@@ -26,6 +26,7 @@ adapt to them.
 | option     | default | meaning |
 | ---------- | ------- | ------- |
 | `HAVE_X11` | `0`     | `1` if an X11 server (CubXWindow or similar) and its development headers and libraries are installed |
+| `X11_PREFIX` | empty | directory holding the X11 `include/` and `lib/`; when empty, X11 packages search `/usr/X11R6`, `/usr/X11` and `/usr/local` |
 
 An environment variable of the same name sets the default, and the file overrides it.
 

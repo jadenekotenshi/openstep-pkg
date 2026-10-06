@@ -62,6 +62,7 @@ has not been attempted.
 | nano | validated | — |
 | ncurses | validated | validated |
 | netsurf-buildsystem | validated | — |
+| neXtaw | not yet built (needs HAVE_X11=1) | — |
 | nsgenbind | validated | — |
 | ntp | written; never built on OPENSTEP | — |
 | openssh | validated | validated |

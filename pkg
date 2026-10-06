@@ -76,6 +76,10 @@ load_config() {
     # development headers and libraries are installed, else 0.
     HAVE_X11=${HAVE_X11-0}
 
+    # X11_PREFIX: directory holding the X11 include/ and lib/ (empty: packages
+    # look in the usual places).
+    X11_PREFIX=${X11_PREFIX-}
+
     if [ -f "$conf_file" ]; then
         . "$conf_file"
     fi
@@ -88,7 +92,7 @@ load_config() {
         ;;
     esac
 
-    export PKG_CONF_FILE HAVE_X11
+    export PKG_CONF_FILE HAVE_X11 X11_PREFIX
 }
 
 # A package's optional `requires` file names the pkg.conf options it needs:
@@ -258,6 +262,8 @@ configuration:
   pre-remove.
     HAVE_X11   1 if an X11 server (CubXWindow or similar) and its development
                headers are installed; default 0
+    X11_PREFIX directory holding the X11 include/ and lib/ (default: packages
+               search /usr/X11R6, /usr/X11 and /usr/local)
 
 architecture:
   pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)
@@ -1204,6 +1210,7 @@ case $ACTION in
         [ "$ARGC" -eq 1 ] || die "config takes no arguments"
         echo "PKG_CONF_FILE=$PKG_CONF_FILE"
         echo "HAVE_X11=$HAVE_X11"
+        echo "X11_PREFIX=$X11_PREFIX"
     ;;
 
     download)
