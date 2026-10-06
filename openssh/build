@@ -7,13 +7,10 @@ VERSION=$2
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 # OpenSSH 8.x and later insist on C99 (variadic macros), which the system cc
 # (gcc 2.x) lacks, so build with gcc 4.2.  On SPARC gcc 4.2 miscompiles at -O2
-# and above, so stay unoptimised there; PKG_SSH_OPT overrides.
+# and above in some programs; PKG_SSH_OPT overrides (try -O1 or -O0 on SPARC if
+# ssh or sshd misbehave).
 CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
-case $PKG_ARCH in
-    sparc) ssh_opt=-O0 ;;
-    *)     ssh_opt=-O2 ;;
-esac
-CFLAGS="${PKG_SSH_OPT-$ssh_opt}"
+CFLAGS="${PKG_SSH_OPT--O2}"
 AWK=/usr/local/bin/gawk
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
