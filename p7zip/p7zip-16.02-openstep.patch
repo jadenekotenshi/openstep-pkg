@@ -1,3 +1,19 @@
+diff -ruN p7a/p7zip_16.02/CPP/7zip/UI/Console/ConsoleClose.cpp p7b/p7zip_16.02/CPP/7zip/UI/Console/ConsoleClose.cpp
+--- a/CPP/7zip/UI/Console/ConsoleClose.cpp	2008-08-05 09:48:32.000000000 +0000
++++ b/CPP/7zip/UI/Console/ConsoleClose.cpp	2026-10-06 02:13:53.931901504 +0000
+@@ -33,10 +33,10 @@
+ CCtrlHandlerSetter::CCtrlHandlerSetter()
+ {
+    memo_sig_int = signal(SIGINT,HandlerRoutine); // CTRL-C
+-   if (memo_sig_int == SIG_ERR)
++   if (memo_sig_int == (void (*)(int))SIG_ERR)
+     throw "SetConsoleCtrlHandler fails (SIGINT)";
+    memo_sig_term = signal(SIGTERM,HandlerRoutine); // for kill -15 (before "kill -9")
+-   if (memo_sig_term == SIG_ERR)
++   if (memo_sig_term == (void (*)(int))SIG_ERR)
+     throw "SetConsoleCtrlHandler fails (SIGTERM)";
+ }
+ 
 diff -ruN p7a/p7zip_16.02/CPP/Common/MyString.h p7b/p7zip_16.02/CPP/Common/MyString.h
 --- a/CPP/Common/MyString.h	2016-02-17 18:39:30.000000000 +0000
 +++ b/CPP/Common/MyString.h	2026-10-06 01:09:43.102510897 +0000
