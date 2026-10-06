@@ -32,6 +32,8 @@ probe_sig() {
     { echo "#include \"$sig_h\""; echo "$1"; } > probe_sig.c
     $CC $CFLAGS -c probe_sig.c -o probe_sig.o > /dev/null 2>&1
 }
+probe_sig 'uint8_t probe_u8;' || echo 'typedef unsigned char uint8_t;' >> "$sig_h"
+probe_sig 'intptr_t probe_ip;' || echo 'typedef long intptr_t;' >> "$sig_h"
 probe_sig 'sigset_t probe_set;' || echo 'typedef unsigned int sigset_t;' >> "$sig_h"
 probe_sig 'int probe_how[3] = { SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK };' || /bin/cat >> "$sig_h" <<'SIGEOF'
 #define SIG_BLOCK	1
