@@ -1,0 +1,5 @@
+dhcpc.c
+dhcpc-testd.c
+dhcpc.script
+dhcpc.8
+dhcpc.conf.dist

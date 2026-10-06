@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2'
+export PATH
+
+# dhcpc is a single-file, purpose-built client (see dhcpc.c): OPENSTEP has no
+# BPF, routing sockets or hardware-address ioctl, which rules out dhcpcd and
+# ISC dhclient.  It needs nothing but BSD sockets and select().
+$CC $CFLAGS -DDHCPC_PREFIX='"/usr/local"' -o dhcpc dhcpc.c
+$CC $CFLAGS -o dhcpc-testd dhcpc-testd.c
+
+PREFIX="$DESTDIR/usr/local"
+/usr/local/bin/mkdir -p "$PREFIX/sbin" "$PREFIX/share/dhcpc" "$PREFIX/man/man8" \
+    "$PREFIX/etc" "$PREFIX/var/dhcpc"
+/bin/cp dhcpc "$PREFIX/sbin/dhcpc"
+/bin/cp dhcpc-testd "$PREFIX/share/dhcpc/dhcpc-testd"
+/bin/cp dhcpc.script "$PREFIX/share/dhcpc/dhcpc.script"
+/bin/cp dhcpc.8 "$PREFIX/man/man8/dhcpc.8"
+/bin/cp dhcpc.conf.dist "$PREFIX/etc/dhcpc.conf.dist"
+/bin/chmod 755 "$PREFIX/sbin/dhcpc" "$PREFIX/share/dhcpc/dhcpc-testd" \
+    "$PREFIX/share/dhcpc/dhcpc.script"

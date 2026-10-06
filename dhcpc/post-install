@@ -1,0 +1,9 @@
+#!/bin/sh
+ETC="$ROOT_DIR/usr/local/etc"
+
+# Install the default configuration only when there is none: never replace an
+# administrator's dhcpc.conf.
+if [ ! -f "$ETC/dhcpc.conf" ] && [ -f "$ETC/dhcpc.conf.dist" ]; then
+    /bin/cp "$ETC/dhcpc.conf.dist" "$ETC/dhcpc.conf"
+fi
+exit 0
