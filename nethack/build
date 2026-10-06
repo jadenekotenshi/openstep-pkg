@@ -13,8 +13,8 @@ pkg_apply_patch "nethack-$VERSION-openstep.patch"
 # The game installs under /usr/local/lib/nethackdir with a launcher in
 # /usr/local/bin.  There is no games user or group here, so ownership is left
 # alone and the score and save files are writable by everyone who can run it.
-# OPENSTEP's libc has no strdup(), which the X libraries use; link a small
-# definition in (it goes ahead of the terminal library in WINTTYLIB below).
+# OPENSTEP's libc has no strdup(), which the X libraries use; the X11 build links
+# a small definition in unless libXpm (which defines its own) is used.
 /bin/cat > openstep_strdup.c <<'SDEOF'
 #include <stdlib.h>
 #include <string.h>
@@ -31,7 +31,8 @@ strdup(const char *s)
 }
 SDEOF
 $CC $PKG_GCC42_ARCH_FLAGS -O2 -c openstep_strdup.c -o openstep_strdup.o
-strdup_obj=`pwd`/openstep_strdup.o
+strdup_shim=`pwd`/openstep_strdup.o
+strdup_obj=
 
 hints=sys/unix/hints/openstep
 /bin/cat > "$hints" <<'HEOF'
@@ -94,6 +95,11 @@ if test "$HAVE_X11" = 1; then
     if test -f "$x11/include/X11/xpm.h" && ls "$x11"/lib/libXpm* > /dev/null 2>&1; then
         xpm_lib=-lXpm
         xpm_def=-DUSE_XPM
+    fi
+    # libXpm carries its own strdup() (it defines one in misc.o), which would
+    # clash with ours; only supply ours when libXpm is not in the link.
+    if test -z "$xpm_lib"; then
+        strdup_obj=$strdup_shim
     fi
     /bin/cat >> "$hints" <<HEOF
 CFLAGS+=-DX11_GRAPHICS $xpm_def -I$x11/include $xaw_inc -idirafter /usr/local/include
