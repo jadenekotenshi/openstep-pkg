@@ -80,6 +80,10 @@ load_config() {
     # installs under /usr/X11R6).
     X11_PREFIX=${X11_PREFIX-/usr/X11R6}
 
+    # WITH_PYTHON: 1 to build packages' optional Python support (git-p4 in git)
+    # against the python311 package, 0 to leave it out.
+    WITH_PYTHON=${WITH_PYTHON-1}
+
     if [ -f "$conf_file" ]; then
         . "$conf_file"
     fi
@@ -92,7 +96,15 @@ load_config() {
         ;;
     esac
 
-    export PKG_CONF_FILE HAVE_X11 X11_PREFIX
+    case $WITH_PYTHON in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: WITH_PYTHON must be 0 or 1, not '$WITH_PYTHON'"
+        ;;
+    esac
+
+    export PKG_CONF_FILE HAVE_X11 X11_PREFIX WITH_PYTHON
 }
 
 # A package's optional `requires` file names the pkg.conf options it needs:
@@ -103,6 +115,9 @@ option_value() {
     case $1 in
         HAVE_X11)
             echo "$HAVE_X11"
+        ;;
+        WITH_PYTHON)
+            echo "$WITH_PYTHON"
         ;;
         *)
             return 1
@@ -265,6 +280,8 @@ configuration:
                headers are installed; default 0
     X11_PREFIX directory holding the X11 include/ and lib/; default /usr/X11R6
                (where CubXWindow installs)
+    WITH_PYTHON 1 (default) builds optional Python support (git-p4 in git) and
+               depends on python311; 0 leaves it out
 
 architecture:
   pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)
@@ -1236,6 +1253,7 @@ case $ACTION in
         echo "PKG_CONF_FILE=$PKG_CONF_FILE"
         echo "HAVE_X11=$HAVE_X11"
         echo "X11_PREFIX=$X11_PREFIX"
+        echo "WITH_PYTHON=$WITH_PYTHON"
     ;;
 
     download)

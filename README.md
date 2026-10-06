@@ -27,6 +27,7 @@ adapt to them.
 | ---------- | ------- | ------- |
 | `HAVE_X11` | `0`     | `1` if an X11 server (CubXWindow or similar) and its development headers and libraries are installed |
 | `X11_PREFIX` | `/usr/X11R6` | directory holding the X11 `include/` and `lib/` (CubXWindow installs under `/usr/X11R6`) |
+| `WITH_PYTHON` | `1` | `1` builds optional Python support and depends on `python311` (git: `git-p4`); `0` leaves it out |
 
 An environment variable of the same name sets the default, and the file overrides it.
 

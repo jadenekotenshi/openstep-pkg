@@ -16,6 +16,14 @@ export PATH CC CFLAGS LDFLAGS CONFIG_SHELL SHELL_PATH GREP AWK
 
 . "$PKG_BUILD_HELPERS"
 patch -p1 < "git-$VERSION-openstep.patch"
+# Python is only used for git-p4; WITH_PYTHON=0 in pkg.conf builds without it.
+if test "$WITH_PYTHON" = 0; then
+    python_conf=--without-python
+    python_make="NO_PYTHON=YesPlease"
+else
+    python_conf=--with-python=/usr/local/bin/python3.11
+    python_make="NO_PYTHON= PYTHON_PATH=/usr/local/bin/python3.11"
+fi
 run_configure \
     --build=$PKG_TARGET \
     --host=$PKG_TARGET \
@@ -25,7 +33,7 @@ run_configure \
     --with-iconv=/usr/local \
     --with-openssl=/usr/local \
     --with-expat=/usr/local \
-    --with-python=/usr/local/bin/python3.11 \
+    $python_conf \
     --without-tcltk \
     --disable-pthreads
 
@@ -39,7 +47,7 @@ make_git() {
     CURL_CONFIG=/usr/local/bin/curl-config \
     NO_GETTEXT=YesPlease \
     NO_PERL=YesPlease \
-    NO_PYTHON= PYTHON_PATH=/usr/local/bin/python3.11 \
+    $python_make \
     NO_TCLTK=YesPlease \
     NO_PTHREADS=YesPlease \
     NO_RUST=YesPlease \

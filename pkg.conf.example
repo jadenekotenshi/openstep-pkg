@@ -8,3 +8,8 @@ HAVE_X11=0
 # Directory holding the X11 include/ and lib/ directories.  CubXWindow installs
 # under /usr/X11R6, which is the default.
 X11_PREFIX=/usr/X11R6
+
+# 1 (default) builds optional Python support, which makes git depend on the
+# python311 package (for git-p4).  Set 0 to build git without Python, for example
+# on a machine where python311 does not build yet.
+WITH_PYTHON=1
