@@ -16,7 +16,7 @@ export PATH CC CFLAGS CPPFLAGS LDFLAGS LIBS GREP EGREP AWK
 if test -d "tcsh-$VERSION"; then cd "tcsh-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 # configure does not know OPENSTEP hosts; the patch maps *-next-* to system/mach.
-patch -p1 < "tcsh-$VERSION-openstep.patch"
+pkg_apply_patch "tcsh-$VERSION-openstep.patch"
 
 # tcsh casts pointers through intptr_t.  Whether OPENSTEP has that type depends
 # on which headers are in play, and a typedef of ours can conflict with the
