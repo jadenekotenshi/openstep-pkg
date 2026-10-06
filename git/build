@@ -5,7 +5,16 @@ VERSION=$2
 test -f Makefile || cd git-$VERSION
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
 CC=/usr/local/bin/gcc-4.2
-CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -std=gnu99 -I/usr/local/include -Icompat/openstep'
+# gcc-4.2 on SPARC has miscompiled other packages at -O2 and above (gzip's
+# deflate.c, python's dictionary code), and git's pack index code failed there
+# with "wrong index v2 file size", so SPARC builds git unoptimized.
+# PKG_GIT_OPT overrides the optimization flags.
+case $PKG_ARCH in
+    sparc) git_opt=-O0 ;;
+    *)     git_opt=-O2 ;;
+esac
+git_opt=${PKG_GIT_OPT-$git_opt}
+CFLAGS="$PKG_GCC42_ARCH_FLAGS $git_opt "'-std=gnu99 -I/usr/local/include -Icompat/openstep'
 LDFLAGS='-L/usr/local/lib'
 CONFIG_SHELL=/usr/local/bin/ksh
 SHELL_PATH=/usr/local/bin/ksh
