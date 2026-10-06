@@ -146,6 +146,10 @@ typedef int ssize_t;
 #ifndef PATH_MAX
 # define PATH_MAX	1024
 #endif
+/* ... and in case something still falls back to it. */
+#ifndef MAX_PATH
+# define MAX_PATH	1024
+#endif
 /* <net/if.h> hides the interface flags unless _POSIX_SOURCE is undefined (the
    4.3BSD values). */
 #ifndef IFF_UP
