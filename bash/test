@@ -25,8 +25,22 @@ trap "echo trapped" EXIT
 ' > "$WORK/out"
 grep trapped "$WORK/out" > /dev/null
 
-# Exit statuses, including from signals and background jobs.
-"$BASH" -c 'sh -c "exit 7"; test $? -eq 7'
-"$BASH" -c 'sh -c "kill -TERM \$\$"; test $? -eq 143' 2>/dev/null
-"$BASH" -c 'sleep 1 & wait $!; test $? -eq 0'
-"$BASH" -c '(exit 3); test $? -eq 3'
+# Exit statuses, including from signals and background jobs.  Each reports the
+# status it saw, so a failure says what bash did.
+check_status() {
+    check_name=$1
+    check_want=$2
+    check_script=$3
+    check_got=`"$BASH" -c "$check_script" 2> /dev/null`
+    if [ "$check_got" != "$check_want" ]; then
+        echo "bash: $check_name: status was '$check_got', expected $check_want" >&2
+        exit 1
+    fi
+}
+
+check_status "exit status of a child" 7 'sh -c "exit 7"; echo $?'
+# Old BSD sh/kill only take numeric signals (kill -15), not names.
+check_status "status of a child killed by SIGTERM" 143 'sh -c "kill -15 \$\$"; echo $?'
+check_status "wait for a background job" 0 'sleep 1 & wait $!; echo $?'
+check_status "exit status of a subshell" 3 '(exit 3); echo $?'
+check_status "exit status of a failed pipeline" 1 'false | false; echo $?'
