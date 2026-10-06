@@ -15,7 +15,16 @@ PATCHFILE="python-$VERSION-openstep.patch"
 
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC=/usr/local/bin/gcc-4.2
-CFLAGS="$PKG_GCC42_ARCH_FLAGS -O3 -DNeXT"
+# -O3 works on x86.  On SPARC the freshly built interpreter fails while running
+# the frozen importlib ("name 'RuntimeError' is not defined" although the name
+# exists), which looks like a miscompile of the dictionary or string code by
+# gcc 4.2, so SPARC builds more conservatively.  PKG_PYTHON_OPT overrides it.
+case $PKG_ARCH in
+    sparc) python_opt='-O1 -fno-strict-aliasing -fwrapv' ;;
+    *)     python_opt=-O3 ;;
+esac
+python_opt=${PKG_PYTHON_OPT-$python_opt}
+CFLAGS="$PKG_GCC42_ARCH_FLAGS $python_opt -DNeXT"
 # GCC42 exhausts memory or crashes optimizing the generated deepfreeze unit.
 # Keep the interpreter optimized; only frozen-object initialization uses -O0.
 DEEPFREEZE_CFLAGS="-O0 -g0"
