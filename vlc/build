@@ -1,0 +1,71 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC=/usr/local/bin/gcc-4.2
+CXX=/usr/local/bin/g++-4.2
+# Append caller flags so CPU tuning is opt-in; retain the portable defaults.
+CFLAGS="-std=gnu99 -O2 -fno-builtin-memset -fno-fast-math -march=i486 -DNeXT ${CFLAGS-}"
+CXXFLAGS="-O2 -fno-builtin-memset -fno-fast-math -march=i486 -DNeXT ${CXXFLAGS-}"
+CPPFLAGS="-I/usr/local/include/lua5.1 -I/usr/local/include -I/usr/local/include/libavutil `sdl-config --cflags`"
+LDFLAGS='-L/usr/local/lib -F/NextLibrary/PrivateFrameworks'
+LIBS="`sdl-config --libs` -framework Interceptor -lgcrypt -lcurl -lssl -lcrypto -lz -lgpg-error"
+CONFIG_SHELL=/usr/local/bin/ksh
+AWK=/usr/local/bin/gawk
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+ac_cv_func_mmap=no
+export ac_cv_func_mmap
+ac_cv_c_fast_math=no
+export ac_cv_c_fast_math
+CHARSET=ASCII
+export CHARSET
+export PATH CC CXX CFLAGS CXXFLAGS CPPFLAGS LDFLAGS LIBS CONFIG_SHELL AWK GREP EGREP
+if test -d "vlc-$VERSION"; then cd "vlc-$VERSION"; fi
+patch -p1 < "vlc-$VERSION-openstep.patch"
+. "$PKG_BUILD_HELPERS"
+run_configure --build=i386-next-openstep4 --prefix=/usr/local \
+    --disable-shared --enable-static --disable-nls --disable-dependency-tracking \
+    --disable-maintainer-mode \
+    --disable-qt4 --disable-skins2 --disable-x11 --disable-xvideo --disable-glx \
+    --disable-macosx --disable-mmx --disable-sse
+echo 'include $(top_srcdir)/modules/gui/openstep.mk' >> src/Makefile
+# Native sockets lack the descriptor-passing API used by vlc-wrapper.
+sed 's/^bin_PROGRAMS =.*/bin_PROGRAMS = vlc/' bin/Makefile > bin/Makefile.os
+mv bin/Makefile.os bin/Makefile
+echo 'include $(top_srcdir)/bin/openstep.mk' >> bin/Makefile
+# SRTP uses native cthreads on this host.
+sed 's/ -lpthread//g' libs/srtp/Makefile > libs/srtp/Makefile.os
+mv libs/srtp/Makefile.os libs/srtp/Makefile
+# Build module archives first, then register every module in the static core.
+build()
+{
+    (cd libs/srtp && /bin/gnumake SHELL="$CONFIG_SHELL" CFLAGS="$CFLAGS" LIBS="$LIBS")
+    (cd modules && /bin/gnumake SHELL="$CONFIG_SHELL" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LIBS="$LIBS" LTLIBVLCCORE=)
+    "$CONFIG_SHELL" modules/gui/openstep-builtins.sh
+    (cd src && /bin/gnumake SHELL="$CONFIG_SHELL" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LIBS="$LIBS")
+    (cd bin && /bin/gnumake SHELL="$CONFIG_SHELL" CFLAGS="$CFLAGS" CXXFLAGS="$CXXFLAGS" LIBS="$LIBS")
+}
+build
+
+"$CONFIG_SHELL" modules/gui/openstep-check.sh
+/bin/strip bin/vlc
+sdl-fix-macho-i486-subtype bin/vlc
+./bin/vlc --ignore-config -MachLaunch '1 30' --version
+
+# All modules are linked into the player; no runtime plugin directory is needed.
+for dir in usr usr/local usr/local/bin usr/local/Apps usr/local/Apps/VLC.app \
+    usr/local/share usr/local/share/vlc usr/local/share/doc usr/local/share/doc/vlc \
+    usr/local/man usr/local/man/man1
+do
+    test -d "$DESTDIR/$dir" || /bin/mkdir "$DESTDIR/$dir"
+done
+/usr/bin/install -c -m 755 bin/vlc "$DESTDIR/usr/local/bin/vlc"
+cp modules/gui/OPENSTEP-Info.plist "$DESTDIR/usr/local/Apps/VLC.app/Info.plist"
+ln -s ../../bin/vlc "$DESTDIR/usr/local/Apps/VLC.app/VLC"
+for dir in lua http osdmenu; do
+    cp -R "share/$dir" "$DESTDIR/usr/local/share/vlc/"
+done
+cp COPYING AUTHORS README THANKS "$DESTDIR/usr/local/share/doc/vlc/"
+cp doc/vlc.1 "$DESTDIR/usr/local/man/man1/"

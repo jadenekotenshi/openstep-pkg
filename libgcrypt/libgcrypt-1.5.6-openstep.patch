@@ -1,0 +1,184 @@
+--- a/configure.ac
++++ b/configure.ac
+@@ -109,6 +109,10 @@
+    we define it here with the usual gcry prefix.  */
+ #define GCRY_GPG_ERR_NOT_OPERATIONAL  176
+ 
++
++#ifdef NeXT
++#include "openstep.h"
++#endif
+ 
+ #endif /*_GCRYPT_CONFIG_H_INCLUDED*/
+ ])
+--- a/config.h.in
++++ b/config.h.in
+@@ -484,5 +484,9 @@
+ #define GCRY_GPG_ERR_NOT_OPERATIONAL  176
+ 
+ 
++#ifdef NeXT
++#include "openstep.h"
++#endif
++
+ #endif /*_GCRYPT_CONFIG_H_INCLUDED*/
+ 
+--- /dev/null
++++ b/openstep.h
+@@ -0,0 +1,30 @@
++/* OPENSTEP libc compatibility. LGPL version 2.1 or later. */
++#ifndef GCRYPT_OPENSTEP_H
++#define GCRYPT_OPENSTEP_H
++#include <libc.h>
++#include <stdio.h>
++#include <time.h>
++#ifndef CLOCKS_PER_SEC
++#define CLOCKS_PER_SEC CLK_TCK
++#endif
++#include <stdlib.h>
++#include <string.h>
++#include <sys/wait.h>
++#include <curl/mprintf.h>
++#define snprintf curl_msnprintf
++static inline char *gcrypt_openstep_strdup (const char *s)
++{
++  size_t n = strlen (s) + 1;
++  char *copy = malloc (n);
++  if (copy) memcpy (copy, s, n);
++  return copy;
++}
++#define strdup gcrypt_openstep_strdup
++static inline int gcrypt_openstep_waitpid (int pid, int *status, int options)
++{
++  return wait4 (pid, (union wait *)status, options, NULL);
++}
++#define waitpid gcrypt_openstep_waitpid
++/* The wrapper supplies the interface absent from native libc. */
++#define HAVE_WAITPID 1
++#endif
+--- a/random/rndunix.c
++++ b/random/rndunix.c
+@@ -100,11 +100,16 @@
+ #endif				/* __osf__ */
+ 
+ #include <unistd.h>
++#ifdef NeXT
++#include <libc.h>
++#endif
+ #include <fcntl.h>
+ #include <pwd.h>
+ #ifndef __QNX__
+ #include <sys/errno.h>
++#ifndef NeXT
+ #include <sys/ipc.h>
++#endif
+ #endif				/* __QNX__ */
+ #include <sys/time.h>		/* SCO and SunOS need this before resource.h */
+ #ifndef __QNX__
+@@ -114,7 +119,9 @@
+ #include <sys/select.h>
+ #endif				/* _AIX */
+ #ifndef __QNX__
++#ifndef NeXT
+ #include <sys/shm.h>
++#endif
+ #include <signal.h>
+ #include <sys/signal.h>
+ #endif				/* __QNX__ */
+@@ -721,7 +728,9 @@
+     }
+     /* close all files but the ones we need */
+     {	int nmax, n1, n2, i;
+-#ifdef _SC_OPEN_MAX
++#ifdef NeXT
++        nmax = getdtablesize ();
++#elif defined(_SC_OPEN_MAX)
+ 	if( (nmax=sysconf( _SC_OPEN_MAX )) < 0 ) {
+ #ifdef _POSIX_OPEN_MAX
+ 	    nmax = _POSIX_OPEN_MAX;
+@@ -786,7 +795,11 @@
+ 		    struct timeval tv;
+ 		    tv.tv_sec = 0;
+ 		    tv.tv_usec = 50000;
++#ifdef NeXT
++                    usleep (50000);
++#else
+ 		    select(0, NULL, NULL, NULL, &tv);
++#endif
+ 		    continue;
+ 		}
+ 		if( errno == EPIPE ) /* parent has exited, so give up */
+--- a/src/gcrypt.h.in
++++ b/src/gcrypt.h.in
+@@ -31,6 +31,10 @@
+ #include <gpg-error.h>
+ 
+ #include <sys/types.h>
++#if defined(NeXT) && !defined(_POSIX_SOURCE)
++typedef int ssize_t;
++typedef int pid_t;
++#endif
+ 
+ #if defined _WIN32 || defined __WIN32__
+ # include <winsock2.h>
+--- a/src/libgcrypt-config.in
++++ b/src/libgcrypt-config.in
+@@ -29,6 +29,9 @@
+ 
+ # Configured for host
+ my_host="@LIBGCRYPT_CONFIG_HOST@"
++case "$my_host" in
++    *-next-openstep* | *-next-nextstep*) libs="$libs @LIBS@" ;;
++esac
+ 
+ # Misc information.
+ symmetric_ciphers="@LIBGCRYPT_CIPHERS@"
+--- a/src/hwfeatures.c
++++ b/src/hwfeatures.c
+@@ -40,7 +40,7 @@
+ }
+ 
+ 
+-#if defined (__i386__) && SIZEOF_UNSIGNED_LONG == 4 && defined (__GNUC__)
++#if defined (__i386__) && SIZEOF_UNSIGNED_LONG == 4 && defined (__GNUC__) && !defined (NeXT)
+ static void
+ detect_ia32_gnuc (void)
+ {
+@@ -179,7 +179,7 @@
+   if (fips_mode ())
+     return; /* Hardware support is not to be evaluated.  */
+ 
+-#if defined (__i386__) && SIZEOF_UNSIGNED_LONG == 4
++#if defined (__i386__) && SIZEOF_UNSIGNED_LONG == 4 && !defined (NeXT)
+ #ifdef __GNUC__
+   detect_ia32_gnuc ();
+ #endif
+--- /dev/null
++++ b/tests/t-openstep.c
+@@ -0,0 +1,26 @@
++/* Native compatibility regression. LGPL version 2.1 or later. */
++#include "config.h"
++#include <assert.h>
++#include <unistd.h>
++#include <limits.h>
++int main (void)
++{
++  char text[64], short_text[3];
++  char *copy = strdup ("OPENSTEP");
++  int status, child, i;
++  unsigned char fill[8];
++  memset (fill, 0xa6, sizeof fill);
++  for (i = 0; i < sizeof fill; ++i) assert (fill[i] == 0xa6);
++  assert (copy && !strcmp (copy, "OPENSTEP"));
++  free (copy);
++  snprintf (text, sizeof text, "%d:%u", INT_MIN, UINT_MAX);
++  assert (!strcmp (text, "-2147483648:4294967295"));
++  snprintf (short_text, sizeof short_text, "%s", "abcdef");
++  assert (!strcmp (short_text, "ab"));
++  child = fork ();
++  assert (child >= 0);
++  if (!child) _exit (7);
++  assert (waitpid (child, &status, 0) == child);
++  assert (WIFEXITED (status) && WEXITSTATUS (status) == 7);
++  return 0;
++}

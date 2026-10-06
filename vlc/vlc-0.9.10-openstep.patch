@@ -1,0 +1,3237 @@
+--- a/aclocal.m4
++++ b/aclocal.m4
+@@ -664,7 +664,9 @@
+ # need in order to bootstrap the dependency handling code.
+ AC_DEFUN([AM_OUTPUT_DEPENDENCY_COMMANDS],
+ [AC_CONFIG_COMMANDS([depfiles],
+-     [test x"$AMDEP_TRUE" != x"" || _AM_OUTPUT_DEPENDENCY_COMMANDS],
++     [if test x"$AMDEP_TRUE" = x""; then
++       _AM_OUTPUT_DEPENDENCY_COMMANDS
++      fi],
+      [AMDEP_TRUE="$AMDEP_TRUE" ac_aux_dir="$ac_aux_dir"])
+ ])
+ 
+--- /dev/null
++++ b/bin/openstep.mk
+@@ -0,0 +1,5 @@
++# Native ld needs the core before its static modules and frameworks last.
++# Libtool's generic OPENSTEP backend drops framework flags and reorders archives.
++openstep_modules = $(shell find ../modules -name 'lib*_plugin.a' -print)
++vlc$(EXEEXT): $(vlc_OBJECTS) ../src/libvlc.la ../src/libvlccore.la $(openstep_modules) $(top_srcdir)/modules/gui/VLC.iconheader $(top_srcdir)/modules/gui/VLC.tiff
++	$(CXX) $(CXXFLAGS) $(LDFLAGS) -o $@ $(vlc_OBJECTS) ../src/.libs/libvlc.a ../src/.libs/libvlccore.a $(openstep_modules) ../src/.libs/libvlccore.a ../libs/srtp/.libs/libvlc_srtp.a `$(VLC_CONFIG) --libs vlc builtin \`find ../modules -name 'lib*_plugin.la' -print\`` $(LIBS) -liconv -framework AppKit -framework Foundation -framework SoundKit -framework Interceptor -Wl,-sectcreate,__ICON,__header,$(top_srcdir)/modules/gui/VLC.iconheader,-segprot,__ICON,r,r,-sectcreate,__ICON,app,$(top_srcdir)/modules/gui/VLC.tiff
+--- a/bin/vlc.c
++++ b/bin/vlc.c
+@@ -33,6 +33,7 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <locale.h>
++#include <string.h>
+ 
+ 
+ /* Explicit HACK */
+@@ -41,7 +42,9 @@
+ 
+ #include <signal.h>
+ #include <time.h>
+-#include <pthread.h>
++#ifndef NeXT
++# include <pthread.h>
++#endif
+ #include <unistd.h>
+ 
+ /*****************************************************************************
+@@ -102,6 +105,9 @@
+      * if they are triggered again 2+ seconds later.
+      * We have to handle SIGTERM cleanly because of daemon mode.
+      * Note that we set the signals after the vlc_create call. */
++#ifdef NeXT
++    signal(SIGPIPE, SIG_IGN);
++#else
+     static const int sigs[] = {
+         SIGINT, SIGHUP, SIGQUIT, SIGTERM,
+     /* Signals that cause a no-op:
+@@ -120,6 +126,7 @@
+ 
+     /* Block all these signals */
+     pthread_sigmask (SIG_BLOCK, &set, NULL);
++#endif
+ 
+     /* Note that FromLocale() can be used before libvlc is initialized */
+     for (int i = 0; i < i_argc; i++)
+@@ -133,7 +140,28 @@
+     /* Initialize libvlc */
+     int i_argc_real = i_argc ? i_argc - 1 : 0;
+     const char **ppsz_argv_real = i_argc ? &ppsz_argv[1] : ppsz_argv;
++#ifdef NeXT
++    /* Workspace supplies these arguments for AppKit, not the VLC parser.
++     * Keep the process argument vector intact for NSApplication. */
++    const char **filtered = malloc((i_argc_real + 1) * sizeof(*filtered));
++    if (!filtered) return 1;
++    i_argc_real = 0;
++    for (int i = 1; i < i_argc; ++i) {
++        if ((!strcmp(ppsz_argv[i], "-MachLaunch") ||
++             !strcmp(ppsz_argv[i], "-NXAutoLaunch")) && i + 1 < i_argc) {
++            /* MachLaunch's two numbers occupy one argument. */
++            ++i;
++            continue;
++        }
++        filtered[i_argc_real++] = ppsz_argv[i];
++    }
++    filtered[i_argc_real] = NULL;
++    ppsz_argv_real = filtered;
++#endif
+     libvlc_instance_t *vlc = libvlc_new (i_argc_real, ppsz_argv_real, &ex);
++#ifdef NeXT
++    free(filtered);
++#endif
+ 
+     if (vlc != NULL)
+     {
+--- a/configure
++++ b/configure
+@@ -8674,6 +8674,11 @@
+   "")
+     SYS=unknown
+     ;;
++  openstep* | nextstep*)
++    SYS=openstep
++    CPPFLAGS_save="${CPPFLAGS_save} -D_POSIX_SOURCE -D_NEXT_SOURCE"
++    CPPFLAGS="${CPPFLAGS_save}"
++    ;;
+   linux*)
+     SYS=linux
+     ;;
+@@ -68872,7 +68877,7 @@
+ #define VLC_COMPILE_BY "`whoami`"
+ _ACEOF
+ 
+-if test "${build_os}" = "cygwin"
++if test "${build_os}" = "cygwin" -o "${SYS}" = "openstep"
+ then
+ 
+ cat >>confdefs.h <<_ACEOF
+@@ -70940,7 +70945,8 @@
+ 
+ 
+   case $ac_file$ac_mode in
+-    "depfiles":C) test x"$AMDEP_TRUE" != x"" || # Autoconf 2.62 quotes --file arguments for eval, but not when files
++    "depfiles":C) if test x"$AMDEP_TRUE" = x""; then
++# Autoconf 2.62 quotes --file arguments for eval, but not when files
+ # are listed without --file.  Let's play safe and only enable the eval
+ # if we detect the quoting.
+ case $CONFIG_FILES in
+@@ -71072,6 +71078,7 @@
+     echo '# dummy' > "$dirpart/$file"
+   done
+ done
++fi
+  ;;
+     "libtool":C)
+ 
+--- a/configure.ac
++++ b/configure.ac
+@@ -163,6 +163,11 @@
+ case "${host_os}" in
+   "")
+     SYS=unknown
++    ;;
++  openstep* | nextstep*)
++    SYS=openstep
++    CPPFLAGS_save="${CPPFLAGS_save} -D_POSIX_SOURCE -D_NEXT_SOURCE"
++    CPPFLAGS="${CPPFLAGS_save}"
+     ;;
+   linux*)
+     SYS=linux
+@@ -5788,7 +5793,7 @@
+ AC_SUBST(VERSION_REVISION)
+ AC_SUBST(COPYRIGHT_YEARS)
+ AC_DEFINE_UNQUOTED(VLC_COMPILE_BY, "`whoami`", [user who ran configure]) 
+-if test "${build_os}" = "cygwin"
++if test "${build_os}" = "cygwin" -o "${SYS}" = "openstep"
+ then
+     AC_DEFINE_UNQUOTED(VLC_COMPILE_HOST, "`hostname`", [host which ran configure])
+ else
+--- a/include/vlc_common.h
++++ b/include/vlc_common.h
+@@ -736,7 +736,7 @@
+ 
+ /* Format string sanity checks */
+ #ifdef __GNUC__
+-#   define LIBVLC_FORMAT(x,y) __attribute__ ((format(printf,x,y)))
++#   define LIBVLC_FORMAT(x,y) __attribute__ ((__format__(__printf__,x,y)))
+ #else
+ #   define LIBVLC_FORMAT(x,y)
+ #endif
+--- a/include/vlc_fixups.h
++++ b/include/vlc_fixups.h
+@@ -26,6 +26,10 @@
+ #ifndef LIBVLC_FIXUPS_H
+ # define LIBVLC_FIXUPS_H 1
+ 
++#ifdef NeXT
++# include "vlc_openstep.h"
++#endif
++
+ #ifndef HAVE_STRDUP
+ # include <string.h>
+ # include <stdlib.h>
+@@ -44,12 +48,21 @@
+ # include <stdarg.h>
+ static inline int vasprintf (char **strp, const char *fmt, va_list ap)
+ {
++#ifdef NeXT
++    size_t length;
++    *strp = curl_mvaprintf(fmt, ap);
++    if (!*strp) return -1;
++    length = strlen(*strp);
++    if (length > INT_MAX) { free(*strp); *strp = NULL; return -1; }
++    return (int)length;
++#else
+     int len = vsnprintf (NULL, 0, fmt, ap) + 1;
+     char *res = (char *)malloc (len);
+     if (res == NULL)
+         return -1;
+     *strp = res;
+     return vsprintf (res, fmt, ap);
++#endif
+ }
+ #endif
+ 
+@@ -120,7 +133,7 @@
+ 
+ static inline lldiv_t lldiv (long long numer, long long denom)
+ {
+-    lldiv_t d = { .quot = numer / denom, .rem = numer % denom };
++    lldiv_t d = { numer / denom, numer % denom };
+     return d;
+ }
+ #endif
+--- a/include/vlc_gcrypt.h
++++ b/include/vlc_gcrypt.h
+@@ -23,7 +23,10 @@
+  * This file implements gcrypt support functions in vlc
+  */
+ 
+-#ifdef LIBVLC_USE_PTHREAD
++#ifdef NeXT
++# include "vlc_openstep_gcrypt.h"
++# define gcry_threads_vlc gcry_threads_openstep
++#elif defined(LIBVLC_USE_PTHREAD)
+ /**
+  * If possible, use gcrypt-provided thread implementation. This is so that
+  * other non-VLC components (inside the process) can also use gcrypt safely.
+--- a/include/vlc_interface.h
++++ b/include/vlc_interface.h
+@@ -50,7 +50,7 @@
+     VLC_COMMON_MEMBERS
+ 
+     /* Thread properties and locks */
+-#if defined( __APPLE__ ) || defined( WIN32 )
++#if defined( __APPLE__ ) || defined( WIN32 ) || defined(NeXT)
+     bool          b_should_run_on_first_thread;
+ #endif
+ 
+--- a/include/vlc_mtime.h
++++ b/include/vlc_mtime.h
+@@ -68,6 +68,20 @@
+ VLC_EXPORT( void,    msleep,   ( mtime_t delay ) );
+ VLC_EXPORT( char *,  secstotimestr, ( char *psz_buffer, int secs ) );
+ 
++/* Media scheduling is separate from wall-clock timers and network timeouts. */
++#ifdef NeXT
++VLC_EXPORT( mtime_t, vlc_playback_date, ( void ) );
++VLC_EXPORT( void, vlc_playback_wait, ( vlc_object_t *, mtime_t ) );
++VLC_EXPORT( void, vlc_playback_pause, ( bool ) );
++VLC_EXPORT( bool, vlc_playback_paused, ( void ) );
++VLC_EXPORT( bool, vlc_playback_active, ( void ) );
++#else
++#define vlc_playback_date mdate
++#define vlc_playback_wait(object, date) mwait(date)
++#define vlc_playback_paused() false
++#define vlc_playback_active() false
++#endif
++
+ /*****************************************************************************
+  * date_t: date incrementation without long-term rounding errors
+  *****************************************************************************/
+--- a/include/vlc_network.h
++++ b/include/vlc_network.h
+@@ -78,6 +78,12 @@
+ #   endif
+ #   include <netdb.h>
+ #   define net_errno errno
++#   ifdef NeXT
++#       define AF_LOCAL AF_UNIX
++#       define SHUT_RD 0
++#       define SHUT_WR 1
++#       define SHUT_RDWR 2
++#   endif
+ #endif
+ 
+ VLC_EXPORT( ssize_t, vlc_sendmsg, ( int, struct msghdr *, int ) );
+--- /dev/null
++++ b/include/vlc_openstep.h
+@@ -0,0 +1,174 @@
++/* OPENSTEP libc compatibility, GPL version 2 or later. */
++#ifndef VLC_OPENSTEP_H
++#define VLC_OPENSTEP_H
++#include <libc.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdarg.h>
++#include <limits.h>
++#include <curl/mprintf.h>
++#include <inttypes.h>
++#include <math.h>
++#include <unistd.h>
++#include <sys/param.h>
++#include <sys/dir.h>
++#include <sys/wait.h>
++#include <errno.h>
++#include <signal.h>
++#include <ctype.h>
++/* Keep the bundled GNU option parser separate from the native libc ABI. */
++#define getopt vlc_getopt
++#define getopt_long vlc_getopt_long
++#define getopt_long_only vlc_getopt_long_only
++#define _getopt_internal vlc_getopt_internal
++#define optarg vlc_optarg
++#define optind vlc_optind
++#define opterr vlc_opterr
++#define optopt vlc_optopt
++#ifdef __cplusplus
++extern "C" {
++#endif
++extern char *vlc_optarg;
++extern int vlc_optind, vlc_opterr, vlc_optopt;
++#ifdef __cplusplus
++}
++#endif
++#ifndef PRId32
++#define PRId32 "d"
++#define PRIu32 "u"
++#define PRIx32 "x"
++#define PRIu16 "u"
++#define PRIu8 "u"
++#define PRIx8 "x"
++#endif
++#ifndef M_PI
++#define M_PI 3.14159265358979323846
++#endif
++#ifndef M_PI_2
++#define M_PI_2 1.57079632679489661923
++#define M_PI_4 0.78539816339744830962
++#endif
++
++/* Native strcoll has an unusable declaration and locale implementation. */
++#define strcoll strcmp
++
++#undef rewinddir
++#define rewinddir(dir) seekdir((dir), 0L)
++#ifndef dirfd
++#define dirfd(dir) ((dir)->dd_fd)
++#endif
++
++static inline unsigned long long vlc_openstep_strtoull(const char *text,
++                                                      char **end, int base)
++{
++    const unsigned char *p = (const unsigned char *)text;
++    unsigned long long value = 0, maximum = ~0ULL;
++    int negative, any = 0, overflow = 0;
++    if (end) *end = (char *)text;
++    if (base && (base < 2 || base > 36)) { errno = EINVAL; return 0; }
++    while (isspace(*p)) ++p;
++    negative = *p == '-';
++    if (*p == '-' || *p == '+') ++p;
++    if ((base == 0 || base == 16) && p[0] == '0' &&
++        (p[1] == 'x' || p[1] == 'X') && isxdigit(p[2])) {
++        base = 16; p += 2;
++    }
++    if (!base) base = *p == '0' ? 8 : 10;
++    for (; *p; ++p) {
++        unsigned digit;
++        if (*p >= '0' && *p <= '9') digit = *p - '0';
++        else if (*p >= 'a' && *p <= 'z') digit = *p - 'a' + 10;
++        else if (*p >= 'A' && *p <= 'Z') digit = *p - 'A' + 10;
++        else break;
++        if (digit >= (unsigned)base) break;
++        any = 1;
++        if (value > (maximum - digit) / base) overflow = 1;
++        else value = value * base + digit;
++    }
++    if (end && any) *end = (char *)p;
++    if (overflow) { errno = ERANGE; return maximum; }
++    return negative ? 0ULL - value : value;
++}
++#define strtoull vlc_openstep_strtoull
++static inline int vlc_openstep_waitpid(int pid, int *status, int options)
++{
++    return wait4(pid, (union wait *)status, options, NULL);
++}
++#define waitpid vlc_openstep_waitpid
++
++static inline int vlc_openstep_strerror_r(int error, char *buf, size_t size)
++{
++    const char *text = strerror(error);
++    size_t length = strlen(text);
++    if (size) {
++        size_t copied = length < size ? length : size - 1;
++        memcpy(buf, text, copied);
++        buf[copied] = 0;
++    }
++    return length < size ? 0 : ERANGE;
++}
++#define strerror_r vlc_openstep_strerror_r
++
++static inline const char *vlc_openstep_strsignal(int number)
++{
++    /* The native signal descriptions are immutable. */
++    extern const char *sys_siglist[];
++    return number > 0 && number < NSIG ? sys_siglist[number] : "Unknown signal";
++}
++#define strsignal vlc_openstep_strsignal
++
++static inline char *vlc_openstep_getcwd(char *buf, size_t size)
++{
++    char path[MAXPATHLEN];
++    size_t length;
++    if (!getwd(path)) return NULL;
++    length = strlen(path) + 1;
++    if (buf && !size) { errno = EINVAL; return NULL; }
++    if (size && size < length) { errno = ERANGE; return NULL; }
++    if (!buf) {
++        buf = (char *)malloc(size ? size : length);
++        if (!buf) { errno = ENOMEM; return NULL; }
++    }
++    memcpy(buf, path, length);
++    return buf;
++}
++#define getcwd vlc_openstep_getcwd
++
++/* curl handles ll/z formats; its snprintf returns a truncated length.
++ * Preserve the C99 required-length result used by VLC's callers. */
++static inline int vlc_openstep_vsnprintf(char *dst, size_t size,
++                                       const char *fmt, va_list ap)
++{
++    char *text;
++    size_t length, copied;
++    if (size) dst[0] = 0;
++    text = curl_mvaprintf(fmt, ap);
++    if (!text) return -1;
++    length = strlen(text);
++    if (length > INT_MAX) { free(text); return -1; }
++    if (size) {
++        copied = length < size ? length : size - 1;
++        memcpy(dst, text, copied); dst[copied] = 0;
++    }
++    free(text);
++    return (int)length;
++}
++static inline int vlc_openstep_snprintf(char *dst, size_t size, const char *fmt, ...)
++{
++    va_list ap;
++    int result;
++    va_start(ap, fmt);
++    result = vlc_openstep_vsnprintf(dst, size, fmt, ap);
++    va_end(ap);
++    return result;
++}
++#define snprintf vlc_openstep_snprintf
++#define vsnprintf vlc_openstep_vsnprintf
++#define sprintf curl_msprintf
++#define vsprintf curl_mvsprintf
++#define printf curl_mprintf
++#define fprintf curl_mfprintf
++#define vprintf curl_mvprintf
++#define vfprintf curl_mvfprintf
++#endif
+--- /dev/null
++++ b/include/vlc_openstep_gcrypt.h
+@@ -0,0 +1,31 @@
++/* Native libgcrypt locks shared by VLC and its standalone SRTP library.
++ * LGPL version 2.1 or later. Include after gcrypt.h. */
++#ifndef VLC_OPENSTEP_GCRYPT_H
++#define VLC_OPENSTEP_GCRYPT_H
++#include <mach/cthreads.h>
++#include <errno.h>
++static int os_gcrypt_lock_init(void **lock)
++{
++    *lock = mutex_alloc();
++    return *lock ? 0 : ENOMEM;
++}
++static int os_gcrypt_lock_destroy(void **lock)
++{
++    mutex_free((mutex_t)*lock);
++    return 0;
++}
++static int os_gcrypt_lock(void **lock)
++{
++    mutex_lock((mutex_t)*lock);
++    return 0;
++}
++static int os_gcrypt_unlock(void **lock)
++{
++    mutex_unlock((mutex_t)*lock);
++    return 0;
++}
++static const struct gcry_thread_cbs gcry_threads_openstep = {
++    GCRY_THREAD_OPTION_USER, NULL, os_gcrypt_lock_init, os_gcrypt_lock_destroy,
++    os_gcrypt_lock, os_gcrypt_unlock
++};
++#endif
+--- a/include/vlc_threads.h
++++ b/include/vlc_threads.h
+@@ -34,7 +34,11 @@
+  *
+  */
+ 
+-#if defined( UNDER_CE )
++#if defined(NeXT)
++# include <mach/cthreads.h>
++# include <SDL/SDL_mutex.h>
++# include <errno.h>
++#elif defined( UNDER_CE )
+                                                                 /* WinCE API */
+ #elif defined( WIN32 )
+ #   include <process.h>                                         /* Win32 API */
+@@ -115,7 +119,14 @@
+  * Type definitions
+  *****************************************************************************/
+ 
+-#if defined (LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++typedef cthread_t vlc_thread_t;
++typedef SDL_mutex *vlc_mutex_t;
++typedef SDL_cond *vlc_cond_t;
++typedef struct vlc_openstep_key *vlc_threadvar_t;
++VLC_EXPORT(int, vlc_openstep_tls_set, (vlc_threadvar_t *, void *));
++VLC_EXPORT(void *, vlc_openstep_tls_get, (vlc_threadvar_t *));
++#elif defined (LIBVLC_USE_PTHREAD)
+ typedef pthread_t       vlc_thread_t;
+ typedef pthread_mutex_t vlc_mutex_t;
+ typedef pthread_cond_t  vlc_cond_t;
+@@ -191,7 +202,9 @@
+ static inline void __vlc_mutex_lock( const char * psz_file, int i_line,
+                                     vlc_mutex_t * p_mutex )
+ {
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    if (SDL_LockMutex(*p_mutex)) abort();
++#elif defined(LIBVLC_USE_PTHREAD)
+ #   define vlc_assert_locked( m ) \
+            assert (pthread_mutex_lock (m) == EDEADLK)
+     int val = pthread_mutex_lock( p_mutex );
+@@ -226,7 +239,9 @@
+ static inline void __vlc_mutex_unlock( const char * psz_file, int i_line,
+                                       vlc_mutex_t *p_mutex )
+ {
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    if (SDL_UnlockMutex(*p_mutex)) abort();
++#elif defined(LIBVLC_USE_PTHREAD)
+     int val = pthread_mutex_unlock( p_mutex );
+     VLC_THREAD_ASSERT ("unlocking mutex");
+ 
+@@ -267,7 +282,9 @@
+ static inline void __vlc_cond_signal( const char * psz_file, int i_line,
+                                       vlc_cond_t *p_condvar )
+ {
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    if (SDL_CondSignal(*p_condvar)) abort();
++#elif defined(LIBVLC_USE_PTHREAD)
+     int val = pthread_cond_signal( p_condvar );
+     VLC_THREAD_ASSERT ("signaling condition variable");
+ 
+@@ -316,7 +333,9 @@
+ static inline void __vlc_cond_wait( const char * psz_file, int i_line,
+                                     vlc_cond_t *p_condvar, vlc_mutex_t *p_mutex )
+ {
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    if (SDL_CondWait(*p_condvar, *p_mutex)) abort();
++#elif defined(LIBVLC_USE_PTHREAD)
+     int val = pthread_cond_wait( p_condvar, p_mutex );
+     VLC_THREAD_ASSERT ("waiting on condition");
+ 
+@@ -368,7 +387,14 @@
+                                         vlc_mutex_t *p_mutex,
+                                         mtime_t deadline )
+ {
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    mtime_t delay = deadline - mdate();
++    Uint32 ms = delay <= 0 ? 0 : (delay / 1000 >= 0xfffffffeLL ?
++        0xfffffffeU : (Uint32)((delay + 999) / 1000));
++    int result = SDL_CondWaitTimeout(*p_condvar, *p_mutex, ms);
++    if (result == SDL_MUTEX_TIMEDOUT) return ETIMEDOUT;
++    if (result) abort();
++#elif defined(LIBVLC_USE_PTHREAD)
+ #if defined(__APPLE__) && !defined(__powerpc__) && !defined( __ppc__ ) && !defined( __ppc64__ )
+     /* mdate() is mac_absolute_time on osx, which we must convert to do
+      * the same base than gettimeofday() on which pthread_cond_timedwait
+@@ -447,7 +473,9 @@
+ {
+     int i_ret;
+ 
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    i_ret = vlc_openstep_tls_set(p_tls, p_value);
++#elif defined(LIBVLC_USE_PTHREAD)
+     i_ret = pthread_setspecific( *p_tls, p_value );
+ 
+ #elif defined( SYS_BEOS )
+@@ -468,7 +496,9 @@
+ {
+     void *p_ret;
+ 
+-#if defined(LIBVLC_USE_PTHREAD)
++#if defined(NeXT)
++    p_ret = vlc_openstep_tls_get(p_tls);
++#elif defined(LIBVLC_USE_PTHREAD)
+     p_ret = pthread_getspecific( *p_tls );
+ 
+ #elif defined( SYS_BEOS )
+--- a/libs/srtp/srtp.c
++++ b/libs/srtp/srtp.c
+@@ -43,8 +43,12 @@
+ # include <winsock2.h>
+ #else
+ # include <netinet/in.h>
+-# include <pthread.h>
++# ifdef NeXT
++#  include "../../include/vlc_openstep_gcrypt.h"
++# else
++#  include <pthread.h>
+ GCRY_THREAD_OPTION_PTHREAD_IMPL;
++# endif
+ #endif
+ 
+ #define debug( ... ) (void)0
+@@ -90,7 +94,9 @@
+ 
+ static void initonce_libgcrypt (void)
+ {
+-#ifndef WIN32
++#ifdef NeXT
++    gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_openstep);
++#elif !defined(WIN32)
+     gcry_control (GCRYCTL_SET_THREAD_CBS, &gcry_threads_pthread);
+ #endif
+ 
+@@ -105,7 +111,13 @@
+ static int init_libgcrypt (void)
+ {
+     int retval;
+-#ifndef WIN32
++#ifdef NeXT
++    static struct mutex lock = MUTEX_INITIALIZER;
++    static bool initialized;
++    mutex_lock(&lock);
++    if (!initialized) { initonce_libgcrypt(); initialized = true; }
++    mutex_unlock(&lock);
++#elif !defined(WIN32)
+     static pthread_once_t once = PTHREAD_ONCE_INIT;
+ 
+     pthread_once (&once, initonce_libgcrypt);
+--- a/modules/access/file.c
++++ b/modules/access/file.c
+@@ -53,7 +53,7 @@
+ #   include <ctype.h>
+ #else
+ #   include <unistd.h>
+-#   include <poll.h>
++#   include <vlc_network.h>
+ #endif
+ 
+ #if defined( WIN32 ) && !defined( UNDER_CE )
+--- a/modules/access/udp.c
++++ b/modules/access/udp.c
+@@ -110,8 +110,14 @@
+                 break;
+ 
+             case '6':
++#ifdef AF_INET6
+                 fam = AF_INET6;
+                 break;
++#else
++                free(psz_name);
++                msg_Err(p_access, "IPv6 is not supported on this system");
++                return VLC_EGENERIC;
++#endif
+         }
+     }
+ 
+--- a/modules/audio_filter/spatializer/denormals.h
++++ b/modules/audio_filter/spatializer/denormals.h
+@@ -11,10 +11,17 @@
+ #include <stdint.h>
+ 
+ #include <math.h>
++#ifdef NeXT
++#include <float.h>
++#endif
+ 
+ static inline float undenormalise( float f )
+ {
++#ifdef NeXT
++    if( f != 0.0f && fabs((double)f) < FLT_MIN )
++#else
+     if( fpclassify( f ) == FP_SUBNORMAL  )
++#endif
+         return 0.0;
+     return f;
+ }
+--- a/modules/codec/avcodec/avutil.h
++++ b/modules/codec/avcodec/avutil.h
+@@ -25,7 +25,7 @@
+ /*****************************************************************************
+  * Export libavutil messages to the VLC message system
+  *****************************************************************************/
+-void LibavutilCallback( void *p_opaque, int i_level,
++static void LibavutilCallback( void *p_opaque, int i_level,
+                         const char *psz_format, va_list va )
+ {
+     int i_vlc_level;
+--- a/modules/codec/cmml/cmml.c
++++ b/modules/codec/cmml/cmml.c
+@@ -63,7 +63,7 @@
+ /*****************************************************************************
+  * Exported prototypes
+  *****************************************************************************/
+-int  OpenIntf  ( vlc_object_t * );
++int  OpenCMMLIntf  ( vlc_object_t * );
+ void CloseIntf ( vlc_object_t * );
+ 
+ /*****************************************************************************
+@@ -77,7 +77,7 @@
+ 
+     add_submodule();
+         set_capability( "interface", 0 );
+-        set_callbacks( OpenIntf, CloseIntf );
++        set_callbacks( OpenCMMLIntf, CloseIntf );
+ vlc_module_end();
+ 
+ /*****************************************************************************
+@@ -297,4 +297,3 @@
+     free( p_clip_parser );
+     free( psz_url );
+ }
+-
+--- a/modules/codec/cmml/intf.c
++++ b/modules/codec/cmml/intf.c
+@@ -79,7 +79,7 @@
+  * Local prototypes.
+  *****************************************************************************/
+ 
+-int          OpenIntf               ( vlc_object_t * );
++int          OpenCMMLIntf           ( vlc_object_t * );
+ void         CloseIntf              ( vlc_object_t * );
+ 
+ static int   InitThread                 ( intf_thread_t * );
+@@ -114,7 +114,7 @@
+ /*****************************************************************************
+  * OpenIntf: initialize CMML interface
+  *****************************************************************************/
+-int OpenIntf ( vlc_object_t *p_this )
++int OpenCMMLIntf ( vlc_object_t *p_this )
+ {
+     intf_thread_t *p_intf = (intf_thread_t *)p_this;
+ 
+@@ -860,4 +860,3 @@
+ 
+     return p_history;
+ }
+-
+--- a/modules/codec/png.c
++++ b/modules/codec/png.c
+@@ -94,12 +94,11 @@
+ static void user_read( png_structp p_png, png_bytep data, png_size_t i_length )
+ {
+     block_t *p_block = (block_t *)png_get_io_ptr( p_png );
+-    png_size_t i_read = __MIN( p_block->i_buffer, i_length );
++    if( i_length > p_block->i_buffer ) png_error( p_png, "not enough data" );
+     memcpy( data, p_block->p_buffer, i_length );
+     p_block->p_buffer += i_length;
+     p_block->i_buffer -= i_length;
+ 
+-    if( i_length != i_read ) png_error( p_png, "not enough data" );
+ }
+ 
+ static void user_error( png_structp p_png, png_const_charp error_msg )
+@@ -149,7 +148,7 @@
+     p_info = png_create_info_struct( p_png );
+     if( p_info == NULL )
+     {
+-        png_destroy_read_struct( &p_png, png_infopp_NULL, png_infopp_NULL );
++        png_destroy_read_struct( &p_png, NULL, NULL );
+         block_Release( p_block ); *pp_block = NULL;
+         return NULL;
+     }
+@@ -157,7 +156,7 @@
+     p_end_info = png_create_info_struct( p_png );
+     if( p_end_info == NULL )
+     {
+-        png_destroy_read_struct( &p_png, &p_info, png_infopp_NULL );
++        png_destroy_read_struct( &p_png, &p_info, NULL );
+         block_Release( p_block ); *pp_block = NULL;
+         return NULL;
+     }
+--- a/modules/control/gestures.c
++++ b/modules/control/gestures.c
+@@ -66,8 +66,8 @@
+ #define NONE 0
+ #define GESTURE( a, b, c, d ) (a | ( b << 4 ) | ( c << 8 ) | ( d << 12 ))
+ 
+-int  Open   ( vlc_object_t * );
+-void Close  ( vlc_object_t * );
++static int  Open   ( vlc_object_t * );
++static void Close  ( vlc_object_t * );
+ static int  InitThread     ( intf_thread_t *p_intf );
+ static void EndThread      ( intf_thread_t *p_intf );
+ static int  MouseEvent     ( vlc_object_t *, char const *,
+--- a/modules/control/showintf.c
++++ b/modules/control/showintf.c
+@@ -53,8 +53,8 @@
+ /*****************************************************************************
+  * Local prototypes.
+  *****************************************************************************/
+-int  Open ( vlc_object_t * );
+-void Close( vlc_object_t * );
++static int  Open ( vlc_object_t * );
++static void Close( vlc_object_t * );
+ static void RunIntf( intf_thread_t *p_intf );
+ static int  InitThread( intf_thread_t *p_intf );
+ static int  MouseEvent( vlc_object_t *, char const *,
+--- a/modules/control/signals.c
++++ b/modules/control/signals.c
+@@ -22,7 +22,9 @@
+ # include "config.h"
+ #endif
+ 
+-#include <pthread.h>
++#ifndef NeXT
++# include <pthread.h>
++#endif
+ #include <signal.h>
+ #include <time.h>
+ 
+@@ -33,7 +35,9 @@
+ static int  Open (vlc_object_t *);
+ static void Close (vlc_object_t *);
+ static void Run (intf_thread_t *);
++#ifndef NeXT
+ static void *SigThread (void *);
++#endif
+ 
+ vlc_module_begin ();
+     set_shortname (N_("Signals"));
+@@ -44,6 +48,38 @@
+     set_callbacks (Open, Close);
+ vlc_module_end ();
+ 
++#ifdef NeXT
++/* A cthread may receive a process signal. Only touch sig_atomic_t there;
++ * perform VLC shutdown on the interface thread. */
++static volatile sig_atomic_t caught_signal;
++static const int signals[] = { SIGINT, SIGHUP, SIGQUIT, SIGTERM };
++struct intf_sys_t { void (*previous[4])(int); };
++static void CatchSignal(int number) { caught_signal = number; }
++static int Open(vlc_object_t *obj)
++{
++    intf_thread_t *intf = (intf_thread_t *)obj;
++    unsigned n;
++    intf->p_sys = malloc(sizeof(*intf->p_sys));
++    if (!intf->p_sys) return VLC_ENOMEM;
++    caught_signal = 0;
++    for (n = 0; n < 4; ++n)
++        intf->p_sys->previous[n] = signal(signals[n], CatchSignal);
++    intf->pf_run = Run;
++    return VLC_SUCCESS;
++}
++static void Close(vlc_object_t *obj)
++{
++    intf_thread_t *intf = (intf_thread_t *)obj;
++    unsigned n;
++    for (n = 0; n < 4; ++n) signal(signals[n], intf->p_sys->previous[n]);
++    free(intf->p_sys);
++}
++static void Run(intf_thread_t *obj)
++{
++    while (vlc_object_alive(obj) && !caught_signal) msleep(100000);
++    if (caught_signal) vlc_object_kill(obj->p_libvlc);
++}
++#else
+ struct intf_sys_t
+ {
+     pthread_t       thread;
+@@ -145,3 +181,4 @@
+     vlc_object_unlock (obj);
+     vlc_object_kill (obj->p_libvlc);
+ }
++#endif
+--- /dev/null
++++ b/modules/gui/openstep-builtins.sh
+@@ -0,0 +1,17 @@
++#!/bin/sh
++# Run from the source root after building modules, before linking the core.
++# VLC 0.9's configure list omits modules selected by Modules.am.
++set -e
++modules=`find modules -name 'lib*_plugin.la' -print | sed 's|.*/lib||; s|_plugin.la$||' | sort -u`
++test -n "$modules"
++target=src/modules/builtin.h
++cat src/modules/builtin.h.in > "$target.tmp"
++for module in $modules; do
++    echo "int vlc_entry__$module (module_t *);" >> "$target.tmp"
++done
++echo '#define ALLOCATE_ALL_BUILTINS() do { \' >> "$target.tmp"
++for module in $modules; do
++    echo "ALLOCATE_BUILTIN($module); \\" >> "$target.tmp"
++done
++echo '} while (0);' >> "$target.tmp"
++mv "$target.tmp" "$target"
+--- /dev/null
++++ b/modules/gui/openstep-check.sh
+@@ -0,0 +1,30 @@
++#!/bin/sh
++# Run from the configured source root after the native static build.
++set -e
++flags="-std=gnu99 -O2 -fno-builtin-memset -fno-fast-math -march=i486 -DNeXT ${CFLAGS-} -D_POSIX_SOURCE -D_NEXT_SOURCE -DHAVE_CONFIG_H -D__LIBVLC__ -I. -Iinclude -I/usr/local/include -I/usr/local/include/libavutil"
++cc=/usr/local/bin/gcc-4.2
++$cc $flags src/test/openstep_pixels.c -o openstep-pixel-check
++./openstep-pixel-check
++$cc $flags src/test/openstep_format.c `curl-config --static-libs` -o openstep-format-check
++./openstep-format-check
++$cc $flags `sdl-config --cflags` src/test/openstep_threads.c `sdl-config --libs` -o openstep-thread-check
++sdl-fix-macho-i486-subtype openstep-thread-check
++./openstep-thread-check
++$cc $flags `sdl-config --cflags` src/test/openstep_time.c src/misc/mtime.c `curl-config --static-libs` -o openstep-time-check
++./openstep-time-check
++$cc $flags `sdl-config --cflags` src/test/openstep_poll.c src/network/poll.c src/misc/mtime.c `sdl-config --libs` `curl-config --static-libs` -o openstep-poll-check
++sdl-fix-macho-i486-subtype openstep-poll-check
++./openstep-poll-check
++$cc $flags libs/srtp/test-aes.c `libgcrypt-config --libs` -o openstep-aes-check
++./openstep-aes-check
++$cc $flags libs/srtp/test-recv.c libs/srtp/srtp.c `libgcrypt-config --libs` -o openstep-srtp-check
++./openstep-srtp-check
++$cc $flags `sdl-config --cflags` -c src/test/test_block.c -o src/test/openstep-block.o
++(
++    cd bin
++    /bin/gnumake SHELL="$CONFIG_SHELL" EXEEXT=-block-check 'vlc_OBJECTS=../src/test/openstep-block.o' vlc-block-check
++    /bin/strip vlc-block-check
++    sdl-fix-macho-i486-subtype vlc-block-check
++    ./vlc-block-check
++)
++echo 'OPENSTEP pixels, libc, threads, timers, sockets, SRTP and file-block checks passed'
+--- /dev/null
++++ b/modules/gui/OPENSTEP-Info.plist
+@@ -0,0 +1,4 @@
++{
++    NSExecutable = VLC;
++    NSPrincipalClass = NSApplication;
++}
+--- /dev/null
++++ b/modules/gui/openstep-playback-check.sh
+@@ -0,0 +1,32 @@
++#!/bin/sh
++# From a configured/built source root, pass generic-exec, desktop PID and
++# a moving video lasting at least 10 seconds (audio is optional).
++# Avoid loop boundaries; the installed app is untouched.
++set -e
++test "$#" -ge 3 || { echo 'usage: ksh modules/gui/openstep-playback-check.sh /path/generic-exec desktop-pid /path/media [VLC options]'; exit 1; }
++PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
++CONFIG_SHELL=/usr/local/bin/ksh
++export PATH CONFIG_SHELL
++ulimit -c 0
++{
++    echo '#include <assert.h>'
++    sed '/@implementation OSPlayer/r src/test/openstep_playback.inc
++/    playlist_Play(playlist);/a\
++    alarm(40); [NSTimer scheduledTimerWithTimeInterval:0.02 target:self selector:@selector(checkPlayback:) userInfo:nil repeats:YES];
++' modules/gui/openstep.m
++} > openstep-playback.m
++gcc-4.2 -O2 -std=gnu99 -fno-builtin-memset -fno-fast-math -march=i486 ${CFLAGS-} \
++    -DNeXT -D_POSIX_SOURCE -D_NEXT_SOURCE -DHAVE_CONFIG_H -I. -Iinclude \
++    -Imodules/gui -I/usr/local/include -I/usr/local/include/libavutil \
++    `sdl-config --cflags` -D__BUILTIN__ -DMODULE_STRING=\"openstep\" \
++    -DMODULE_NAME=openstep -x objective-c -c openstep-playback.m -o openstep-playback.o
++(
++    cd bin
++    /bin/gnumake SHELL="$CONFIG_SHELL" EXEEXT=-playback-check \
++        'vlc_OBJECTS=vlc-vlc.o ../openstep-playback.o' vlc-playback-check
++    /bin/strip vlc-playback-check
++    sdl-fix-macho-i486-subtype vlc-playback-check
++)
++helper=$1; desktop=$2; media=$3; shift 3
++exec "$helper" "$desktop" "$PWD/bin/vlc-playback-check" --ignore-config --no-color \
++    --no-osd --no-video-title-show "$media" "$@"
+--- /dev/null
++++ b/modules/gui/openstep.m
+@@ -0,0 +1,576 @@
++/* Minimal OPENSTEP AppKit interface, SoundKit output and Interceptor video.
++ * Copyright (C) 2026. GPL version 2 or later. */
++#ifdef HAVE_CONFIG_H
++#include "config.h"
++#endif
++#import <AppKit/AppKit.h>
++#import <SoundKit/NXSoundOut.h>
++#import <SoundKit/NXPlayStream.h>
++#include <mach/mach.h>
++#include <vlc_common.h>
++#include <vlc_plugin.h>
++#include <vlc_interface.h>
++#include <vlc_playlist.h>
++#include <vlc_charset.h>
++#include <vlc_aout.h>
++#include <vlc_vout.h>
++#include "openstep_pixels.h"
++
++/* Private Interceptor API on OPENSTEP 4.2. */
++@interface NSSimpleBitmap : NSObject
++- (char *)data;
++- (int)bytesPerRow;
++- (int)pixelsWide;
++- (int)pixelsHigh;
++- pixelEncoding;
++@end
++@interface NSDirectBitmap : NSSimpleBitmap
++- initForRect:(NSRect)rect inWindow:(id)window;
++- (char)isDirectMapped;
++- (void)setDirectMapped:(char)flag;
++- (void)setBuffered:(char)flag;
++- (void)updateForRect:(NSRect)rect inWindow:(id)window;
++- (char)tryLockBitmap;
++- (void)unlockBitmap;
++- (void)flushIn:(NSRect)rect;
++@end
++
++static int OpenIntf(vlc_object_t *);
++static void CloseIntf(vlc_object_t *);
++static void RunIntf(intf_thread_t *);
++static int OpenVideo(vlc_object_t *);
++static void CloseVideo(vlc_object_t *);
++static int OpenAudio(vlc_object_t *);
++static void CloseAudio(vlc_object_t *);
++
++vlc_module_begin();
++    set_shortname("OPENSTEP");
++    set_description(N_("OPENSTEP AppKit interface"));
++    set_capability("interface", 100);
++    set_category(CAT_INTERFACE);
++    set_subcategory(SUBCAT_INTERFACE_MAIN);
++    add_shortcut("openstep");
++    set_callbacks(OpenIntf, CloseIntf);
++    add_submodule();
++        set_description(N_("OPENSTEP Interceptor video"));
++        set_capability("video output", 100);
++        set_category(CAT_VIDEO);
++        set_subcategory(SUBCAT_VIDEO_VOUT);
++        add_shortcut("interceptor");
++        set_callbacks(OpenVideo, CloseVideo);
++    add_submodule();
++        set_description(N_("OPENSTEP SoundKit audio"));
++        set_capability("audio output", 100);
++        set_category(CAT_AUDIO);
++        set_subcategory(SUBCAT_AUDIO_AOUT);
++        add_shortcut("soundkit");
++        set_callbacks(OpenAudio, CloseAudio);
++vlc_module_end();
++
++struct vout_sys_t {
++    unsigned char *pixels;
++    int width, height;
++    unsigned serial;
++};
++/* ponytail: one native player per process; add separate bridges only if
++ * concurrent embedded players are required. No AppKit calls on VLC threads. */
++static struct mutex bridge = MUTEX_INITIALIZER;
++static condition_t readers_done;
++static int interface_reserved, gui_running, sound_rate;
++static vout_sys_t *video;
++static aout_instance_t *audio;
++static unsigned audio_readers, audio_epoch, video_serial;
++
++static int VideoInit(vout_thread_t *v)
++{
++    vout_thread_t *p_vout = v;
++    picture_t *picture = NULL;
++    int i;
++    I_OUTPUTPICTURES = 0;
++    v->output.i_chroma = VLC_FOURCC('R','V','3','2');
++    /* The core's window size includes cropping and sample aspect ratio. */
++    v->output.i_width = v->i_window_width;
++    v->output.i_height = v->i_window_height;
++    v->output.i_aspect = v->render.i_aspect;
++    v->output.i_rmask = 0xff0000;
++    v->output.i_gmask = 0x00ff00;
++    v->output.i_bmask = 0x0000ff;
++    v->output.pf_setpalette = NULL;
++    if (v->output.i_width <= 0 || v->output.i_width > 8192 ||
++        v->output.i_height <= 0 || v->output.i_height > 8192) return VLC_EGENERIC;
++    v->p_sys->width = v->output.i_width;
++    v->p_sys->height = v->output.i_height;
++    v->p_sys->pixels = malloc(v->output.i_width * v->output.i_height * 4);
++    if (!v->p_sys->pixels) return VLC_ENOMEM;
++    for (i = 0; i < VOUT_MAX_PICTURES; ++i)
++        if (v->p_picture[i].i_status == FREE_PICTURE) { picture = &v->p_picture[i]; break; }
++    if (!picture) return VLC_EGENERIC;
++    vout_AllocatePicture(VLC_OBJECT(v), picture, v->output.i_chroma,
++                        v->output.i_width, v->output.i_height, v->output.i_aspect);
++    if (!picture->i_planes) return VLC_ENOMEM;
++    picture->i_status = DESTROYED_PICTURE;
++    picture->i_type = DIRECT_PICTURE;
++    PP_OUTPUTPICTURE[0] = picture;
++    I_OUTPUTPICTURES = 1;
++    mutex_lock(&bridge);
++    if (video) {
++        mutex_unlock(&bridge);
++        free(picture->p_data_orig);
++        I_OUTPUTPICTURES = 0;
++        return VLC_EGENERIC;
++    }
++    video = v->p_sys;
++    mutex_unlock(&bridge);
++    return VLC_SUCCESS;
++}
++static void VideoDisplay(vout_thread_t *v, picture_t *picture)
++{
++    int y;
++    mutex_lock(&bridge);
++    for (y = 0; y < v->p_sys->height; ++y)
++        memcpy(v->p_sys->pixels + y * v->p_sys->width * 4,
++               picture->p[0].p_pixels + y * picture->p[0].i_pitch,
++               v->p_sys->width * 4);
++    v->p_sys->serial = ++video_serial;
++    mutex_unlock(&bridge);
++}
++static void VideoEnd(vout_thread_t *p_vout)
++{
++    int i;
++    mutex_lock(&bridge);
++    if (video == p_vout->p_sys) video = NULL;
++    mutex_unlock(&bridge);
++    for (i = 0; i < I_OUTPUTPICTURES; ++i)
++        free(PP_OUTPUTPICTURE[i]->p_data_orig);
++    I_OUTPUTPICTURES = 0;
++    free(p_vout->p_sys->pixels);
++    p_vout->p_sys->pixels = NULL;
++}
++static int OpenVideo(vlc_object_t *obj)
++{
++    vout_thread_t *v = (vout_thread_t *)obj;
++    int available;
++    mutex_lock(&bridge); available = gui_running && !video; mutex_unlock(&bridge);
++    if (!available) return VLC_EGENERIC;
++    v->p_sys = calloc(1, sizeof(*v->p_sys));
++    if (!v->p_sys) return VLC_ENOMEM;
++    v->pf_init = VideoInit;
++    v->pf_end = VideoEnd;
++    v->pf_manage = NULL;
++    v->pf_render = NULL;
++    v->pf_display = VideoDisplay;
++    return VLC_SUCCESS;
++}
++static void CloseVideo(vlc_object_t *obj)
++{
++    vout_thread_t *v = (vout_thread_t *)obj;
++    mutex_lock(&bridge);
++    if (video == v->p_sys) video = NULL;
++    mutex_unlock(&bridge);
++    free(v->p_sys->pixels);
++    free(v->p_sys);
++}
++
++static void AudioPlay(aout_instance_t *a) { (void)a; }
++static int OpenAudio(vlc_object_t *obj)
++{
++    aout_instance_t *a = (aout_instance_t *)obj;
++    mutex_lock(&bridge);
++    if (!gui_running || !sound_rate || audio) {
++        mutex_unlock(&bridge); return VLC_EGENERIC;
++    }
++    a->output.output.i_format = AOUT_FMT_S16_NE;
++    a->output.output.i_rate = sound_rate;
++    a->output.output.i_physical_channels = AOUT_CHAN_LEFT | AOUT_CHAN_RIGHT;
++    a->output.i_nb_samples = 1024;
++    a->output.pf_play = AudioPlay;
++    audio = a;
++    ++audio_epoch;
++    mutex_unlock(&bridge);
++    aout_VolumeSoftInit(a);
++    return VLC_SUCCESS;
++}
++static void CloseAudio(vlc_object_t *obj)
++{
++    mutex_lock(&bridge);
++    if (audio == (aout_instance_t *)obj) { audio = NULL; ++audio_epoch; }
++    while (audio_readers) condition_wait(readers_done, &bridge);
++    mutex_unlock(&bridge);
++}
++static aout_buffer_t *AudioBuffer(mtime_t date, unsigned *epoch)
++{
++    aout_instance_t *a;
++    aout_buffer_t *buffer;
++    mutex_lock(&bridge);
++    a = audio; *epoch = audio_epoch;
++    if (a) ++audio_readers;
++    mutex_unlock(&bridge);
++    if (!a) return NULL;
++    buffer = aout_OutputNextBuffer(a, date, false);
++    mutex_lock(&bridge);
++    --audio_readers;
++    condition_broadcast(readers_done);
++    if (*epoch != audio_epoch && buffer) { aout_BufferFree(buffer); buffer = NULL; }
++    mutex_unlock(&bridge);
++    return buffer;
++}
++
++@interface OSVideoView : NSView { id owner; }
++- initWithFrame:(NSRect)rect owner:(id)object;
++@end
++@interface OSPlayer : NSObject {
++    intf_thread_t *intf;
++    playlist_t *playlist;
++    NSWindow *window;
++    OSVideoView *view;
++    NSTextField *status;
++    NSDirectBitmap *bitmap;
++    unsigned char *frame;
++    int width, height, dirty, inPanel;
++    unsigned presented, frames, submitted, completed;
++    NXSoundOut *device;
++    NXPlayStream *stream;
++    vm_address_t memory;
++    vm_size_t stride;
++    unsigned tag, queued, seen_epoch;
++    int rate, paused, sound_ok;
++    struct { unsigned tag, bytes; int busy; } slots[8];
++}
++- (void)start:(intf_thread_t *)object;
++- (void)finish;
++- (void)tick:(id)sender;
++- (void)redraw;
++- (void)open:(id)sender;
++- (void)play:(id)sender;
++- (void)stop:(id)sender;
++- (void)quit:(id)sender;
++- (void)setupSound;
++- (void)resetSound;
++- (void)soundTick:(int)hold;
++- (BOOL)soundResult:(NXSoundDeviceError)error;
++@end
++static OSPlayer *player;
++
++@implementation OSVideoView
++- initWithFrame:(NSRect)rect owner:(id)object
++{ self = [super initWithFrame:rect]; owner = object; return self; }
++- (void)drawRect:(NSRect)rect
++{ [[NSColor blackColor] set]; NSRectFill(rect); [owner redraw]; }
++@end
++
++extern void PSWait(void);
++@implementation OSPlayer
++- (void)start:(intf_thread_t *)object
++{
++    NSMenu *menu = [[NSMenu alloc] initWithTitle:@"VLC"];
++    NSButton *button;
++    id item;
++    const char *titles[] = {"Open...", "Play/Pause", "Stop"};
++    SEL actions[] = {@selector(open:), @selector(play:), @selector(stop:)};
++    int n;
++    intf = object;
++    playlist = pl_Yield(intf);
++    frames = submitted = completed = presented = 0;
++    width = height = 0;
++    window = [[NSWindow alloc] initWithContentRect:NSMakeRect(160,160,400,288)
++        styleMask:NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask
++        backing:NSBackingStoreBuffered defer:NO];
++    [window setTitle:@"VLC media player"];
++    [window setReleasedWhenClosed:NO];
++    [window setDelegate:self];
++    view = [[OSVideoView alloc] initWithFrame:NSMakeRect(0,48,400,240) owner:self];
++    [[window contentView] addSubview:view];
++    for (n = 0; n < 3; ++n) {
++        NSString *title = [NSString stringWithCString:titles[n]];
++        button = [[NSButton alloc] initWithFrame:NSMakeRect(8+n*100,22,96,24)];
++        [button setTitle:title]; [button setTarget:self]; [button setAction:actions[n]];
++        [[window contentView] addSubview:button]; [button release];
++        item = [menu addItemWithTitle:title action:actions[n]
++                    keyEquivalent:n == 0 ? @"o" : @""];
++        [item setTarget:self];
++    }
++    item = [menu addItemWithTitle:@"Quit" action:@selector(quit:) keyEquivalent:@"q"];
++    [item setTarget:self];
++    [NSApp setMainMenu:menu]; [menu release];
++    status = [[NSTextField alloc] initWithFrame:NSMakeRect(8,2,384,18)];
++    [status setEditable:NO]; [status setSelectable:NO];
++    [status setBordered:NO]; [status setDrawsBackground:NO];
++    [status setStringValue:@"Ready"];
++    [[window contentView] addSubview:status];
++    [NSApp finishLaunching];
++    [window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
++    [self setupSound];
++    mutex_lock(&bridge); gui_running = 1; mutex_unlock(&bridge);
++    vlc_playback_pause(false);
++    playlist_Play(playlist);
++}
++- (void)finish
++{
++    vlc_playback_pause(false);
++    mutex_lock(&bridge); gui_running = sound_rate = 0; mutex_unlock(&bridge);
++    sound_ok = 0;
++    [stream setDelegate:nil]; [stream deactivate];
++    if (bitmap) { [bitmap setDirectMapped:NO]; [bitmap release]; bitmap = nil; }
++    free(frame); frame = NULL;
++    [window orderOut:nil]; [window setDelegate:nil];
++    [view release]; [status release]; [window release];
++    view = nil; status = nil; window = nil;
++    pl_Release(intf);
++    msg_Info(intf, "OPENSTEP: %u frames, %u audio buffers submitted, %u completed",
++             frames, submitted, completed);
++    intf = NULL;
++}
++- (void)redraw { dirty = 1; }
++- (void)windowDidMove:(NSNotification *)note { (void)note; dirty = 1; }
++- (void)windowDidDeminiaturize:(NSNotification *)note { (void)note; dirty = 1; }
++- (BOOL)windowShouldClose:(id)sender { [self quit:sender]; return NO; }
++- (void)quit:(id)sender { (void)sender; vlc_playback_pause(false); vlc_object_kill(intf->p_libvlc); }
++- (void)stop:(id)sender { (void)sender; vlc_playback_pause(false); playlist_Stop(playlist); [self resetSound]; }
++- (void)play:(id)sender
++{
++    int state;
++    (void)sender;
++    vlc_object_lock(playlist);
++    /* PLAYLIST_PAUSE toggles both input and playlist state. PLAYLIST_PLAY
++     * alone leaves the playlist paused when an existing input resumes. */
++    playlist_Control(playlist, playlist->status.i_status == PLAYLIST_STOPPED ?
++                     PLAYLIST_PLAY : PLAYLIST_PAUSE, pl_Locked);
++    state = playlist->status.i_status;
++    vlc_object_unlock(playlist);
++    vlc_playback_pause(state == PLAYLIST_PAUSED);
++    [self soundTick:state != PLAYLIST_RUNNING];
++}
++- (void)open:(id)sender
++{
++    NSOpenPanel *panel = [NSOpenPanel openPanel];
++    (void)sender;
++    inPanel = 1;
++    [panel setAllowsMultipleSelection:NO];
++    if ([panel runModal] == NSOKButton && vlc_object_alive(intf->p_libvlc)) {
++        char *path = FromLocale([[panel filename] cString]);
++        if (path) {
++            playlist_Add(playlist, path, path, PLAYLIST_APPEND | PLAYLIST_GO,
++                         PLAYLIST_END, true, false);
++            LocaleFree(path);
++        }
++    }
++    inPanel = 0;
++}
++- (void)tick:(id)sender
++{
++    int state, changed = 0, w = 0, h = 0;
++    (void)sender;
++    if (!vlc_object_alive(intf) || !vlc_object_alive(intf->p_libvlc)) {
++        vlc_playback_pause(false);
++        if (inPanel) [NSApp abortModal];
++        else {
++            [NSApp stop:nil];
++            [NSApp postEvent:[NSEvent otherEventWithType:NSApplicationDefined
++                location:NSMakePoint(0,0) modifierFlags:0 timestamp:0 windowNumber:0
++                context:[NSDPSContext currentContext] subtype:0 data1:0 data2:0] atStart:NO];
++        }
++        return;
++    }
++    vlc_object_lock(playlist); state = playlist->status.i_status; vlc_object_unlock(playlist);
++    vlc_playback_pause(state == PLAYLIST_PAUSED);
++    [status setStringValue:state == PLAYLIST_RUNNING ? @"Playing" :
++                          state == PLAYLIST_PAUSED ? @"Paused" : @"Ready"];
++    [self soundTick:state != PLAYLIST_RUNNING];
++    mutex_lock(&bridge);
++    if (state != PLAYLIST_PAUSED && video && video->serial && video->serial != presented) {
++        w = video->width; h = video->height;
++        if (w != width || h != height) {
++            unsigned char *next = realloc(frame, w*h*4);
++            if (next) { frame = next; changed = 1; }
++            else { w = h = 0; }
++        }
++        if (w && h) {
++            memcpy(frame, video->pixels, w*h*4);
++            presented = video->serial; dirty = 1;
++        }
++    }
++    mutex_unlock(&bridge);
++    if (changed) {
++        int content_width = w < 320 ? 320 : w;
++        if (bitmap) { [bitmap setDirectMapped:NO]; [bitmap release]; bitmap = nil; }
++        width = w; height = h;
++        [window setContentSize:NSMakeSize(content_width,h+48)];
++        [view setFrame:NSMakeRect((content_width-w)/2,48,w,h)];
++        [status setFrame:NSMakeRect(8,2,content_width-16,18)];
++        bitmap = [[NSDirectBitmap alloc] initForRect:
++            [view convertRect:[view bounds] toView:nil] inWindow:window];
++        if (!bitmap) msg_Err(intf, "cannot create Interceptor bitmap");
++    }
++    if (bitmap && frame && dirty && ![window isMiniaturized]) {
++        int ok, layout;
++        [bitmap updateForRect:[view convertRect:[view bounds] toView:nil] inWindow:window];
++        [bitmap setDirectMapped:YES];
++        [bitmap setBuffered:[bitmap isDirectMapped] ? NO : YES];
++        if (![bitmap tryLockBitmap]) return;
++        layout = os_pixel_layout([[bitmap pixelEncoding] cString]);
++        ok = [bitmap pixelsWide] >= width && [bitmap pixelsHigh] >= height &&
++            os_pixel_blit((unsigned char *)[bitmap data], [bitmap bytesPerRow],
++                          frame, width, height, layout);
++        [bitmap unlockBitmap];
++        if (ok) { [bitmap flushIn:[view bounds]]; PSWait(); ++frames; dirty = 0; }
++        else {
++            msg_Err(intf, "unsupported Interceptor bitmap layout");
++            [bitmap setDirectMapped:NO]; [bitmap release]; bitmap = nil;
++        }
++    }
++}
++- (BOOL)soundResult:(NXSoundDeviceError)error
++{
++    if (error == NX_SoundDeviceErrorNone) return YES;
++    msg_Err(intf, "SoundKit: %s", [[NXSoundDevice textForError:error] cString]);
++    sound_ok = 0;
++    mutex_lock(&bridge); sound_rate = 0; mutex_unlock(&bridge);
++    [stream deactivate];
++    return NO;
++}
++- (void)setupSound
++{
++    const float *rates = NULL;
++    unsigned count = 0, n;
++    float low, high;
++    int supports22 = 0, supports44 = 0;
++    id <NXSoundParameters> parameters;
++    [NXSoundDevice setTimeout:1000]; [NXSoundDevice setUseSeparateThread:NO];
++    if (!device) device = [[NXSoundOut alloc] init];
++    if (!device) { msg_Err(intf, "SoundKit: no output device"); return; }
++    if ([device acceptsContinuousStreamSamplingRates]) {
++        if (![self soundResult:[device getStreamSamplingRatesLow:&low high:&high]]) return;
++        supports22 = low <= 22050 && high >= 22050;
++        supports44 = low <= 44100 && high >= 44100;
++    } else {
++        if (![self soundResult:[device getStreamSamplingRates:&rates count:&count]]) return;
++        for (n = 0; rates && n < count; ++n) {
++            if (rates[n] == 22050) supports22 = 1;
++            if (rates[n] == 44100) supports44 = 1;
++        }
++    }
++    rate = supports44 ? 44100 : supports22 ? 22050 : 0;
++    if (!rate) { msg_Err(intf, "SoundKit: neither 44100 nor 22050 Hz supported"); return; }
++    if (!stream) {
++        parameters = [[NXSoundParameters alloc] init];
++        stream = [[NXPlayStream alloc] initOnDevice:device withParameters:parameters];
++        [(id)parameters release];
++    }
++    if (!stream) { msg_Err(intf, "SoundKit: cannot create stream"); return; }
++    parameters = [stream parameters];
++    [parameters setParameter:NX_SoundStreamDataEncoding toInt:NX_SoundStreamDataEncoding_Linear16];
++    [parameters setParameter:NX_SoundStreamSamplingRate toFloat:rate];
++    [parameters setParameter:NX_SoundStreamChannelCount toInt:2];
++    stride = ((4096 + vm_page_size - 1) / vm_page_size) * vm_page_size;
++    /* Keep the stream, delegate and VM buffers alive for late SoundKit replies. */
++    if (!memory && vm_allocate(task_self(), &memory, stride*8, TRUE) != KERN_SUCCESS) {
++        memory = 0; msg_Err(intf, "SoundKit: cannot allocate buffers"); return;
++    }
++    [stream setDelegate:self];
++    if (![self soundResult:[stream activate]]) return;
++    sound_ok = 1;
++    [self resetSound];
++    mutex_lock(&bridge); sound_rate = sound_ok ? rate : 0; seen_epoch = audio_epoch; mutex_unlock(&bridge);
++    msg_Info(intf, "SoundKit: %d Hz, stereo Linear16", rate);
++}
++- (void)resetSound
++{
++    if (!sound_ok) return;
++    [stream abort:nil];
++    if (![self soundResult:[stream lastError]]) return;
++    if (![self soundResult:[stream pauseAtTime:NX_SOUNDSTREAM_TIME_NULL]]) return;
++    paused = 1; queued = 0; memset(slots, 0, sizeof(slots));
++}
++- (void)soundTick:(int)hold
++{
++    unsigned epoch;
++    int n;
++    if (!sound_ok) return;
++    mutex_lock(&bridge); epoch = audio_epoch; mutex_unlock(&bridge);
++    if (epoch != seen_epoch) { [self resetSound]; seen_epoch = epoch; }
++    if (!sound_ok) return;
++    if (hold) {
++        if (!paused && [self soundResult:[stream pauseAtTime:NX_SOUNDSTREAM_TIME_NULL]]) paused = 1;
++        return;
++    }
++    if (!queued && !paused) {
++        if (![self soundResult:[stream pauseAtTime:NX_SOUNDSTREAM_TIME_NULL]]) return;
++        paused = 1;
++    }
++    for (n = 0; n < 8; ++n) if (!slots[n].busy) {
++        aout_buffer_t *buffer = AudioBuffer(mdate() + (mtime_t)queued*1000000/(rate*4), &epoch);
++        NXSoundDeviceError error;
++        unsigned bytes;
++        void *dest = (void *)(memory+n*stride);
++        if (!buffer) break;
++        if (epoch != seen_epoch || buffer->i_nb_bytes <= 0 ||
++            buffer->i_nb_bytes > 4096 || (buffer->i_nb_bytes & 3)) {
++            aout_BufferFree(buffer); break;
++        }
++        bytes = buffer->i_nb_bytes;
++#ifdef WORDS_BIGENDIAN
++        memcpy(dest, buffer->p_buffer, bytes);
++#else
++        swab((char *)buffer->p_buffer, (char *)dest, bytes);
++#endif
++        aout_BufferFree(buffer);
++        slots[n].tag = tag++ & 0x7fffffff;
++        error = [stream playBuffer:dest size:bytes tag:slots[n].tag];
++        if (![self soundResult:error]) return;
++        slots[n].bytes = bytes; slots[n].busy = 1; queued += bytes; ++submitted;
++    }
++    if (queued && paused && [self soundResult:[stream resumeAtTime:NX_SOUNDSTREAM_TIME_NULL]]) paused = 0;
++}
++- (void)soundStream:(id)sender didCompleteBuffer:(int)number
++{
++    int n;
++    if (sender != stream || !sound_ok) return;
++    for (n = 0; n < 8; ++n) if (slots[n].busy && slots[n].tag == (unsigned)number) {
++        queued -= slots[n].bytes; slots[n].busy = 0; ++completed; break;
++    }
++}
++- (void)soundStreamDidAbort:(id)sender deviceReserved:(BOOL)reserved
++{
++    if (sender == stream && reserved && sound_ok) {
++        msg_Err(intf, "SoundKit: device reserved by another application");
++        sound_ok = 0;
++        mutex_lock(&bridge); sound_rate = 0; mutex_unlock(&bridge);
++    }
++}
++@end
++
++static int OpenIntf(vlc_object_t *obj)
++{
++    intf_thread_t *i = (intf_thread_t *)obj;
++    mutex_lock(&bridge);
++    if (!readers_done) readers_done = condition_alloc();
++    if (interface_reserved || !readers_done) { mutex_unlock(&bridge); return VLC_EGENERIC; }
++    interface_reserved = 1;
++    mutex_unlock(&bridge);
++    i->pf_run = RunIntf;
++    i->b_should_run_on_first_thread = true;
++    return VLC_SUCCESS;
++}
++static void CloseIntf(vlc_object_t *obj)
++{
++    (void)obj;
++    mutex_lock(&bridge); interface_reserved = 0; mutex_unlock(&bridge);
++}
++static void RunIntf(intf_thread_t *intf)
++{
++    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
++    NSTimer *timer;
++    [NSApplication sharedApplication];
++    if (!player) player = [[OSPlayer alloc] init];
++    [player start:intf];
++    timer = [NSTimer timerWithTimeInterval:0.01 target:player
++                  selector:@selector(tick:) userInfo:nil repeats:YES];
++    [[NSRunLoop currentRunLoop] addTimer:timer forMode:NSDefaultRunLoopMode];
++    [[NSRunLoop currentRunLoop] addTimer:timer forMode:NSModalPanelRunLoopMode];
++    [[NSRunLoop currentRunLoop] addTimer:timer forMode:NSEventTrackingRunLoopMode];
++    /* OPENSTEP modal panels need an outer application run level to unwind. */
++    [NSApp run];
++    [timer invalidate];
++    [player finish];
++    [pool release];
++}
+--- /dev/null
++++ b/modules/gui/openstep.mk
+@@ -0,0 +1,8 @@
++# Included from the configured src/Makefile by the OPENSTEP package build.
++# Keep the native module in the core archive: OPENSTEP has no dlopen plugins.
++# Use the package's optimizer flags for Objective-C; vlc-config's extra
++# optimizer flags cause a crash on first presentation with the native toolchain.
++libvlccore_la_LIBADD += openstep.lo
++libvlccore.la: openstep.lo
++openstep.lo: $(top_srcdir)/modules/gui/openstep.m $(top_srcdir)/modules/gui/openstep_pixels.h
++	$(LIBTOOL) --tag=CC --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(CPPFLAGS) $(CFLAGS) -D__LIBVLC__ -D__BUILTIN__ -DMODULE_STRING=\"openstep\" -DMODULE_NAME=openstep -x objective-c -c $(top_srcdir)/modules/gui/openstep.m -o $@
+--- /dev/null
++++ b/modules/gui/openstep_pixels.h
+@@ -0,0 +1,46 @@
++/* OPENSTEP Interceptor pixel layouts.
++ * GPL version 2 or later. Intel storage order, including legacy 18-bit RGB565. */
++#ifndef VLC_OPENSTEP_PIXELS_H
++#define VLC_OPENSTEP_PIXELS_H
++#include <string.h>
++#include <limits.h>
++enum { OS_BAD, OS_BGRX, OS_RGBX, OS_RGB555, OS_RGB565 };
++static int os_pixel_layout(const char *encoding)
++{
++    if (!encoding) return OS_BAD;
++    if (!strcmp(encoding, "--------RRRRRRRRGGGGGGGGBBBBBBBB")) return OS_BGRX;
++    if (!strcmp(encoding, "RRRRRRRRGGGGGGGGBBBBBBBBAAAAAAAA") ||
++        !strcmp(encoding, "RRRRRRRRGGGGGGGGBBBBBBBB--------")) return OS_RGBX;
++    if (!strcmp(encoding, "RRRRRGGGGGBBBBB") ||
++        !strcmp(encoding, "-RRRRRGGGGGBBBBB")) return OS_RGB555;
++    if (!strcmp(encoding, "RRRRRRGGGGGGBBBBBB") ||
++        !strcmp(encoding, "RRRRRGGGGGGBBBBB")) return OS_RGB565;
++    return OS_BAD;
++}
++static int os_pixel_blit(unsigned char *dst, int stride,
++                         const unsigned char *bgrx, int width, int height,
++                         int layout)
++{
++    int x, y, bytes = layout == OS_RGB555 || layout == OS_RGB565 ? 2 : 4;
++    if (!dst || !bgrx || layout < OS_BGRX || layout > OS_RGB565 ||
++        width <= 0 || width > INT_MAX / 4 || height <= 0 ||
++        stride / bytes < width || height > INT_MAX / stride ||
++        height > INT_MAX / (width * 4)) return 0;
++    for (y = 0; y < height; ++y) {
++        unsigned char *out = dst + y * stride;
++        const unsigned char *in = bgrx + y * width * 4;
++        if (layout == OS_BGRX) { memcpy(out, in, width * 4); continue; }
++        for (x = 0; x < width; ++x, in += 4, out += bytes) {
++            if (layout == OS_RGBX) {
++                out[0] = in[2]; out[1] = in[1]; out[2] = in[0]; out[3] = 0;
++            } else {
++                unsigned pixel = layout == OS_RGB555 ?
++                    ((in[2] >> 3) << 10) | ((in[1] >> 3) << 5) | (in[0] >> 3) :
++                    ((in[2] >> 3) << 11) | ((in[1] >> 2) << 5) | (in[0] >> 3);
++                out[0] = pixel & 255; out[1] = pixel >> 8;
++            }
++        }
++    }
++    return 1;
++}
++#endif
+--- /dev/null
++++ b/modules/gui/VLC.iconheader
+@@ -0,0 +1,2 @@
++F	VLC.app	VLC	app
++F	VLC	VLC	app
+--- a/modules/misc/dummy/dummy.h
++++ b/modules/misc/dummy/dummy.h
+@@ -24,6 +24,16 @@
+ /*****************************************************************************
+  * External prototypes
+  *****************************************************************************/
++/* Static modules share one symbol namespace. */
++#ifdef __BUILTIN__
++#define OpenDecoder OpenDummyDecoder
++#define CloseDecoder CloseDummyDecoder
++#define OpenEncoder OpenDummyEncoder
++#define CloseEncoder CloseDummyEncoder
++#define OpenDemux OpenDummyDemux
++#define CloseDemux CloseDummyDemux
++#define OpenVideo OpenDummyVideo
++#endif
+ int  OpenIntf     ( vlc_object_t * );
+ 
+ int  OpenAccess   ( vlc_object_t * );
+--- a/modules/misc/freetype.c
++++ b/modules/misc/freetype.c
+@@ -51,7 +51,10 @@
+ #define FT_CEIL(X)      (((X + 63) & -64) >> 6)
+ #define FT_MulFix(v, s) (((v)*(s))>>16)
+ 
+-#ifdef __APPLE__
++#ifdef NeXT
++#define DEFAULT_FONT "/NextLibrary/Fonts/Helvetica.font/Helvetica"
++#define FC_DEFAULT_FONT "Helvetica"
++#elif defined(__APPLE__)
+ #define DEFAULT_FONT "/System/Library/Fonts/LucidaGrande.dfont"
+ #define FC_DEFAULT_FONT "Lucida Grande"
+ #elif defined( SYS_BEOS )
+--- a/modules/misc/screensaver.c
++++ b/modules/misc/screensaver.c
+@@ -142,9 +142,13 @@
+     {
+         case 0:     /* we're the child */
+         {
++#ifdef NeXT
++            sigsetmask (0);
++#else
+             sigset_t set;
+             sigemptyset (&set);
+             pthread_sigmask (SIG_SETMASK, &set, NULL);
++#endif
+ 
+             /* We don't want output */
+             if( ( freopen( "/dev/null", "w", stdout ) != NULL )
+@@ -321,4 +325,3 @@
+ }
+ 
+ #endif
+-
+--- a/modules/misc/stats/stats.h
++++ b/modules/misc/stats/stats.h
+@@ -25,6 +25,16 @@
+  * External prototypes
+  *****************************************************************************/
+ 
++/* Static modules share one symbol namespace. */
++#ifdef __BUILTIN__
++#define OpenDecoder OpenStatsDecoder
++#define CloseDecoder CloseStatsDecoder
++#define OpenEncoder OpenStatsEncoder
++#define CloseEncoder CloseStatsEncoder
++#define OpenDemux OpenStatsDemux
++#define CloseDemux CloseStatsDemux
++#define OpenVideo OpenStatsVideo
++#endif
+ int  OpenDecoder  ( vlc_object_t * );
+ void CloseDecoder ( vlc_object_t * );
+ 
+--- a/modules/services_discovery/sap.c
++++ b/modules/services_discovery/sap.c
+@@ -500,6 +500,7 @@
+         InitSocket( p_sd, SAP_V4_LOCAL_ADDRESS, SAP_PORT );
+         InitSocket( p_sd, SAP_V4_LINK_ADDRESS, SAP_PORT );
+     }
++#ifdef AF_INET6
+     if( var_CreateGetInteger( p_sd, "sap-ipv6" ) )
+     {
+         char psz_address[NI_MAXNUMERICHOST] = "ff02::2:7ffe%";
+@@ -550,6 +551,7 @@
+         }
+     }
+ 
++#endif
+     psz_addr = var_CreateGetString( p_sd, "sap-addr" );
+     if( psz_addr && *psz_addr )
+         InitSocket( p_sd, psz_addr, SAP_PORT );
+--- a/modules/video_output/image.c
++++ b/modules/video_output/image.c
+@@ -256,7 +256,7 @@
+ 
+     for( i_index = I_OUTPUTPICTURES-1; i_index >= 0; i_index-- )
+     {
+-        free( PP_OUTPUTPICTURE[ i_index ]->p_data );
++        free( PP_OUTPUTPICTURE[ i_index ]->p_data_orig );
+     }
+ 
+     /* Destroy structure */
+--- a/src/audio_output/dec.c
++++ b/src/audio_output/dec.c
+@@ -339,11 +339,11 @@
+     p_buffer->start_date += p_input->i_desync;
+     p_buffer->end_date += p_input->i_desync;
+ 
+-    if ( p_buffer->start_date > mdate() + p_input->i_pts_delay +
++    if ( p_buffer->start_date > vlc_playback_date() + p_input->i_pts_delay +
+          AOUT_MAX_ADVANCE_TIME )
+     {
+         msg_Warn( p_aout, "received buffer in the future (%"PRId64")",
+-                  p_buffer->start_date - mdate());
++                  p_buffer->start_date - vlc_playback_date());
+         if( p_input->p_input_thread )
+         {
+             vlc_mutex_lock( &p_input->p_input_thread->p->counters.counters_lock);
+@@ -389,7 +389,7 @@
+     }
+ 
+     /* If the buffer is too early, wait a while. */
+-    mwait( p_buffer->start_date - AOUT_MAX_PREPARE_TIME );
++    vlc_playback_wait( VLC_OBJECT(p_aout), p_buffer->start_date - AOUT_MAX_PREPARE_TIME );
+ 
+     int ret = aout_InputPlay( p_aout, p_input, p_buffer, i_input_rate );
+ 
+--- a/src/audio_output/input.c
++++ b/src/audio_output/input.c
+@@ -545,13 +545,13 @@
+     start_date = aout_FifoNextStart( p_aout, &p_input->fifo );
+     aout_unlock_input_fifos( p_aout );
+ 
+-    if ( start_date != 0 && start_date < mdate() )
++    if ( start_date != 0 && start_date < vlc_playback_date() )
+     {
+         /* The decoder is _very_ late. This can only happen if the user
+          * pauses the stream (or if the decoder is buggy, which cannot
+          * happen :). */
+         msg_Warn( p_aout, "computed PTS is out of range (%"PRId64"), "
+-                  "clearing out", mdate() - start_date );
++                  "clearing out", vlc_playback_date() - start_date );
+         aout_lock_input_fifos( p_aout );
+         aout_FifoSet( p_aout, &p_input->fifo, 0 );
+         p_input->p_first_byte_to_mix = NULL;
+@@ -562,12 +562,12 @@
+         start_date = 0;
+     }
+ 
+-    if ( p_buffer->start_date < mdate() + AOUT_MIN_PREPARE_TIME )
++    if ( p_buffer->start_date < vlc_playback_date() + AOUT_MIN_PREPARE_TIME )
+     {
+         /* The decoder gives us f*cked up PTS. It's its business, but we
+          * can't present it anyway, so drop the buffer. */
+         msg_Warn( p_aout, "PTS is out of range (%"PRId64"), dropping buffer",
+-                  mdate() - p_buffer->start_date );
++                  vlc_playback_date() - p_buffer->start_date );
+ 
+         inputDrop( p_aout, p_input, p_buffer );
+         inputResamplingStop( p_input );
+@@ -624,7 +624,7 @@
+          */
+         mtime_t drift = p_buffer->start_date - start_date;
+ 
+-        p_input->i_resamp_start_date = mdate();
++        p_input->i_resamp_start_date = vlc_playback_date();
+         p_input->i_resamp_start_drift = (int)drift;
+ 
+         if ( drift > 0 )
+@@ -664,7 +664,7 @@
+             p_input->i_resampling_type = AOUT_RESAMPLING_NONE;
+             msg_Warn( p_aout, "resampling stopped after %"PRIi64" usec "
+                       "(drift: %"PRIi64")",
+-                      mdate() - p_input->i_resamp_start_date,
++                      vlc_playback_date() - p_input->i_resamp_start_date,
+                       p_buffer->start_date - start_date);
+         }
+         else if( abs( (int)(p_buffer->start_date - start_date) ) <
+--- a/src/audio_output/mixer.c
++++ b/src/audio_output/mixer.c
+@@ -106,13 +106,13 @@
+             sizeof(audio_date_t) );
+     start_date = aout_DateGet( &exact_start_date );
+ 
+-    if ( start_date != 0 && start_date < mdate() )
++    if ( start_date != 0 && start_date < vlc_playback_date() )
+     {
+         /* The output is _very_ late. This can only happen if the user
+          * pauses the stream (or if the decoder is buggy, which cannot
+          * happen :). */
+         msg_Warn( p_aout, "output PTS is out of range (%"PRId64"), clearing out",
+-                  mdate() - start_date );
++                  vlc_playback_date() - start_date );
+         aout_FifoSet( p_aout, &p_aout->output.fifo, 0 );
+         aout_DateSet( &exact_start_date, 0 );
+         start_date = 0;
+@@ -134,10 +134,10 @@
+             if ( p_input->b_error ) continue;
+ 
+             p_buffer = p_fifo->p_first;
+-            while ( p_buffer != NULL && p_buffer->start_date < mdate() )
++            while ( p_buffer != NULL && p_buffer->start_date < vlc_playback_date() )
+             {
+                 msg_Warn( p_aout, "input PTS is out of range (%"PRId64"), "
+-                          "trashing", mdate() - p_buffer->start_date );
++                          "trashing", vlc_playback_date() - p_buffer->start_date );
+                 p_buffer = aout_FifoPop( p_aout, p_fifo );
+                 aout_BufferFree( p_buffer );
+                 if( p_input->p_input_thread )
+--- a/src/audio_output/output.c
++++ b/src/audio_output/output.c
+@@ -276,6 +276,10 @@
+ {
+     aout_buffer_t * p_buffer;
+ 
++#ifdef NeXT
++    /* Output devices supply wall-clock dates; queued media excludes pauses. */
++    start_date -= mdate() - vlc_playback_date();
++#endif
+     aout_lock_output_fifo( p_aout );
+ 
+     p_buffer = p_aout->output.fifo.p_first;
+@@ -284,10 +288,10 @@
+      * In the case of b_can_sleek, we don't use a resampler so we need to be
+      * a lot more severe. */
+     while ( p_buffer && p_buffer->start_date <
+-            (b_can_sleek ? start_date : mdate()) - AOUT_PTS_TOLERANCE )
++            (b_can_sleek ? start_date : vlc_playback_date()) - AOUT_PTS_TOLERANCE )
+     {
+         msg_Dbg( p_aout, "audio output is too slow (%"PRId64"), "
+-                 "trashing %"PRId64"us", mdate() - p_buffer->start_date,
++                 "trashing %"PRId64"us", vlc_playback_date() - p_buffer->start_date,
+                  p_buffer->end_date - p_buffer->start_date );
+         p_buffer = p_buffer->p_next;
+         aout_BufferFree( p_aout->output.fifo.p_first );
+--- a/src/extras/libc.c
++++ b/src/extras/libc.c
+@@ -58,7 +58,7 @@
+ #   include <sys/wait.h>
+ #   include <fcntl.h>
+ #   include <sys/socket.h>
+-#   include <sys/poll.h>
++#   include <vlc_network.h>
+ #endif
+ 
+ #if defined(WIN32) || defined(UNDER_CE)
+@@ -525,9 +525,13 @@
+ 
+         case 0:
+         {
++#ifdef NeXT
++            sigsetmask (0);
++#else
+             sigset_t set;
+             sigemptyset (&set);
+             pthread_sigmask (SIG_SETMASK, &set, NULL);
++#endif
+ 
+             /* NOTE:
+              * Like it or not, close can fail (and not only with EBADF)
+--- a/src/input/clock.c
++++ b/src/input/clock.c
+@@ -100,7 +100,7 @@
+  *****************************************************************************/
+ static mtime_t ClockCurrent( input_clock_t *cl )
+ {
+-    return (mdate() - cl->sysdate_ref) * INPUT_RATE_DEFAULT / cl->i_rate +
++    return (vlc_playback_date() - cl->sysdate_ref) * INPUT_RATE_DEFAULT / cl->i_rate +
+            cl->cr_ref;
+ }
+ 
+@@ -143,7 +143,7 @@
+                         input_clock_t *cl, mtime_t i_clock )
+ {
+     const bool b_synchronize = p_input->b_can_pace_control && cl->b_master;
+-    const mtime_t i_mdate = mdate();
++    const mtime_t i_mdate = vlc_playback_date();
+ 
+     if( ( cl->i_synchro_state != SYNCHRO_OK ) ||
+         ( i_clock == 0 && cl->last_cr != 0 ) )
+@@ -187,12 +187,12 @@
+         if( !p_input->p->b_out_pace_control )
+         {
+             mtime_t i_wakeup = ClockToSysdate( cl, i_clock );
+-            while( (i_wakeup - mdate()) / CLOCK_FREQ > 1 )
++            while( (i_wakeup - vlc_playback_date()) / CLOCK_FREQ > 1 )
+             {
+                 msleep( CLOCK_FREQ );
+-                if( p_input->b_die ) i_wakeup = mdate();
++                if( p_input->b_die ) i_wakeup = vlc_playback_date();
+             }
+-            mwait( i_wakeup );
++            vlc_playback_wait( VLC_OBJECT(p_input), i_wakeup );
+         }
+     }
+     else if ( i_mdate - cl->last_update > 200000 )
+--- a/src/input/decoder.c
++++ b/src/input/decoder.c
+@@ -137,7 +137,11 @@
+ mtime_t decoder_GetDisplayDate( decoder_t *p_dec, mtime_t i_ts )
+ {
+     VLC_UNUSED(p_dec);
++#ifdef NeXT
++    return i_ts > 0 ? i_ts + mdate() - vlc_playback_date() : i_ts;
++#else
+     return i_ts;
++#endif
+ }
+ 
+ /**
+@@ -1486,4 +1490,3 @@
+ 
+     vlc_object_release( p_vout );
+ }
+-
+--- a/src/input/decoder_synchro.c
++++ b/src/input/decoder_synchro.c
+@@ -178,7 +178,7 @@
+     memset( p_synchro->pi_meaningful, 0, 4 * sizeof(unsigned int) );
+     p_synchro->i_nb_ref = 0;
+     p_synchro->i_trash_nb_ref = p_synchro->i_dec_nb_ref = 0;
+-    p_synchro->current_pts = mdate() + DEFAULT_PTS_DELAY;
++    p_synchro->current_pts = vlc_playback_date() + DEFAULT_PTS_DELAY;
+     p_synchro->backward_pts = 0;
+     p_synchro->i_current_period = p_synchro->i_backward_period = 0;
+     p_synchro->i_trashed_pic = p_synchro->i_not_chosen_pic =
+@@ -223,7 +223,7 @@
+     if ( p_synchro->b_no_skip )
+         return 1;
+ 
+-    now = mdate();
++    now = vlc_playback_date();
+     period = 1000000 * 1001 / p_synchro->i_frame_rate
+                      * p_synchro->i_current_rate / INPUT_RATE_DEFAULT;
+ 
+@@ -349,7 +349,7 @@
+  *****************************************************************************/
+ void decoder_SynchroDecode( decoder_synchro_t * p_synchro )
+ {
+-    p_synchro->decoding_start = mdate();
++    p_synchro->decoding_start = vlc_playback_date();
+     p_synchro->i_nb_ref = p_synchro->i_dec_nb_ref;
+ }
+ 
+@@ -363,7 +363,7 @@
+ 
+     if( !b_garbage )
+     {
+-        tau = mdate() - p_synchro->decoding_start;
++        tau = vlc_playback_date() - p_synchro->decoding_start;
+ 
+         /* If duration too high, something happened (pause ?), so don't
+          * take it into account. */
+@@ -404,7 +404,7 @@
+     mtime_t         period = 1000000 * 1001 / p_synchro->i_frame_rate
+                               * i_current_rate / INPUT_RATE_DEFAULT;
+ #if 0
+-    mtime_t         now = mdate();
++    mtime_t         now = vlc_playback_date();
+ #endif
+     p_synchro->i_current_rate = i_current_rate;
+ 
+--- a/src/input/es_out.c
++++ b/src/input/es_out.c
+@@ -380,6 +380,10 @@
+     es_out_sys_t *p_sys = out->p_sys;
+     input_thread_t *p_input = p_sys->p_input;
+ 
++    /* Native output retains its queues on a clock that stops while paused. */
++    if( vlc_playback_active() )
++        return;
++
+     if( p_input->i_state  == PAUSE_S )
+     {
+         /* Send discontinuity to decoders (it will allow them to flush
+@@ -1432,7 +1436,7 @@
+     if ( p_block->i_rate == INPUT_RATE_DEFAULT &&
+          es->fmt.i_codec == VLC_FOURCC( 't', 'e', 'l', 'x' ) )
+     {
+-        mtime_t current_date = mdate();
++        mtime_t current_date = vlc_playback_date();
+         if( !p_block->i_pts
+                || p_block->i_pts > current_date + 10000000
+                || current_date > p_block->i_pts )
+--- a/src/interface/interface.c
++++ b/src/interface/interface.c
+@@ -50,7 +50,7 @@
+  * Local prototypes
+  *****************************************************************************/
+ static void* RunInterface( vlc_object_t *p_this );
+-#if defined( __APPLE__ ) || defined( WIN32 )
++#if defined( __APPLE__ ) || defined( WIN32 ) || defined(NeXT)
+ static void * MonitorLibVLCDeath( vlc_object_t *p_this );
+ #endif
+ static int AddIntfCallback( vlc_object_t *, char const *,
+@@ -96,7 +96,7 @@
+     if( !p_intf )
+         return NULL;
+     p_intf->b_interaction = false;
+-#if defined( __APPLE__ ) || defined( WIN32 )
++#if defined( __APPLE__ ) || defined( WIN32 ) || defined(NeXT)
+     p_intf->b_should_run_on_first_thread = false;
+ #endif
+ 
+@@ -139,7 +139,7 @@
+  */
+ int intf_RunThread( intf_thread_t *p_intf )
+ {
+-#if defined( __APPLE__ ) || defined( WIN32 )
++#if defined( __APPLE__ ) || defined( WIN32 ) || defined(NeXT)
+     /* Hack to get Mac OS X Cocoa runtime running
+      * (it needs access to the main thread) */
+     if( p_intf->b_should_run_on_first_thread )
+@@ -261,7 +261,7 @@
+     return NULL;
+ }
+ 
+-#if defined( __APPLE__ ) || defined( WIN32 )
++#if defined( __APPLE__ ) || defined( WIN32 ) || defined(NeXT)
+ /*****************************************************************************
+  * MonitorLibVLCDeath: Used when b_should_run_on_first_thread is set.
+  *****************************************************************************/
+--- a/src/libvlc.c
++++ b/src/libvlc.c
+@@ -39,6 +39,10 @@
+ #include <vlc_common.h>
+ #include "control/libvlc_internal.h"
+ #include <vlc_input.h>
++#ifdef NeXT
++# include <gcrypt.h>
++# include <vlc_gcrypt.h>
++#endif
+ 
+ #include "modules/modules.h"
+ #include "config/configuration.h"
+@@ -188,6 +192,10 @@
+     vlc_mutex_t *lock = var_AcquireMutex( "libvlc" );
+     if( i_instances == 0 )
+     {
++#ifdef NeXT
++        /* Install crypto locks before any worker or SRTP module can use it. */
++        vlc_gcrypt_init();
++#endif
+         /* Guess what CPU we have */
+         cpu_flags = CPUCapabilities();
+        /* The module bank will be initialized later */
+--- a/src/misc/block.c
++++ b/src/misc/block.c
+@@ -243,7 +243,22 @@
+ #endif
+ 
+ 
+-#ifdef WIN32
++#ifdef NeXT
++/* block_File callers own their descriptor while loading it. */
++static ssize_t pread (int fd, void *buf, size_t count, off_t offset)
++{
++    off_t saved = lseek (fd, 0, SEEK_CUR);
++    ssize_t result;
++    int error;
++    if (saved == (off_t)-1 || lseek (fd, offset, SEEK_SET) == (off_t)-1)
++        return -1;
++    do result = read (fd, buf, count); while (result < 0 && errno == EINTR);
++    error = errno;
++    if (lseek (fd, saved, SEEK_SET) == (off_t)-1) return -1;
++    errno = error;
++    return result;
++}
++#elif defined(WIN32)
+ static
+ ssize_t pread (int fd, void *buf, size_t count, off_t offset)
+ {
+@@ -325,8 +340,9 @@
+     for (size_t i = 0; i < length;)
+     {
+         ssize_t len = pread (fd, block->p_buffer + i, length - i, i);
+-        if (len == -1)
++        if (len <= 0)
+         {
++            if (len == 0) errno = EIO; /* File was truncated while reading. */
+             block_Release (block);
+             return NULL;
+         }
+--- a/src/misc/mtime.c
++++ b/src/misc/mtime.c
+@@ -34,10 +34,75 @@
+ #endif
+ 
+ #include <vlc_common.h>
++#ifdef NeXT
++#include <mach/mach.h>
++#include <mach/thread_switch.h>
++#endif
+ 
+ #include <time.h>                      /* clock_gettime(), clock_nanosleep() */
+ #include <assert.h>
+ #include <errno.h>
++
++#ifdef NeXT
++/* ponytail: one clock for the native player's single playback pipeline;
++ * use per-input clocks if concurrent embedded players are added. */
++static struct mutex playback_lock = MUTEX_INITIALIZER;
++static bool playback_active, playback_paused;
++static mtime_t playback_offset, playback_pause_date;
++
++void vlc_playback_pause( bool paused )
++{
++    mutex_lock( &playback_lock );
++    playback_active = true;
++    if( paused != playback_paused )
++    {
++        const mtime_t now = mdate();
++        if( paused ) playback_pause_date = now;
++        else playback_offset += now - playback_pause_date;
++        playback_paused = paused;
++    }
++    mutex_unlock( &playback_lock );
++}
++
++bool vlc_playback_active( void )
++{
++    bool active;
++    mutex_lock( &playback_lock );
++    active = playback_active;
++    mutex_unlock( &playback_lock );
++    return active;
++}
++
++bool vlc_playback_paused( void )
++{
++    bool paused;
++    mutex_lock( &playback_lock );
++    paused = playback_paused;
++    mutex_unlock( &playback_lock );
++    return paused;
++}
++
++mtime_t vlc_playback_date( void )
++{
++    mtime_t date;
++    mutex_lock( &playback_lock );
++    date = (playback_paused ? playback_pause_date : mdate()) - playback_offset;
++    mutex_unlock( &playback_lock );
++    return date;
++}
++
++void vlc_playback_wait( vlc_object_t *object, mtime_t date )
++{
++    if( !vlc_playback_active() ) { mwait(date); return; }
++    while( vlc_object_alive(object) && vlc_object_alive(object->p_libvlc) )
++    {
++        mtime_t delay = date - vlc_playback_date();
++        /* Return to input controls promptly, including while paused. */
++        if( delay <= 0 || vlc_playback_paused() ) return;
++        msleep( __MIN(delay, 10000) );
++    }
++}
++#endif
+ 
+ #ifdef HAVE_UNISTD_H
+ #   include <unistd.h>                                           /* select() */
+@@ -387,7 +452,15 @@
+  */
+ void msleep( mtime_t delay )
+ {
+-#if defined( HAVE_CLOCK_NANOSLEEP )
++#if defined( NeXT )
++    /* Native usleep uses process-wide SIGALRM and races between threads. */
++    mtime_t deadline = mdate() + delay;
++    while (delay > 0) {
++        thread_switch(THREAD_NULL, SWITCH_OPTION_WAIT,
++                      delay > 999999 ? 1000 : (unsigned)((delay + 999) / 1000));
++        delay = deadline - mdate();
++    }
++#elif defined( HAVE_CLOCK_NANOSLEEP )
+     lldiv_t d = lldiv( delay, 1000000 );
+     struct timespec ts = { d.quot, d.rem * 1000 };
+ 
+@@ -602,4 +675,3 @@
+     t |= ((70LL * 365 + 17) * 24 * 60 * 60 + ts.tv_sec) << 32;
+     return t;
+ }
+-
+--- /dev/null
++++ b/src/misc/openstep_threads.inc
+@@ -0,0 +1,98 @@
++/* OPENSTEP thread-local storage for VLC; GPL version 2 or later.
++ * Mutexes and timed conditions use the installed SDL cthreads backend. */
++struct vlc_openstep_value {
++    cthread_t thread;
++    void *value;
++    void (*destroy)(void *);
++    struct vlc_openstep_value *next;
++};
++struct vlc_openstep_key {
++    void (*destroy)(void *);
++    struct vlc_openstep_value *values;
++    struct vlc_openstep_key *next;
++};
++static struct mutex tls_lock = MUTEX_INITIALIZER;
++static struct vlc_openstep_key *tls_keys;
++
++/* ponytail: linear lookup over VLC's few TLS keys/threads; use a per-thread
++ * table if profiling ever shows this in the playback hot path. */
++static int openstep_key_create(vlc_threadvar_t *key, void (*destroy)(void *))
++{
++    *key = calloc(1, sizeof(**key));
++    if (!*key) return ENOMEM;
++    (*key)->destroy = destroy;
++    mutex_lock(&tls_lock);
++    (*key)->next = tls_keys;
++    tls_keys = *key;
++    mutex_unlock(&tls_lock);
++    return 0;
++}
++static void openstep_key_delete(vlc_threadvar_t *key)
++{
++    struct vlc_openstep_key **p;
++    struct vlc_openstep_value *v, *next;
++    mutex_lock(&tls_lock);
++    for (p = &tls_keys; *p && *p != *key; p = &(*p)->next) {}
++    if (*p) *p = (*key)->next;
++    for (v = (*key)->values; v; v = next) { next = v->next; free(v); }
++    free(*key);
++    *key = NULL;
++    mutex_unlock(&tls_lock);
++}
++int vlc_openstep_tls_set(vlc_threadvar_t *key, void *value)
++{
++    struct vlc_openstep_value *v;
++    cthread_t self = cthread_self();
++    mutex_lock(&tls_lock);
++    for (v = (*key)->values; v && v->thread != self; v = v->next) {}
++    if (!v) {
++        v = malloc(sizeof(*v));
++        if (!v) { mutex_unlock(&tls_lock); return ENOMEM; }
++        v->thread = self;
++        v->destroy = (*key)->destroy;
++        v->next = (*key)->values;
++        (*key)->values = v;
++    }
++    v->value = value;
++    mutex_unlock(&tls_lock);
++    return 0;
++}
++void *vlc_openstep_tls_get(vlc_threadvar_t *key)
++{
++    struct vlc_openstep_value *v;
++    void *value;
++    cthread_t self = cthread_self();
++    mutex_lock(&tls_lock);
++    for (v = (*key)->values; v && v->thread != self; v = v->next) {}
++    value = v ? v->value : NULL;
++    mutex_unlock(&tls_lock);
++    return value;
++}
++static void openstep_tls_cleanup(void)
++{
++    struct vlc_openstep_key *key;
++    struct vlc_openstep_value **p, *v, *pending, *next;
++    unsigned pass;
++    cthread_t self = cthread_self();
++    /* Match POSIX's four destructor passes, then discard any reassignment. */
++    for (pass = 0; pass <= 4; ++pass) {
++        mutex_lock(&tls_lock);
++        pending = NULL;
++        for (key = tls_keys; key; key = key->next) {
++            for (p = &key->values; *p && (*p)->thread != self; p = &(*p)->next) {}
++            if (*p) {
++                v = *p;
++                *p = v->next;
++                v->next = pending;
++                pending = v;
++            }
++        }
++        mutex_unlock(&tls_lock);
++        if (!pending) break;
++        for (v = pending; v; v = next) {
++            next = v->next;
++            if (pass < 4 && v->destroy && v->value) v->destroy(v->value);
++            free(v);
++        }
++    }
++}
+--- a/src/misc/rand.c
++++ b/src/misc/rand.c
+@@ -26,7 +26,17 @@
+ #include <vlc_common.h>
+ #include <vlc_rand.h>
+ 
+-#ifndef WIN32
++#ifdef NeXT
++#include <gcrypt.h>
++#include <vlc_gcrypt.h>
++
++void vlc_rand_bytes (void *buf, size_t len)
++{
++    /* Native systems have no /dev/urandom; use the installed entropy gatherer. */
++    vlc_gcrypt_init ();
++    gcry_randomize (buf, len, GCRY_STRONG_RANDOM);
++}
++#elif !defined(WIN32)
+ #include <stdint.h>
+ #include <string.h>
+ #include <stdlib.h>
+--- a/src/misc/threads.c
++++ b/src/misc/threads.c
+@@ -46,6 +46,10 @@
+  * Global mutex for lazy initialization of the threads system
+  *****************************************************************************/
+ static volatile unsigned i_initializations = 0;
++#ifdef NeXT
++#include "openstep_threads.inc"
++static struct mutex once_mutex = MUTEX_INITIALIZER;
++#endif
+ 
+ #if defined( LIBVLC_USE_PTHREAD )
+ # include <sched.h>
+@@ -158,12 +162,18 @@
+ 
+     /* If we have lazy mutex initialization, use it. Otherwise, we just
+      * hope nothing wrong happens. */
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    mutex_lock(&once_mutex);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_mutex_lock( &once_mutex );
+ #endif
+ 
+     if( i_initializations == 0 )
+     {
++#ifdef NeXT
++        static bool initialized;
++        if (!initialized) { cthread_init(); initialized = true; }
++#endif
+         p_root = vlc_custom_create( (vlc_object_t *)NULL, sizeof( *p_root ),
+                                     VLC_OBJECT_GENERIC, "root" );
+         if( p_root == NULL )
+@@ -183,7 +193,9 @@
+ out:
+     /* If we have lazy mutex initialization support, unlock the mutex.
+      * Otherwize, we are screwed. */
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    mutex_unlock(&once_mutex);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_mutex_unlock( &once_mutex );
+ #endif
+ 
+@@ -197,7 +209,9 @@
+  *****************************************************************************/
+ void vlc_threads_end( void )
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    mutex_lock(&once_mutex);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_mutex_lock( &once_mutex );
+ #endif
+ 
+@@ -213,7 +227,9 @@
+     }
+     i_initializations--;
+ 
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    mutex_unlock(&once_mutex);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_mutex_unlock( &once_mutex );
+ #endif
+ }
+@@ -228,7 +244,10 @@
+  *****************************************************************************/
+ int vlc_mutex_init( vlc_mutex_t *p_mutex )
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    *p_mutex = SDL_CreateMutex();
++    return *p_mutex ? 0 : ENOMEM;
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_mutexattr_t attr;
+     int                 i_result;
+ 
+@@ -282,7 +301,9 @@
+  *****************************************************************************/
+ int vlc_mutex_init_recursive( vlc_mutex_t *p_mutex )
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    return vlc_mutex_init(p_mutex);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_mutexattr_t attr;
+     int                 i_result;
+ 
+@@ -310,7 +331,9 @@
+  *****************************************************************************/
+ void __vlc_mutex_destroy( const char * psz_file, int i_line, vlc_mutex_t *p_mutex )
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    SDL_DestroyMutex(*p_mutex);
++#elif defined( LIBVLC_USE_PTHREAD )
+     int val = pthread_mutex_destroy( p_mutex );
+     VLC_THREAD_ASSERT ("destroying mutex");
+ 
+@@ -338,7 +361,10 @@
+  *****************************************************************************/
+ int __vlc_cond_init( vlc_cond_t *p_condvar )
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    *p_condvar = SDL_CreateCond();
++    return *p_condvar ? 0 : ENOMEM;
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_condattr_t attr;
+     int ret;
+ 
+@@ -390,7 +416,9 @@
+  *****************************************************************************/
+ void __vlc_cond_destroy( const char * psz_file, int i_line, vlc_cond_t *p_condvar )
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    SDL_DestroyCond(*p_condvar);
++#elif defined( LIBVLC_USE_PTHREAD )
+     int val = pthread_cond_destroy( p_condvar );
+     VLC_THREAD_ASSERT ("destroying condition");
+ 
+@@ -412,7 +440,9 @@
+ {
+     int i_ret;
+ 
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    i_ret = openstep_key_create(p_tls, destr);
++#elif defined( LIBVLC_USE_PTHREAD )
+     i_ret =  pthread_key_create( p_tls, destr );
+ #elif defined( UNDER_CE )
+     i_ret = ENOSYS;
+@@ -428,7 +458,9 @@
+ 
+ void vlc_threadvar_delete (vlc_threadvar_t *p_tls)
+ {
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    openstep_key_delete(p_tls);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_key_delete (*p_tls);
+ #elif defined( UNDER_CE )
+ #elif defined( WIN32 )
+@@ -444,7 +476,7 @@
+     vlc_object_t *object;
+ };
+ 
+-#if defined (LIBVLC_USE_PTHREAD)
++#if defined (LIBVLC_USE_PTHREAD) || defined(NeXT)
+ # define THREAD_RTYPE void *
+ # define THREAD_RVAL  NULL
+ #elif defined (WIN32)
+@@ -465,6 +497,9 @@
+     func (obj);
+     msg_Dbg (obj, "thread ended");
+ 
++#ifdef NeXT
++    openstep_tls_cleanup();
++#endif
+     return THREAD_RVAL;
+ }
+ 
+@@ -492,7 +527,11 @@
+     /* Make sure we don't re-create a thread if the object has already one */
+     assert( !p_priv->b_thread );
+ 
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    p_priv->thread_id = cthread_fork(thread_entry, boot);
++    i_ret = p_priv->thread_id ? 0 : EAGAIN;
++    if (i_ret) free(boot);
++#elif defined( LIBVLC_USE_PTHREAD )
+     pthread_attr_t attr;
+     pthread_attr_init (&attr);
+ 
+@@ -664,7 +703,10 @@
+     vlc_object_internals_t *p_priv = vlc_internals( p_this );
+     int i_ret = 0;
+ 
+-#if defined( LIBVLC_USE_PTHREAD )
++#if defined(NeXT)
++    if (p_priv->thread_id == cthread_self()) cthread_detach(p_priv->thread_id);
++    else cthread_join(p_priv->thread_id);
++#elif defined( LIBVLC_USE_PTHREAD )
+     /* Make sure we do return if we are calling vlc_thread_join()
+      * from the joined thread */
+     if (pthread_equal (pthread_self (), p_priv->thread_id))
+--- a/src/modules/modules.c
++++ b/src/modules/modules.c
+@@ -89,6 +89,9 @@
+ 
+ #include "modules/modules.h"
+ #include "modules/builtin.h"
++#ifdef NeXT
++extern int vlc_entry__openstep(module_t *);
++#endif
+ 
+ /*****************************************************************************
+  * Local prototypes
+@@ -246,6 +249,9 @@
+ 
+     msg_Dbg( p_this, "checking builtin modules" );
+     ALLOCATE_ALL_BUILTINS();
++#ifdef NeXT
++    ALLOCATE_BUILTIN(openstep);
++#endif
+ }
+ 
+ /**
+--- a/src/modules/modules.h
++++ b/src/modules/modules.h
+@@ -78,7 +78,9 @@
+ #define MODULE_SHORTCUT_MAX 50
+ 
+ /* The module handle type. */
+-#if defined(HAVE_DL_DYLD)
++#if !defined(HAVE_DYNAMIC_PLUGINS)
++typedef void * module_handle_t;
++#elif defined(HAVE_DL_DYLD)
+ #   if defined (HAVE_MACH_O_DYLD_H)
+ #       include <mach-o/dyld.h>
+ #   endif
+--- a/src/network/getaddrinfo.c
++++ b/src/network/getaddrinfo.c
+@@ -168,7 +168,7 @@
+     return 0;
+ }
+ #undef getnameinfo
+-#define getnameifo stub_getnameinfo
++#define getnameinfo stub_getnameinfo
+ #endif /* if !HAVE_GETNAMEINFO */
+ 
+ #ifndef HAVE_GETADDRINFO
+@@ -441,9 +441,9 @@
+     return 0;
+ }
+ #undef getaddrinfo
+-#define getaddrifo stub_getaddrinfo
++#define getaddrinfo stub_getaddrinfo
+ #undef freeaddrinfo
+-#define freeaddrifo stub_freeaddrinfo
++#define freeaddrinfo stub_freeaddrinfo
+ #endif /* if !HAVE_GETADDRINFO */
+ 
+ #if defined( WIN32 ) && !defined( UNDER_CE )
+@@ -770,4 +770,3 @@
+     return inet_ntop( af, src, dst, cnt );
+ #endif /* HAVE_INET_NTOP */
+ }
+-
+--- a/src/network/poll.c
++++ b/src/network/poll.c
+@@ -35,6 +35,51 @@
+ {
+     (void)fds; (void)nfds; (void)timeout;
+     abort ();
++}
++#elif defined(NeXT)
++#include <errno.h>
++#include <fcntl.h>
++#include <sys/time.h>
++#include <unistd.h>
++
++int vlc_poll(struct pollfd *fds, unsigned nfds, int timeout)
++{
++    fd_set rd, wr, ex;
++    struct timeval tv;
++    unsigned i;
++    int highest = -1, ready = 0, result;
++    FD_ZERO(&rd); FD_ZERO(&wr); FD_ZERO(&ex);
++    for (i = 0; i < nfds; ++i) {
++        int fd = fds[i].fd;
++        fds[i].revents = 0;
++        if (fd < 0) continue;
++        /* NeXT fd_set is a fixed bitset; never pass an out-of-range fd. */
++        if (fd >= FD_SETSIZE || fcntl(fd, F_GETFD) < 0) {
++            fds[i].revents = POLLNVAL; ++ready; continue;
++        }
++        if (fd > highest) highest = fd;
++        if (fds[i].events & POLLIN) FD_SET(fd, &rd);
++        if (fds[i].events & POLLOUT) FD_SET(fd, &wr);
++        if (fds[i].events & POLLPRI) FD_SET(fd, &ex);
++    }
++    if (ready) timeout = 0;
++    if (highest < 0) {
++        if (timeout > 0) msleep((mtime_t)timeout * 1000);
++        else if (timeout < 0) { pause(); errno = EINTR; return -1; }
++        return ready;
++    }
++    tv.tv_sec = timeout / 1000; tv.tv_usec = (timeout % 1000) * 1000;
++    result = select(highest + 1, &rd, &wr, &ex, timeout < 0 ? NULL : &tv);
++    if (result < 0) return -1;
++    for (i = 0; i < nfds; ++i) {
++        int fd = fds[i].fd;
++        if (fd < 0 || fds[i].revents == POLLNVAL) continue;
++        fds[i].revents = (FD_ISSET(fd, &rd) ? POLLIN : 0) |
++                        (FD_ISSET(fd, &wr) ? POLLOUT : 0) |
++                        (FD_ISSET(fd, &ex) ? POLLPRI : 0);
++        if (fds[i].revents) ++ready;
++    }
++    return ready;
+ }
+ #else /* !HAVE_POLL */
+ #include <string.h>
+--- a/src/network/rootbind.c
++++ b/src/network/rootbind.c
+@@ -22,7 +22,7 @@
+ # include <config.h>
+ #endif
+ 
+-#if !defined (WIN32) && !defined (SYS_BEOS)
++#if !defined (WIN32) && !defined (SYS_BEOS) && !defined (NeXT)
+ # define ENABLE_ROOTWRAP 1
+ #endif
+ 
+--- a/src/network/udp.c
++++ b/src/network/udp.c
+@@ -291,6 +291,7 @@
+ static int net_SetMcastOut (vlc_object_t *p_this, int fd, int family,
+                             const char *iface, const char *addr)
+ {
++#if defined(IPV6_MULTICAST_IF) || defined(__linux__)
+     if (iface != NULL)
+     {
+         int scope = if_nametoindex (iface);
+@@ -306,6 +307,7 @@
+         msg_Err (p_this, "%s: %m", iface);
+     }
+ 
++#endif
+     if (addr != NULL)
+     {
+         if (family == AF_INET)
+@@ -453,6 +455,7 @@
+ {
+     int level, iid = 0;
+ 
++#if defined(AF_INET6) || defined(MCAST_JOIN_SOURCE_GROUP)
+     char *iface = var_CreateGetNonEmptyString (obj, "miface");
+     if (iface != NULL)
+     {
+@@ -466,6 +469,7 @@
+         free (iface);
+     }
+ 
++#endif
+     switch (grp->sa_family)
+     {
+ #ifdef AF_INET6
+@@ -613,10 +617,12 @@
+             break;
+ #endif
+ 
++#ifdef IP_TOS
+         case AF_INET:
+             level = SOL_IP;
+             cmd = IP_TOS;
+             break;
++#endif
+ 
+         default:
+ #ifdef ENOPROTOOPT
+--- /dev/null
++++ b/src/test/openstep_format.c
+@@ -0,0 +1,78 @@
++/* Standalone native formatter check, GPL version 2 or later.
++ * gcc-4.2 -std=gnu99 -DNeXT -Iinclude -I/usr/local/include
++ * src/test/openstep_format.c -L/usr/local/lib -lcurl -lssl -lcrypto -lz -o test
++ */
++#include "vlc_openstep.h"
++#include <assert.h>
++int main(void)
++{
++    char out[80], small[5];
++    const char *expected = "-9223372036854775808/18446744073709551615/123/7";
++    int n = snprintf(out, sizeof(out), "%lld/%llu/%zu/%d",
++                     -9223372036854775807LL-1, ~0ULL, (size_t)123, 7);
++    assert(n == (int)strlen(expected) && !strcmp(out, expected));
++    assert(snprintf(small, sizeof(small), "%s", out) == n);
++    assert(!strcmp(small, "-922"));
++    assert(snprintf(NULL, 0, "%s", out) == n);
++    assert(strerror_r(ENOENT, out, sizeof(out)) == 0);
++    assert(!strcmp(out, strerror(ENOENT)));
++    assert(strerror_r(ENOENT, small, sizeof(small)) == ERANGE);
++    assert(small[sizeof(small)-1] == 0);
++    assert(strerror_r(ENOENT, NULL, 0) == ERANGE);
++    assert(strlen(strsignal(SIGTERM)) > 0);
++    assert(!strcmp(strsignal(-1), "Unknown signal"));
++    {
++        char native[] = {0x34, 0x12, 0, (char)0x80, (char)0xff, 0x7f, 0, 0};
++        char expected[] = {0x12, 0x34, (char)0x80, 0, 0x7f, (char)0xff, 0, 0};
++        char wire[sizeof(native)];
++        swab(native, wire, sizeof(native));
++        assert(!memcmp(wire, expected, sizeof(wire)));
++    }
++    {
++        char *end;
++        const char *bad = " +xyz";
++        assert(strtoull("ffffffffffffffff!", &end, 16) == ~0ULL && *end == '!');
++        assert(strtoull("18446744073709551615", &end, 10) == ~0ULL && !*end);
++        errno = 0;
++        assert(strtoull("18446744073709551616x", &end, 10) == ~0ULL);
++        assert(errno == ERANGE && *end == 'x');
++        assert(strtoull(" -1", &end, 0) == ~0ULL && !*end);
++        assert(strtoull("  +0x2a!", &end, 0) == 42 && *end == '!');
++        assert(strtoull("0778", &end, 0) == 63 && *end == '8');
++        assert(strtoull("0x", &end, 0) == 0 && *end == 'x');
++        assert(strtoull(bad, &end, 10) == 0 && end == bad);
++        assert(strtoull("z", &end, 36) == 35 && !*end);
++        errno = 0;
++        assert(strtoull(bad, &end, 1) == 0 && end == bad && errno == EINVAL);
++    }
++    {
++        char *cwd = getcwd(NULL, 0);
++        char path[MAXPATHLEN];
++        DIR *dir;
++        struct direct *entry;
++        char first[MAXPATHLEN];
++        int status, child;
++        assert(cwd && cwd[0] == '/');
++        assert(getcwd(path, sizeof(path)) == path && !strcmp(cwd, path));
++        assert(getcwd(small, 1) == NULL && errno == ERANGE);
++        assert(getcwd(path, 0) == NULL && errno == EINVAL);
++        free(cwd);
++        dir = opendir(".");
++        assert(dir);
++        assert(dirfd(dir) >= 0);
++        entry = (struct direct *)readdir(dir);
++        assert(entry);
++        strcpy(first, entry->d_name);
++        while (readdir(dir)) { }
++        rewinddir(dir);
++        entry = (struct direct *)readdir(dir);
++        assert(entry && !strcmp(first, entry->d_name));
++        closedir(dir);
++        child = fork();
++        assert(child >= 0);
++        if (!child) _exit(7);
++        assert(waitpid(child, &status, 0) == child);
++        assert(WIFEXITED(status) && WEXITSTATUS(status) == 7);
++    }
++    return 0;
++}
+--- /dev/null
++++ b/src/test/openstep_pixels.c
+@@ -0,0 +1,28 @@
++/* Compile and run standalone with gcc-4.2. GPL version 2 or later. */
++#include "../../modules/gui/openstep_pixels.h"
++#include <assert.h>
++int main(void)
++{
++    const unsigned char src[] = {0,0,255,0, 0,255,0,0, 255,0,0,0, 255,255,255,0};
++    unsigned char dst[24];
++    memset(dst, 0xa5, sizeof(dst));
++    assert(os_pixel_layout("--------RRRRRRRRGGGGGGGGBBBBBBBB") == OS_BGRX);
++    assert(os_pixel_layout("RRRRRRGGGGGGBBBBBB") == OS_RGB565);
++    assert(os_pixel_layout(NULL) == OS_BAD && os_pixel_layout("unknown") == OS_BAD);
++    assert(os_pixel_blit(dst, 12, src, 2, 2, OS_BGRX));
++    assert(!memcmp(dst, src, 8) && !memcmp(dst+12, src+8, 8));
++    assert(dst[8] == 0xa5 && dst[23] == 0xa5);
++    assert(os_pixel_blit(dst, 12, src, 2, 2, OS_RGBX));
++    assert(dst[0] == 255 && dst[2] == 0 && dst[14] == 255);
++    assert(os_pixel_blit(dst, 12, src, 2, 2, OS_RGB565));
++    assert(dst[0] == 0 && dst[1] == 0xf8 && dst[2] == 0xe0 && dst[3] == 7);
++    assert(dst[12] == 31 && dst[13] == 0 && dst[14] == 255 && dst[15] == 255);
++    assert(os_pixel_blit(dst, 12, src, 2, 2, OS_RGB555));
++    assert(dst[1] == 0x7c && dst[2] == 0xe0 && dst[3] == 3);
++    assert(dst[8] == 0xa5 && dst[23] == 0xa5);
++    assert(!os_pixel_blit(dst, 3, src, 2, 2, OS_RGB555));
++    assert(!os_pixel_blit(dst, 0, src, 2, 2, OS_BGRX));
++    assert(!os_pixel_blit(dst, 12, src, INT_MAX, 2, OS_BGRX));
++    assert(!os_pixel_blit(dst, 12, src, 2, 2, OS_BAD));
++    return 0;
++}
+--- /dev/null
++++ b/src/test/openstep_playback.inc
+@@ -0,0 +1,98 @@
++/* Included only in the separate GUI regression executable. */
++- (void)checkPlayback:(id)sender
++{
++    static mtime_t deadline, action_date, last_change, first_change;
++    static unsigned phase, cycles, saved_completed;
++    static int has_audio;
++    static unsigned char *previous;
++    static size_t bytes;
++    static input_thread_t *initial_input;
++    mtime_t now = mdate();
++    input_thread_t *input;
++    vlc_value_t choices;
++    int state, input_state;
++    unsigned n;
++    NSButton *button = nil;
++    NSArray *views;
++    if (!deadline) { deadline = now + 4000000; return; }
++    if (previous) assert(frame && bytes == width * height * 4);
++    if (previous && !dirty && memcmp(previous, frame, bytes)) {
++        memcpy(previous, frame, bytes);
++        last_change = now;
++        if (!first_change) first_change = now;
++    }
++    if (now < deadline) return;
++    vlc_object_lock(playlist);
++    state = playlist->status.i_status;
++    input = playlist->p_input;
++    input_state = input ? var_GetInteger(input, "state") : -1;
++    vlc_object_unlock(playlist);
++    if (phase == 4) {
++        assert(state == PLAYLIST_STOPPED && !input && !vlc_playback_paused());
++        saved_completed = completed;
++        first_change = 0;
++        [self play:nil]; phase = 5; deadline = now + 2000000; return;
++    }
++    if (phase == 5) {
++        assert(state == PLAYLIST_RUNNING && input && first_change);
++        assert(!has_audio || completed > saved_completed);
++        fprintf(stderr, "PLAYBACK PASS stop while paused, restart, quit while paused\n");
++        free(previous); previous = NULL;
++        [sender invalidate]; [self play:nil]; [self quit:nil]; return;
++    }
++    if (!previous) {
++        assert(input && frame && frames > 10);
++        var_Change(input, "audio-es", VLC_VAR_CHOICESCOUNT, &choices, NULL);
++        has_audio = choices.i_int > 1; /* Includes the Disable choice. */
++        assert(!has_audio || completed > 10);
++        initial_input = input;
++        bytes = width * height * 4;
++        previous = malloc(bytes);
++        assert(previous);
++        memcpy(previous, frame, bytes);
++    }
++    assert(input == initial_input && bytes == width * height * 4);
++    if (phase == 1 || phase == 2) {
++        assert(state == PLAYLIST_PAUSED && input_state == PAUSE_S && (!has_audio || paused));
++        if (phase == 1) {
++            fprintf(stderr, "LATENCY pause cycle=%u last_motion_ms=%ld\n",
++                    cycles+1, (long)((last_change-action_date)/1000));
++            assert(last_change == action_date);
++            saved_completed = completed;
++        } else {
++            assert(completed == saved_completed && last_change == action_date);
++        }
++    } else {
++        assert(state == PLAYLIST_RUNNING && input_state == PLAYING_S && (!has_audio || !paused));
++        if (phase == 3) {
++            assert(first_change && (!has_audio || completed > saved_completed));
++            fprintf(stderr, "LATENCY resume cycle=%u first_motion_ms=%ld\n",
++                    ++cycles, (long)((first_change-action_date)/1000));
++            assert(first_change - action_date < 200000);
++            if (cycles == 4) {
++                [self play:nil]; [self stop:nil];
++                phase = 4; deadline = now + 1000000; return;
++            }
++        }
++    }
++    if (phase == 0 || phase == 2) {
++        views = [[window contentView] subviews];
++        for (n = 0; n < [views count]; ++n) {
++            id candidate = [views objectAtIndex:n];
++            if ([candidate isKindOfClass:[NSButton class]] &&
++                [[candidate title] isEqual:@"Play/Pause"]) {
++                button = candidate; break;
++            }
++        }
++        assert(button);
++        [button performClick:nil];
++        action_date = last_change = mdate(); first_change = 0;
++        /* Ignore any frame already presented during the button animation. */
++        memcpy(previous, frame, bytes);
++    }
++    fflush(stderr);
++    phase = (phase + 1) % 4;
++    /* Include a long pause to expose stale decoder timestamps on resume. */
++    deadline = mdate() + (phase == 0 ? 200000 :
++                         phase == 2 && cycles == 0 ? 6000000 : 1000000);
++}
+--- /dev/null
++++ b/src/test/openstep_poll.c
+@@ -0,0 +1,29 @@
++/* Link with the configured native poll.c and mtime.c, or libvlccore.
++ * GPL version 2 or later. */
++#include "config.h"
++#include <vlc_common.h>
++#include <vlc_network.h>
++#include <sys/time.h>
++#include <assert.h>
++#include <unistd.h>
++int main(void)
++{
++    int pipefd[2];
++    struct pollfd fds[3];
++    char byte;
++    mtime_t before = mdate();
++    assert(vlc_poll(NULL, 0, 50) == 0);
++    assert(mdate() - before >= 40000);
++    assert(pipe(pipefd) == 0);
++    fds[0].fd = -1; fds[0].events = POLLIN;
++    fds[1].fd = pipefd[0]; fds[1].events = POLLIN;
++    fds[2].fd = FD_SETSIZE; fds[2].events = POLLIN;
++    assert(vlc_poll(fds, 3, 5000) == 1);
++    assert(fds[0].revents == 0 && fds[1].revents == 0 && fds[2].revents == POLLNVAL);
++    assert(write(pipefd[1], "x", 1) == 1);
++    assert(vlc_poll(fds, 2, 100) == 1 && (fds[1].revents & POLLIN));
++    assert(read(pipefd[0], &byte, 1) == 1 && byte == 'x');
++    close(pipefd[0]); close(pipefd[1]);
++    assert(vlc_poll(fds, 2, 0) == 1 && fds[1].revents == POLLNVAL);
++    return 0;
++}
+--- /dev/null
++++ b/src/test/openstep_threads.c
+@@ -0,0 +1,79 @@
++/* Standalone regression for the OPENSTEP TLS and SDL cthreads backend.
++ * Build from the source root with gcc-4.2 -DNeXT `sdl-config --cflags`
++ * src/test/openstep_threads.c `sdl-config --libs` -o openstep-thread-test.
++ * GPL version 2 or later. */
++#include <mach/cthreads.h>
++#include <SDL/SDL_mutex.h>
++#include <stdlib.h>
++#include <errno.h>
++#include <assert.h>
++#include <sys/time.h>
++typedef struct vlc_openstep_key *vlc_threadvar_t;
++#include "../misc/openstep_threads.inc"
++
++static vlc_threadvar_t key;
++static SDL_mutex *lock;
++static SDL_cond *cond;
++static unsigned ready;
++struct context { unsigned calls; };
++
++static void destroy(void *value)
++{
++    struct context *ctx = value;
++    assert(vlc_openstep_tls_get(&key) == NULL);
++    ++ctx->calls;
++    /* Deliberately reassign forever: cleanup must bound destructor calls. */
++    assert(vlc_openstep_tls_set(&key, value) == 0);
++}
++static any_t worker(any_t unused)
++{
++    struct context ctx = {0};
++    unsigned i;
++    assert(vlc_openstep_tls_get(&key) == NULL);
++    for (i = 0; i < 1000; ++i) {
++        assert(vlc_openstep_tls_set(&key, &ctx) == 0);
++        assert(vlc_openstep_tls_get(&key) == &ctx);
++        cthread_yield();
++    }
++    openstep_tls_cleanup();
++    assert(ctx.calls == 4);
++    assert(vlc_openstep_tls_get(&key) == NULL);
++    assert(SDL_mutexP(lock) == 0);
++    ++ready;
++    assert(SDL_CondSignal(cond) == 0);
++    assert(SDL_mutexV(lock) == 0);
++    return NULL;
++}
++int main(void)
++{
++    cthread_t threads[4];
++    struct context parent = {0};
++    struct timeval before, after;
++    unsigned i;
++    cthread_init();
++    assert(openstep_key_create(&key, destroy) == 0);
++    assert(vlc_openstep_tls_set(&key, &parent) == 0);
++    lock = SDL_CreateMutex();
++    cond = SDL_CreateCond();
++    assert(lock && cond);
++    assert(SDL_mutexP(lock) == 0);
++    assert(SDL_mutexP(lock) == 0);
++    assert(SDL_mutexV(lock) == 0);
++    for (i = 0; i < 4; ++i) {
++        threads[i] = cthread_fork(worker, NULL);
++        assert(threads[i]);
++    }
++    while (ready != 4) assert(SDL_CondWait(cond, lock) == 0);
++    gettimeofday(&before, NULL);
++    assert(SDL_CondWaitTimeout(cond, lock, 100) == SDL_MUTEX_TIMEDOUT);
++    gettimeofday(&after, NULL);
++    assert((after.tv_sec-before.tv_sec)*1000000L + after.tv_usec-before.tv_usec >= 50000);
++    assert(SDL_mutexV(lock) == 0);
++    for (i = 0; i < 4; ++i) cthread_join(threads[i]);
++    assert(vlc_openstep_tls_get(&key) == &parent);
++    openstep_key_delete(&key);
++    assert(parent.calls == 0 && tls_keys == NULL);
++    SDL_DestroyCond(cond);
++    SDL_DestroyMutex(lock);
++    return 0;
++}
+--- /dev/null
++++ b/src/test/openstep_time.c
+@@ -0,0 +1,51 @@
++/* Concurrent sleep regression for OPENSTEP. GPL version 2 or later. */
++#include "config.h"
++#include <vlc_common.h>
++#include <assert.h>
++static any_t sleeper(any_t unused)
++{
++    mtime_t start = mdate();
++    int n;
++    (void)unused;
++    for (n = 0; n < 20; ++n) msleep(10000);
++    assert(mdate() - start >= 200000);
++    return NULL;
++}
++int main(void)
++{
++    cthread_t a, b;
++    mtime_t paused, wall, resumed;
++    vlc_object_t object;
++    int n;
++    alarm(10);
++    cthread_init();
++    a = cthread_fork(sleeper, NULL);
++    b = cthread_fork(sleeper, NULL);
++    assert(a && b);
++    sleeper(NULL);
++    cthread_join(a);
++    cthread_join(b);
++    msleep(0);
++    msleep(-1);
++    assert(!vlc_playback_active());
++    memset(&object, 0, sizeof(object));
++    object.p_libvlc = (libvlc_int_t *)&object;
++    wall = mdate();
++    vlc_playback_wait(&object, wall + 20000);
++    assert(mdate() - wall >= 20000);
++    for (n = 0; n < 4; ++n) {
++        vlc_playback_pause(true);
++        paused = vlc_playback_date(); wall = mdate();
++        msleep(30000);
++        assert(vlc_playback_date() == paused && mdate() - wall >= 30000);
++        vlc_playback_wait(&object, paused + 1000000);
++        vlc_playback_pause(false);
++        resumed = vlc_playback_date();
++        assert(resumed >= paused && resumed - paused < 10000);
++        vlc_playback_wait(&object, resumed + 30000);
++        assert(vlc_playback_date() - resumed >= 30000);
++    }
++    object.b_die = true;
++    vlc_playback_wait(&object, vlc_playback_date() + 1000000);
++    return 0;
++}
+--- a/src/test/test_block.c
++++ b/src/test/test_block.c
+@@ -48,6 +48,7 @@
+     assert (res != EOF);
+ 
+     block_t *block = block_File (fileno (stream));
++    assert (ftell (stream) == (long)strlen (text));
+     fclose (stream);
+ 
+     assert (block != NULL);
+@@ -63,4 +64,3 @@
+     test_block_File ();
+     return 0;
+ }
+-
+--- a/src/text/unicode.c
++++ b/src/text/unicode.c
+@@ -77,6 +77,11 @@
+ #endif
+ 
+ #if defined (USE_ICONV)
++#ifdef NeXT
++/* AppKit's cString and the filesystem use the native NeXT character set. */
++static const char charset[] = "NEXTSTEP";
++static int find_charset(void) { return 0; }
++#else
+ # include <langinfo.h>
+ static char charset[sizeof ("CSISO11SWEDISHFORNAMES")] = "";
+ 
+@@ -94,6 +99,7 @@
+     pthread_once (&once, find_charset_once);
+     return !strcasecmp (charset, "UTF-8");
+ }
++#endif
+ #endif
+ 
+ 
+--- a/src/video_output/video_output.c
++++ b/src/video_output/video_output.c
+@@ -822,13 +822,23 @@
+     while( vlc_object_alive( p_vout ) && !p_vout->b_error )
+     {
+         /* Initialize loop variables */
+-        const mtime_t current_date = mdate();
++        const mtime_t current_date = vlc_playback_date();
+         picture_t *p_picture = NULL;
+         picture_t *p_filtered_picture;
+         mtime_t display_date = 0;
+         picture_t *p_directbuffer;
+         input_thread_t *p_input;
+         int i_index;
++
++        if( vlc_playback_paused() )
++        {
++            vlc_mutex_unlock( &p_vout->change_lock );
++            vlc_object_unlock( p_vout );
++            msleep( 10000 );
++            vlc_object_lock( p_vout );
++            vlc_mutex_lock( &p_vout->change_lock );
++            continue;
++        }
+ 
+ #if 0
+         p_vout->c_loops++;
+@@ -1000,7 +1010,7 @@
+          */
+         if( display_date != 0 && p_directbuffer != NULL )
+         {
+-            mtime_t current_render_time = mdate() - current_date;
++            mtime_t current_render_time = vlc_playback_date() - current_date;
+             /* if render time is very large we don't include it in the mean */
+             if( current_render_time < p_vout->render_time +
+                 VOUT_DISPLAY_DELAY )
+@@ -1025,7 +1035,7 @@
+              * in advance */
+             if( !p_vout->psz_filter_chain || !*p_vout->psz_filter_chain )
+             {
+-                mwait( display_date - VOUT_MWAIT_TOLERANCE );
++                vlc_playback_wait( VLC_OBJECT(p_vout), display_date - VOUT_MWAIT_TOLERANCE );
+             }
+         }
+         else
+@@ -1043,7 +1053,8 @@
+         /*
+          * Display the previously rendered picture
+          */
+-        if( p_filtered_picture != NULL && p_directbuffer != NULL )
++        if( p_filtered_picture != NULL && p_directbuffer != NULL &&
++            !vlc_playback_paused() )
+         {
+             /* Display the direct buffer returned by vout_RenderPicture */
+             if( p_vout->pf_display )
+@@ -1587,7 +1598,7 @@
+               VLC_OBJECT_INPUT, FIND_ANYWHERE );
+     if( p_input )
+     {
+-        i_now = mdate();
++        i_now = vlc_playback_date();
+         i_stop = i_now + (mtime_t)(p_vout->i_title_timeout * 1000);
+         char *psz_nowplaying =
+             input_item_GetNowPlaying( input_GetItem( p_input ) );
+--- a/src/video_output/video_text.c
++++ b/src/video_output/video_text.c
+@@ -47,7 +47,7 @@
+                            int i_flags, int i_hmargin, int i_vmargin,
+                            mtime_t i_duration )
+ {
+-    mtime_t i_now = mdate();
++    mtime_t i_now = vlc_playback_date();
+ 
+     return vout_ShowTextAbsolute( p_vout, i_channel, psz_string,
+                                   p_style, i_flags, i_hmargin, i_vmargin,
+--- a/src/video_output/vout_intf.c
++++ b/src/video_output/vout_intf.c
+@@ -465,8 +465,8 @@
+     }
+ 
+     p_subpic->i_channel = 0;
+-    p_subpic->i_start = mdate();
+-    p_subpic->i_stop = mdate() + 4000000;
++    p_subpic->i_start = vlc_playback_date();
++    p_subpic->i_stop = vlc_playback_date() + 4000000;
+     p_subpic->b_ephemer = true;
+     p_subpic->b_fade = true;
+     p_subpic->i_original_picture_width = fmt_out.i_width * 4;
+--- a/src/video_output/vout_subpictures.c
++++ b/src/video_output/vout_subpictures.c
+@@ -627,7 +627,7 @@
+     var_Create( p_spu->p_text, "scale", VLC_VAR_INTEGER );
+ 
+     var_SetTime( p_spu->p_text, "spu-duration", p_subpic->i_stop - p_subpic->i_start );
+-    var_SetTime( p_spu->p_text, "spu-elapsed", mdate() - p_subpic->i_start );
++    var_SetTime( p_spu->p_text, "spu-elapsed", vlc_playback_date() - p_subpic->i_start );
+     var_SetBool( p_spu->p_text, "text-rerender", false );
+     var_SetInteger( p_spu->p_text, "scale", i_min_scale_ratio );
+ 
+@@ -910,7 +910,7 @@
+     {
+         mtime_t i_fade_start = ( p_subpic->i_stop +
+                                  p_subpic->i_start ) / 2;
+-        mtime_t i_now = mdate();
++        mtime_t i_now = vlc_playback_date();
+         if( i_now >= i_fade_start && p_subpic->i_stop > i_fade_start )
+         {
+             i_fade_alpha = 255 * ( p_subpic->i_stop - i_now ) /
+@@ -1022,7 +1022,7 @@
+             fmt_org.i_height =
+             fmt_org.i_visible_height = i_source_video_height;
+ 
+-            p_subpic->pf_update_regions( &fmt_org, p_spu, p_subpic, mdate() );
++            p_subpic->pf_update_regions( &fmt_org, p_spu, p_subpic, vlc_playback_date() );
+         }
+ 
+         /* */
+--- a/vlc-config.in.in
++++ b/vlc-config.in.in
+@@ -1,4 +1,4 @@
+-#!/bin/sh
++#!@SHELL@
+ 
+ prefix="@prefix@"
+ exec_prefix="@exec_prefix@"
+@@ -218,7 +218,11 @@
+       ;;
+     plugin)
+       echo_plugin=yes
+-      cppflags="${cppflags} -D__LIBVLC__ -D__PLUGIN__"
++      if test "@SYS@" = openstep; then
++        cppflags="${cppflags} -D__LIBVLC__ -D__BUILTIN__"
++      else
++        cppflags="${cppflags} -D__LIBVLC__ -D__PLUGIN__"
++      fi
+       ;;
+     builtin)
+       echo_builtin=yes

@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+TMP=/usr/tmp/fribidi-test.$$
+trap '/bin/rm -f "$TMP" "$TMP.c"' 0
+trap 'exit 1' 1 2 15
+cat > "$TMP.c" <<'EOF'
+#include <fribidi.h>
+#include <assert.h>
+#include <string.h>
+int main(void)
+{
+    FriBidiChar logical[4], visual[4];
+    FriBidiStrIndex forward[3], backward[3];
+    FriBidiLevel levels[3];
+    FriBidiParType direction = FRIBIDI_PAR_RTL;
+    char utf8[16];
+    int i;
+    assert(sizeof(FriBidiChar) == 4);
+    assert(fribidi_charset_to_unicode(FRIBIDI_CHAR_SET_UTF8,
+           "\327\220\327\221\327\222", 6, logical) == 3);
+    assert(fribidi_log2vis(logical, 3, &direction, visual, forward, backward, levels));
+    for (i = 0; i < 3; ++i) {
+        assert(visual[i] == logical[2-i]);
+        assert(forward[i] == 2-i && backward[i] == 2-i && levels[i] == 1);
+    }
+    assert(fribidi_unicode_to_charset(FRIBIDI_CHAR_SET_UTF8, visual, 3, utf8) == 6);
+    assert(!strcmp(utf8, "\327\222\327\221\327\220"));
+    return 0;
+}
+EOF
+/usr/local/bin/gcc-4.2 -O2 -march=i486 -DNeXT -I"$LOCAL_ROOT/include/fribidi"     "$TMP.c" -L"$LOCAL_ROOT/lib" -lfribidi -o "$TMP"
+"$TMP"
+"$LOCAL_ROOT/bin/fribidi" --version
+echo 'FriBidi installed headers, UTF-8 conversion and bidirectional mapping passed'
