@@ -14,6 +14,32 @@ export PATH CC CFLAGS GREP EGREP AWK FORCE_UNSAFE_CONFIGURE
 if test -d "tar-$VERSION"; then cd "tar-$VERSION"; fi
 patch -p1 < "tar-$VERSION-openstep.patch"
 . "$PKG_BUILD_HELPERS"
+
+# gnulib's wrappers for <fcntl.h> and <sys/stat.h> #include the system header by
+# absolute name, which configure finds by running `sed -n '\#/fcntl.h#{...}'`
+# over the preprocessor's output.  That sed script does not work here, and the
+# result is an empty name ("empty filename in #include").  Ask the compiler for
+# the dependency list instead and hand configure the answers.
+abs_header() {
+    echo "#include <$1>" > absh.c
+    for abs_w in `$CC $CFLAGS -M absh.c 2> /dev/null`; do
+        case $abs_w in
+            */$1)
+                echo "$abs_w"
+                break
+            ;;
+        esac
+    done
+}
+abs_fcntl_h=`abs_header fcntl.h`
+abs_sys_stat_h=`abs_header sys/stat.h`
+/bin/rm -f absh.c
+test -n "$abs_fcntl_h" && test -n "$abs_sys_stat_h" ||
+    { echo "tar: cannot locate the system fcntl.h/sys/stat.h" >&2; exit 1; }
+gl_cv_absolute_fcntl_h=$abs_fcntl_h
+gl_cv_absolute_sys_stat_h=$abs_sys_stat_h
+export gl_cv_absolute_fcntl_h gl_cv_absolute_sys_stat_h
+
 # --program-prefix=g installs the program as gtar (and the man page as gtar.1,
 # the remote tape helper as grmt, whose compiled-in default path matches).
 # It must never be installed as "tar" or "gnutar": the system has its own, and
