@@ -11,11 +11,11 @@ has not been attempted.
 | Package | x86 | SPARC |
 |---|---|---|
 | bash | validated | — |
-| bison | validated | — |
+| bison | validated | validated |
 | bzip2 | validated | — |
 | ca-certificates | validated | — |
 | class-dump | validated | — |
-| coreutils | validated | — |
+| coreutils | validated | validated |
 | curl | validated | — |
 | diffutils | validated | — |
 | duktape | validated | — |
@@ -23,14 +23,14 @@ has not been attempted.
 | expat | validated | — |
 | ffmpeg | queued for testing | — |
 | findutils | validated | — |
-| flex | validated | — |
+| flex | validated | validated |
 | freetype | validated | — |
 | freeze | validated | — |
-| gawk | validated | — |
+| gawk | validated | validated |
 | gcc42 | validated | validated (port; bootstraps, compare passes, `pkg test` passes) |
 | git | validated | — |
 | gperf | validated | — |
-| grep | validated | — |
+| grep | validated | validated |
 | gzip | validated | — |
 | help2man | queued for testing | — |
 | jpeg | validated | — |
@@ -55,8 +55,8 @@ has not been attempted.
 | libxml2 | validated | — |
 | lua | validated | — |
 | lz4 | being tested | — |
-| m4 | validated | — |
-| make | validated | — |
+| m4 | validated | validated |
+| make | validated | validated |
 | mktemp | validated | — |
 | mpg123 | validated | — |
 | nano | validated | — |
@@ -83,7 +83,7 @@ has not been attempted.
 | termcap | validated | — |
 | texinfo | validated | — |
 | top | validated | — |
-| unzip | validated | — |
+| unzip | validated | validated |
 | utf8proc | validated | — |
 | vim | validated | — |
 | wget | validated | — |
