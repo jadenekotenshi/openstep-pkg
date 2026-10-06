@@ -16,11 +16,9 @@ AWK=/usr/local/bin/gawk
 # configure's own "*-*-nextstep*" case (lockf() is broken there) does not match
 # the openstep4 host name.
 ac_cv_func_lockf=no
-# Do not pick up a stray zlib for sudoreplay.
-ac_cv_lib_z_gzdopen=no
 # pdksh stalls and mis-expands parts of sudo's configure; zsh runs it cleanly.
 CONFIG_SHELL=/usr/local/bin/zsh
-export PATH CC CFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf ac_cv_lib_z_gzdopen
+export PATH CC CFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 
@@ -56,6 +54,8 @@ export CPPFLAGS
 /bin/mv configure.new configure
 /bin/chmod 755 configure
 
+# zlib comes from the zlib package (a dependency), always from /usr/local, so
+# I/O logging and sudoreplay never depend on whatever else is on the system.
 # No shared libraries or dlopen() here, so no noexec support; hardening
 # (-fstack-protector, PIE) needs runtime support this system lacks.
 # sudo defaults sysconfdir to /etc even with a prefix; keep everything under
@@ -63,7 +63,8 @@ export CPPFLAGS
 run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
     --disable-shared --with-noexec=no --disable-hardening --without-pam \
-    --without-sendmail --with-timedir=/usr/local/var/run/sudo
+    --without-sendmail --with-timedir=/usr/local/var/run/sudo \
+    --enable-zlib=/usr/local
 /bin/gnumake
 
 # Install owned by whoever is building (post-install makes it root's).

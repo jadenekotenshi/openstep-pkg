@@ -4,3 +4,4 @@ coreutils
 grep
 gawk
 zsh
+zlib
