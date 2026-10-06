@@ -71,7 +71,7 @@ has not been attempted.
 | p7zip | validated | — |
 | patch | validated | validated |
 | pdksh | validated | validated |
-| perl | compiling | validated |
+| perl | validated | validated |
 | pkg-config | validated | — |
 | python311 | validated | — |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | — |
