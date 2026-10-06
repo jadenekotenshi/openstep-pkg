@@ -109,6 +109,11 @@ struct timespec {
 };
 /* libntp's realpath and work_fork code use ssize_t, which OPENSTEP lacks. */
 typedef int ssize_t;
+/* ISO C's EILSEQ is missing from <errno.h> here (the BSD value). */
+#include <errno.h>
+#ifndef EILSEQ
+# define EILSEQ	84
+#endif
 /* <sys/resource.h> has no rlim_t; struct rlimit's fields are plain ints here. */
 typedef int rlim_t;
 /* The generated stdnoreturn.h defines "noreturn" as an attribute, but this
