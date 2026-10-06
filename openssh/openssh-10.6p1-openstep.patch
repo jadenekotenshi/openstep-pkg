@@ -502,6 +502,19 @@ diff -ruN a/openbsd-compat/openbsd-compat.h b/openbsd-compat/openbsd-compat.h
  #ifndef HAVE_SETPROCTITLE
  void setproctitle(const char *fmt, ...);
  void compat_init_setproctitle(int argc, char *argv[]);
+diff -ruN a/openbsd-compat/port-net.c b/openbsd-compat/port-net.c
+--- a/openbsd-compat/port-net.c	2026-10-06 08:45:31.000000000 +0000
++++ b/openbsd-compat/port-net.c	2026-10-06 23:10:34.017523063 +0000
+@@ -21,7 +21,9 @@
+ 
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
++#ifndef HAVE_NEXT
+ #include <netinet/ip.h>
++#endif
+ 
+ #include <errno.h>
+ #include <fcntl.h>
 diff -ruN a/openbsd-compat/sigact.h b/openbsd-compat/sigact.h
 --- a/openbsd-compat/sigact.h	2026-10-06 08:45:31.000000000 +0000
 +++ b/openbsd-compat/sigact.h	2026-10-06 22:55:02.176398479 +0000
