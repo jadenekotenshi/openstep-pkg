@@ -72,7 +72,7 @@ has not been attempted.
 | perl | not recorded | building; fixes pushed, no result yet |
 | pkg-config | validated | — |
 | python311 | validated | — |
-| quake2 | builds and installs; the content-free startup test has no recorded result (no game data) | — |
+| quake2 | validated (content-free dedicated-server startup test; no game data) | — |
 | quickjs | validated | — |
 | rsync | validated | — |
 | sdl12 | validated | — |

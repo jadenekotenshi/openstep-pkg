@@ -18,6 +18,14 @@ if test -d "tcsh-$VERSION"; then cd "tcsh-$VERSION"; fi
 # configure does not know OPENSTEP hosts; the patch maps *-next-* to system/mach.
 patch -p1 < "tcsh-$VERSION-openstep.patch"
 
+# tcsh casts pointers through intptr_t.  Whether OPENSTEP has that type depends
+# on which headers are in play, and a typedef of ours can conflict with the
+# system's, so use long (the same size as a pointer on every OPENSTEP target).
+for f in `/usr/local/bin/grep -l intptr_t *.c *.h`; do
+    /bin/sed 's/intptr_t/long/g' "$f" > "$f.new"
+    /bin/mv "$f.new" "$f"
+done
+
 # tcsh 6.24 needs POSIX signals (struct sigaction, sigprocmask, sigemptyset and
 # friends).  OPENSTEP's libc has none of those functions and, without feature
 # macros, its <signal.h> may not even define the types.  Probe what is missing,
@@ -33,7 +41,6 @@ probe_sig() {
     $CC $CFLAGS -c probe_sig.c -o probe_sig.o > /dev/null 2>&1
 }
 probe_sig 'uint8_t probe_u8;' || echo 'typedef unsigned char uint8_t;' >> "$sig_h"
-probe_sig 'intptr_t probe_ip;' || echo 'typedef long intptr_t;' >> "$sig_h"
 probe_sig 'sigset_t probe_set;' || echo 'typedef unsigned int sigset_t;' >> "$sig_h"
 probe_sig 'int probe_how[3] = { SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK };' || /bin/cat >> "$sig_h" <<'SIGEOF'
 #define SIG_BLOCK	1
