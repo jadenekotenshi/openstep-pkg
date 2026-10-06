@@ -6,6 +6,7 @@ export HACKDIR
 
 test -x "$HACKDIR/nethack"
 test -f "$HACKDIR/nhdat"
+test -f "$HACKDIR/sysconf"
 test -x "$LOCAL_ROOT/bin/nethack"
 cd "$HACKDIR"
 ./nethack --version | /usr/local/bin/grep 'NetHack Version 3.6.7' > /dev/null

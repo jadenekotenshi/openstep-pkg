@@ -144,6 +144,11 @@ echo "LFLAGS += $strdup_shim" >> util/Makefile
 # game needs.
 /bin/gnumake install DESTDIR="$DESTDIR"
 
+# This build uses a system configuration file (SYSCF is on by default) and the
+# game refuses to start without one: install the stock sysconf.
+/bin/cp sys/unix/sysconf "$DESTDIR/usr/local/lib/nethackdir/sysconf"
+/bin/chmod 644 "$DESTDIR/usr/local/lib/nethackdir/sysconf"
+
 # Replace the stock launcher (it uses shell features the system sh lacks).
 /bin/cat > "$DESTDIR/usr/local/bin/nethack" <<'LEOF'
 #!/bin/sh
@@ -158,3 +163,4 @@ LEOF
 
 test -x "$DESTDIR/usr/local/lib/nethackdir/nethack"
 test -f "$DESTDIR/usr/local/lib/nethackdir/nhdat"
+test -f "$DESTDIR/usr/local/lib/nethackdir/sysconf"
