@@ -58,8 +58,35 @@ diff -ruN pa/sudo-1.7.10p9/glob.c pc/sudo-1.7.10p9/glob.c
 +#endif /* !HAVE_GLOB */
 diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
 --- a/missing.h	2015-02-10 17:05:31.000000000 +0000
-+++ b/missing.h	2026-10-06 00:54:23.803503445 +0000
-@@ -192,6 +192,45 @@
++++ b/missing.h	2026-10-06 01:24:44.707880308 +0000
+@@ -104,6 +104,26 @@
+ #ifndef S_ISDIR
+ # define S_ISDIR(m)		(((m) & _S_IFMT) == _S_IFDIR)
+ #endif /* S_ISDIR */
++/*
++ * S_ISLNK and friends are not POSIX.1-1990, so OPENSTEP's <sys/stat.h> hides
++ * them under -D_POSIX_SOURCE (and an undefined S_ISLNK() becomes a call to a
++ * missing function).  These are the standard BSD file type bits.
++ */
++#ifndef S_ISCHR
++# define S_ISCHR(m)		(((m) & 0170000) == 0020000)
++#endif
++#ifndef S_ISBLK
++# define S_ISBLK(m)		(((m) & 0170000) == 0060000)
++#endif
++#ifndef S_ISFIFO
++# define S_ISFIFO(m)		(((m) & 0170000) == 0010000)
++#endif
++#ifndef S_ISLNK
++# define S_ISLNK(m)		(((m) & 0170000) == 0120000)
++#endif
++#ifndef S_ISSOCK
++# define S_ISSOCK(m)		(((m) & 0170000) == 0140000)
++#endif
+ 
+ /*
+  * Some OS's may not have this.
+@@ -192,6 +212,45 @@
  #endif /* HAVE__INNETGR */
  
  /*
@@ -105,7 +132,7 @@ diff -ruN pa/sudo-1.7.10p9/missing.h pc/sudo-1.7.10p9/missing.h
   * On POSIX systems, O_NOCTTY is the default so some OS's may lack this define.
   */
  #ifndef O_NOCTTY
-@@ -200,23 +239,44 @@
+@@ -200,23 +259,44 @@
  
  /*
   * Emulate POSIX signals via sigvec(2)
