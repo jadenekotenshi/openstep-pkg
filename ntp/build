@@ -12,6 +12,60 @@ AWK=/usr/local/bin/gawk
 export PATH CC CFLAGS SED GREP EGREP AWK
 if test -d "ntp-$VERSION"; then cd "ntp-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
+# OPENSTEP has neither <stdint.h> nor <inttypes.h>, and ntp's libopts refuses to
+# configure without one.  Provide both from a private include directory.  The
+# targets are 32-bit: int is 32 bits, long long is 64, and the pointer-sized
+# types come from the compiler.
+/usr/local/bin/mkdir -p openstep
+/bin/cat > openstep/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef __PTRDIFF_TYPE__ intptr_t;
+typedef __SIZE_TYPE__ uintptr_t;
+typedef long long intmax_t;
+typedef unsigned long long uintmax_t;
+#define INT8_MIN (-128)
+#define INT8_MAX 127
+#define UINT8_MAX 255
+#define INT16_MIN (-32767-1)
+#define INT16_MAX 32767
+#define UINT16_MAX 65535
+#define INT32_MIN (-2147483647-1)
+#define INT32_MAX 2147483647
+#define UINT32_MAX 4294967295U
+#define INT64_MIN (-9223372036854775807LL-1)
+#define INT64_MAX 9223372036854775807LL
+#define UINT64_MAX 18446744073709551615ULL
+#define INTPTR_MIN INT32_MIN
+#define INTPTR_MAX INT32_MAX
+#define UINTPTR_MAX UINT32_MAX
+#define SIZE_MAX UINT32_MAX
+#endif
+SEOF
+/bin/cat > openstep/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <stdint.h>
+#define PRId32 "d"
+#define PRIi32 "i"
+#define PRIu32 "u"
+#define PRIx32 "x"
+#define PRId64 "lld"
+#define PRIi64 "lli"
+#define PRIu64 "llu"
+#define PRIx64 "llx"
+#endif
+SEOF
+CPPFLAGS="-I`pwd`/openstep"
+export CPPFLAGS
 # No sntp (needs libevent), no OpenSSL (MD5 keys still work; SHA-1 keys and
 # Autokey do not), no ntpsnmpd, no ntp-keygen autokey, no kernel PLL tricks.
 # configure runs sntp/scripts/genHardFlags to pick compiler hardening flags
