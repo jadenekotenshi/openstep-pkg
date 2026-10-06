@@ -32,6 +32,16 @@ typedef __PTRDIFF_TYPE__ intptr_t;
 typedef __SIZE_TYPE__ uintptr_t;
 typedef long long intmax_t;
 typedef unsigned long long uintmax_t;
+#define INT8_C(c) c
+#define INT16_C(c) c
+#define INT32_C(c) c
+#define INT64_C(c) c ## LL
+#define UINT8_C(c) c
+#define UINT16_C(c) c
+#define UINT32_C(c) c ## U
+#define UINT64_C(c) c ## ULL
+#define INTMAX_C(c) c ## LL
+#define UINTMAX_C(c) c ## ULL
 typedef signed char int_least8_t;
 typedef short int_least16_t;
 typedef int int_least32_t;
@@ -527,8 +537,130 @@ REOF
 $CC $CFLAGS -c openstep_rand.c -o openstep_rand.o
 # Link the shim as a library: libtool refuses a bare .o in LIBS when it builds
 # libopts.la ("cannot build libtool library from non-libtool objects").
+# POSIX functions this libc lacks: getcwd (via getwd), waitpid (via wait4) and
+# the termios calls (via the BSD ioctls).  ntp_refclock.c and ntpd use them even
+# with no hardware clocks configured.
+/bin/cat > openstep_posix.c <<'PXEOF'
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <sys/file.h>
+#include <termios.h>
+#include <errno.h>
+#include <string.h>
+
+extern char *getwd();
+extern int wait4();
+
+char *
+getcwd(char *buf, size_t size)
+{
+    char tmp[1024];
+
+    if (buf == 0 || size == 0) {
+	errno = EINVAL;
+	return 0;
+    }
+    if (getwd(tmp) == 0)
+	return 0;
+    if (strlen(tmp) >= size) {
+	errno = ERANGE;
+	return 0;
+    }
+    strcpy(buf, tmp);
+    return buf;
+}
+
+int
+waitpid(int pid, int *status, int options)
+{
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+
+int
+tcgetattr(int fd, struct termios *t)
+{
+    return ioctl(fd, TIOCGETA, (char *) t);
+}
+
+int
+tcsetattr(int fd, int actions, const struct termios *t)
+{
+    switch (actions) {
+    case 0:	/* TCSANOW */
+	return ioctl(fd, TIOCSETA, (char *) t);
+    case 1:	/* TCSADRAIN */
+	return ioctl(fd, TIOCSETAW, (char *) t);
+    case 2:	/* TCSAFLUSH */
+	return ioctl(fd, TIOCSETAF, (char *) t);
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+int
+tcflush(int fd, int queue)
+{
+    int what;
+
+    switch (queue) {
+    case 1:	/* TCIFLUSH */
+	what = FREAD;
+	break;
+    case 2:	/* TCOFLUSH */
+	what = FWRITE;
+	break;
+    case 3:	/* TCIOFLUSH */
+	what = FREAD | FWRITE;
+	break;
+    default:
+	errno = EINVAL;
+	return -1;
+    }
+    return ioctl(fd, TIOCFLUSH, (char *) &what);
+}
+
+#ifdef HAVE_TERMIOS_SPEED_FIELDS
+int
+cfsetispeed(struct termios *t, speed_t speed)
+{
+    t->c_ispeed = speed;
+    return 0;
+}
+
+int
+cfsetospeed(struct termios *t, speed_t speed)
+{
+    t->c_ospeed = speed;
+    return 0;
+}
+#else
+int
+cfsetispeed(struct termios *t, speed_t speed)
+{
+    return 0;
+}
+
+int
+cfsetospeed(struct termios *t, speed_t speed)
+{
+    return 0;
+}
+#endif
+PXEOF
+# Does struct termios here carry c_ispeed/c_ospeed?
+/bin/cat > probe_ts.c <<'PEOF'
+#include <sys/types.h>
+#include <termios.h>
+int probe_f(struct termios *t) { t->c_ispeed = 0; t->c_ospeed = 0; return 0; }
+PEOF
+nx_tsdef=
+if $CC $CFLAGS -c probe_ts.c -o probe_ts.o > /dev/null 2>&1; then
+    nx_tsdef=-DHAVE_TERMIOS_SPEED_FIELDS
+fi
+/bin/rm -f probe_ts.c probe_ts.o
+$CC $CFLAGS $nx_tsdef -c openstep_posix.c -o openstep_posix.o
 /bin/rm -f libopenstepntp.a
-/bin/ar rc libopenstepntp.a openstep_rand.o
+/bin/ar rc libopenstepntp.a openstep_rand.o openstep_posix.o
 /bin/ranlib libopenstepntp.a
 LIBS="-L`pwd` -lopenstepntp"
 ac_cv_func_arc4random_buf=yes
