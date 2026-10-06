@@ -111,6 +111,16 @@ struct timespec {
 typedef int ssize_t;
 /* <sys/resource.h> has no rlim_t; struct rlimit's fields are plain ints here. */
 typedef int rlim_t;
+/* The generated stdnoreturn.h defines "noreturn" as an attribute, but this
+   system's <stdlib.h> declares "abort() __attribute__ ((noreturn))", which that
+   macro would rewrite to an attribute inside an attribute.  Defining noreturn
+   (empty) first makes that header do nothing; _Noreturn is still provided. */
+#ifndef _Noreturn
+# define _Noreturn __attribute__ ((__noreturn__))
+#endif
+#ifndef noreturn
+# define noreturn /* empty */
+#endif
 /* <sys/stat.h> hides the POSIX permission and file-type macros unless
    _POSIX_SOURCE is defined (the standard BSD values). */
 #include <sys/stat.h>
