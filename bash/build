@@ -4,7 +4,10 @@ DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
 CC=/usr/local/bin/gcc-4.2
-CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2'
+# configure defines HAVE_GETCWD unconditionally, even when libc has no getcwd(),
+# and then never builds lib/sh/getcwd.c.  GETCWD_BROKEN makes config-bot.h undo
+# HAVE_GETCWD, so bash's own getcwd() is compiled and linked.
+CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -DGETCWD_BROKEN'
 SED=/bin/sed
 GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
