@@ -18,11 +18,18 @@ ac_cv_func_lockf=no
 ac_cv_sys_posix_termios=yes
 TERMIOS_RENAMES='-Dtcgetattr=openstep_tcgetattr -Dtcsetattr=openstep_tcsetattr -Dtcgetpgrp=openstep_tcgetpgrp -Dtcsetpgrp=openstep_tcsetpgrp -Dcfgetispeed=openstep_cfgetispeed -Dcfgetospeed=openstep_cfgetospeed -Dcfsetispeed=openstep_cfsetispeed -Dcfsetospeed=openstep_cfsetospeed'
 CPPFLAGS=$TERMIOS_RENAMES
-export PATH CC CFLAGS CPPFLAGS SED GREP EGREP AWK ac_cv_func_lockf ac_cv_sys_posix_termios
+# pdksh stalls and mis-expands parts of sudo's configure; zsh runs it cleanly.
+CONFIG_SHELL=/usr/local/bin/zsh
+export PATH CC CFLAGS CPPFLAGS CONFIG_SHELL SED GREP EGREP AWK ac_cv_func_lockf ac_cv_sys_posix_termios
 if test -d "sudo-$VERSION"; then cd "sudo-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
+# OPENSTEP has no id_t; sudo only uses it as an integer holding a uid or gid.
+# Force a typedef into every compile, configure's probes included.
+printf 'typedef unsigned int id_t;\n' > openstep-id_t.h
+CPPFLAGS="$CPPFLAGS -include `pwd`/openstep-id_t.h"
+export CPPFLAGS
 patch -p1 < "sudo-$VERSION-openstep.patch"
-# pdksh leaves the quotes in `echo \"$var\"` inside backticks, so configure's
+# (Kept as a precaution under zsh.)  pdksh leaves the quotes in `echo \"$var\"` inside backticks, so configure's
 # library searches end up with -l"-lsocket" and die with "bad substitution" or
 # hang waiting for an unbalanced quote.  This system has no libsocket, libinet,
 # libnsl or libresolv (the socket calls are in libc), so the loops that search
