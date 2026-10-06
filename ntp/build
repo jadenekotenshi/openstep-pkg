@@ -176,12 +176,14 @@ GLDATA
 exit 0
 GLEOF
 /bin/chmod 755 sntp/scripts/genLocInfo
+# --disable-thread-support: configure finds <cthreads.h> and then cannot link
+# Mach CThreads; ntpd copes without threads (name lookups use a child process).
 # Everything stays under /usr/local; configuration is /usr/local/etc/ntpd.conf
 # (start ntpd with -c /usr/local/etc/ntpd.conf).
 run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
     --without-crypto --without-sntp --without-ntpsnmpd --disable-debugging \
-    --disable-dependency-tracking
+    --disable-thread-support --disable-dependency-tracking
 /bin/gnumake
 /bin/gnumake install DESTDIR="$DESTDIR"
 
