@@ -7,3 +7,4 @@ gawk
 gzip
 termcap
 patch
+?HAVE_X11:neXtaw

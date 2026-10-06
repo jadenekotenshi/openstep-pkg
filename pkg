@@ -178,6 +178,7 @@ EOF
         [ -f "$rq_cur/depends" ] || continue
 
         while read rq_dep rq_extra || [ -n "$rq_dep" ]; do
+            rq_dep=`dep_resolve "$rq_dep"` || exit 1
             case $rq_dep in
                 ''|\#*|!*)
                     continue
@@ -278,13 +279,35 @@ architecture:
 package layout:
   build         required build script
   version       required, contains version
-  depends       optional, one package name per line
+  depends       optional, one package name per line (?OPTION:name = only when OPTION is 1)
   requires      optional, pkg.conf options: HAVE_X11 (needed) or ?HAVE_X11 (extra features)
   sources       optional, one source per line
   post-install  optional shell hook
   pre-remove    optional shell hook
   test          optional installed-package test hook
 EOF
+}
+
+# A depends entry may be conditional on a pkg.conf option: "?HAVE_X11:neXtaw"
+# is a dependency on neXtaw only when HAVE_X11 is 1 (and is ignored otherwise).
+# Print the entry to act on: the plain entry, or nothing when it is inactive.
+dep_resolve() {
+    dr_entry=$1
+
+    case $dr_entry in
+        \?*:*)
+            dr_opt=`echo "$dr_entry" | sed 's/^?//; s/:.*//'`
+            dr_rest=`echo "$dr_entry" | sed 's/^[^:]*://'`
+            dr_val=`option_value "$dr_opt"` ||
+                die "unknown option in depends entry: $dr_entry"
+            if [ "x$dr_val" = x1 ]; then
+                echo "$dr_rest"
+            fi
+        ;;
+        *)
+            echo "$dr_entry"
+        ;;
+    esac
 }
 
 dep_name() {
@@ -767,6 +790,7 @@ check_depends() {
     conflicts=
 
     while read dep extra || [ -n "$dep" ]; do
+        dep=`dep_resolve "$dep"` || exit 1
         case $dep in
             ''|\#*)
                 continue
@@ -835,6 +859,7 @@ install_depends() {
     parent_pkg_name=$PKG_NAME
 
     while read dep extra || [ -n "$dep" ]; do
+        dep=`dep_resolve "$dep"` || exit 1
         case $dep in
             ''|\#*)
                 continue

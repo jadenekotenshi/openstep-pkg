@@ -46,22 +46,26 @@ VARFILEPERM = 0666
 HEOF
 
 if test "$HAVE_X11" = 1; then
-    # X11 interface (Xaw widgets) in addition to tty; tty stays the default.
+    # X11 interface in addition to tty; tty stays the default.  The Athena
+    # widgets come from neXtaw (a dependency when HAVE_X11 is 1), which has the
+    # same programming interface, through an X11/Xaw include alias.
     x11=${X11_PREFIX:-/usr/X11R6}
-    xaw_lib=-lXaw
-    xaw_inc=
-    if test ! -f "$x11/include/X11/Xaw/Label.h"; then
-        if test -f /usr/local/include/X11/neXtaw/Label.h; then
-            # No Athena widgets in the X11 install: use neXtaw, which has the
-            # same programming interface, through an X11/Xaw include alias.
-            /usr/local/bin/mkdir -p openstep-inc/X11
-            /bin/ln -s /usr/local/include/X11/neXtaw openstep-inc/X11/Xaw
-            xaw_lib=-lneXtaw
-            xaw_inc="-I`pwd`/openstep-inc"
-        else
-            echo "nethack: HAVE_X11=1 but there are no Xaw headers under $x11 and neXtaw is not installed" >&2
-            exit 1
-        fi
+    if test ! -f /usr/local/include/X11/neXtaw/Label.h; then
+        echo "nethack: HAVE_X11=1 but neXtaw is not installed" >&2
+        exit 1
+    fi
+    if test ! -f "$x11/include/X11/Intrinsic.h"; then
+        echo "nethack: no X11 headers under $x11; set X11_PREFIX in pkg.conf" >&2
+        exit 1
+    fi
+    /usr/local/bin/mkdir -p openstep-inc/X11
+    /bin/ln -s /usr/local/include/X11/neXtaw openstep-inc/X11/Xaw
+    xaw_inc="-I`pwd`/openstep-inc"
+    # libSM and libICE are only there when the X11 install has session
+    # management; libXpm only when it has pixmap support (tiles and the tombstone).
+    sm_libs=
+    if ls "$x11"/lib/libSM* > /dev/null 2>&1 && ls "$x11"/lib/libICE* > /dev/null 2>&1; then
+        sm_libs="-lSM -lICE"
     fi
     xpm_lib=
     xpm_def=
@@ -70,12 +74,12 @@ if test "$HAVE_X11" = 1; then
         xpm_def=-DUSE_XPM
     fi
     /bin/cat >> "$hints" <<HEOF
-CFLAGS+=-DX11_GRAPHICS $xpm_def -I$x11/include $xaw_inc
-LFLAGS=-L$x11/lib
+CFLAGS+=-DX11_GRAPHICS $xpm_def -I$x11/include $xaw_inc -idirafter /usr/local/include
+LFLAGS=-L/usr/local/lib -L$x11/lib
 WINSRC = \$(WINTTYSRC) \$(WINX11SRC)
 WINOBJ = \$(WINTTYOBJ) \$(WINX11OBJ)
 WINLIB = \$(WINTTYLIB) \$(WINX11LIB)
-WINX11LIB = $xaw_lib -lXmu -lXext -lXt -lX11 $xpm_lib
+WINX11LIB = -lneXtaw -lXmu -lXt $sm_libs -lXext -lX11 $xpm_lib
 VARDATND = x11tiles NetHack.ad pet_mark.xbm pilemark.xbm
 HEOF
     if test -n "$xpm_def"; then

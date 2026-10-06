@@ -50,6 +50,10 @@ HAVE_X11      # required: refuse to build or install without it
   and reinstall the package to pick up the change.
 * An option name `pkg` does not know is an error, so typos are caught.
 
+A `depends` entry can be made conditional on an option with `?OPTION:package`, for example
+`?HAVE_X11:neXtaw`: the dependency is installed (and checked) only when that option is 1, and is
+ignored otherwise.  `!package` conflicts work the same way (`?HAVE_X11:!package`).
+
 A `build` script typically does:
 
 ```sh
