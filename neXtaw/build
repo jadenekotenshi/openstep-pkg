@@ -14,10 +14,10 @@ if test -d "neXtaw-$VERSION"; then cd "neXtaw-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 
 # neXtaw needs the X11 development files (Xt, Xmu, Xext, X11 headers and
-# libraries).  X11_PREFIX in pkg.conf says where they live; otherwise look in
-# the usual places.
+# libraries).  X11_PREFIX in pkg.conf says where they live (default
+# /usr/X11R6, where CubXWindow installs).
 x11_prefix=
-for d in $X11_PREFIX /usr/X11R6 /usr/X11 /usr/local; do
+for d in $X11_PREFIX /usr/X11R6; do
     if test -n "$d" && test -f "$d/include/X11/Intrinsic.h"; then
         x11_prefix=$d
         break

@@ -76,9 +76,9 @@ load_config() {
     # development headers and libraries are installed, else 0.
     HAVE_X11=${HAVE_X11-0}
 
-    # X11_PREFIX: directory holding the X11 include/ and lib/ (empty: packages
-    # look in the usual places).
-    X11_PREFIX=${X11_PREFIX-}
+    # X11_PREFIX: directory holding the X11 include/ and lib/ (CubXWindow
+    # installs under /usr/X11R6).
+    X11_PREFIX=${X11_PREFIX-/usr/X11R6}
 
     if [ -f "$conf_file" ]; then
         . "$conf_file"
@@ -262,8 +262,8 @@ configuration:
   pre-remove.
     HAVE_X11   1 if an X11 server (CubXWindow or similar) and its development
                headers are installed; default 0
-    X11_PREFIX directory holding the X11 include/ and lib/ (default: packages
-               search /usr/X11R6, /usr/X11 and /usr/local)
+    X11_PREFIX directory holding the X11 include/ and lib/; default /usr/X11R6
+               (where CubXWindow installs)
 
 architecture:
   pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)

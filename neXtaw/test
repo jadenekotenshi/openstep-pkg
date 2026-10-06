@@ -7,7 +7,7 @@ TMP=/usr/tmp/neXtaw-test.$$
 trap '/bin/rm -f "$TMP.c" "$TMP"' 0
 
 x11_prefix=
-for d in $X11_PREFIX /usr/X11R6 /usr/X11 /usr/local; do
+for d in $X11_PREFIX /usr/X11R6; do
     if test -n "$d" && test -f "$d/include/X11/Intrinsic.h"; then
         x11_prefix=$d
         break

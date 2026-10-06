@@ -5,6 +5,6 @@
 # libraries are installed.  Packages that can use X11 check this.
 HAVE_X11=0
 
-# Directory holding the X11 include/ and lib/ directories (for example
-# /usr/X11R6).  Leave empty to let packages search the usual places.
-X11_PREFIX=
+# Directory holding the X11 include/ and lib/ directories.  CubXWindow installs
+# under /usr/X11R6, which is the default.
+X11_PREFIX=/usr/X11R6
