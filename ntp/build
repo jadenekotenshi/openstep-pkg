@@ -489,7 +489,12 @@ arc4random_buf(void *buf, size_t nbytes)
 }
 REOF
 $CC $CFLAGS -c openstep_rand.c -o openstep_rand.o
-LIBS="`pwd`/openstep_rand.o"
+# Link the shim as a library: libtool refuses a bare .o in LIBS when it builds
+# libopts.la ("cannot build libtool library from non-libtool objects").
+/bin/rm -f libopenstepntp.a
+/bin/ar rc libopenstepntp.a openstep_rand.o
+/bin/ranlib libopenstepntp.a
+LIBS="-L`pwd` -lopenstepntp"
 ac_cv_func_arc4random_buf=yes
 export LIBS ac_cv_func_arc4random_buf
 
