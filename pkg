@@ -61,6 +61,36 @@ detect_arch() {
     export PKG_ARCH PKG_TARGET PKG_SYSCC_ARCH_FLAGS PKG_GCC42_ARCH_FLAGS
 }
 
+# Site configuration lives outside the package tree, in a plain sh file of
+# VAR=value lines: $PKG_CONF, else $PKG_ROOT/usr/local/etc/pkg.conf.  Every
+# option has a default, so the file is optional.  The options are exported to
+# build, test, post-install and pre-remove.
+load_config() {
+    conf_file=$PKG_CONF
+    if [ "x$conf_file" = x ]; then
+        conf_file=$PKG_ROOT/usr/local/etc/pkg.conf
+    fi
+    PKG_CONF_FILE=$conf_file
+
+    # HAVE_X11: 1 when an X11 server (CubXWindow or similar) and its
+    # development headers and libraries are installed, else 0.
+    HAVE_X11=${HAVE_X11-0}
+
+    if [ -f "$conf_file" ]; then
+        . "$conf_file"
+    fi
+
+    case $HAVE_X11 in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: HAVE_X11 must be 0 or 1, not '$HAVE_X11'"
+        ;;
+    esac
+
+    export PKG_CONF_FILE HAVE_X11
+}
+
 usage() {
     cat <<'EOF'
 usage:
@@ -71,6 +101,15 @@ usage:
   pkg remove <name>
   pkg test <name>...
   pkg arch
+  pkg config
+
+configuration:
+  pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
+  PKG_ROOT when that is set).  The file is optional, plain sh VAR=value lines.
+  See pkg.conf.example.  Options are exported to build, test, post-install and
+  pre-remove.
+    HAVE_X11   1 if an X11 server (CubXWindow or similar) and its development
+               headers are installed; default 0
 
 architecture:
   pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)
@@ -985,6 +1024,7 @@ else
 fi
 
 detect_arch
+load_config
 
 case $ACTION in
     arch)
@@ -993,6 +1033,12 @@ case $ACTION in
         echo "PKG_TARGET=$PKG_TARGET"
         echo "PKG_SYSCC_ARCH_FLAGS=$PKG_SYSCC_ARCH_FLAGS"
         echo "PKG_GCC42_ARCH_FLAGS=$PKG_GCC42_ARCH_FLAGS"
+    ;;
+
+    config)
+        [ "$ARGC" -eq 1 ] || die "config takes no arguments"
+        echo "PKG_CONF_FILE=$PKG_CONF_FILE"
+        echo "HAVE_X11=$HAVE_X11"
     ;;
 
     download)

@@ -1,0 +1,6 @@
+# pkg site configuration.  Copy to /usr/local/etc/pkg.conf (or point PKG_CONF at
+# it).  This is a plain sh file; every option is optional.
+
+# Set to 1 if an X11 server such as CubXWindow and its development headers and
+# libraries are installed.  Packages that can use X11 check this.
+HAVE_X11=0

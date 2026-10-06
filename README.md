@@ -14,6 +14,21 @@ sh ./pkg list
 sh ./pkg remove bash
 ```
 
+## Configuration
+
+Site options live outside the package tree in `/usr/local/etc/pkg.conf` (under `PKG_ROOT`
+when that is set; point `PKG_CONF` at another file to override).  The file is plain `sh`
+`VAR=value` lines and is optional: every option has a default.  `pkg.conf.example` is a
+template, and `./pkg config` prints the file in use and the resolved values.  Options are
+exported to every `build`, `test`, `post-install` and `pre-remove` hook, so packages can
+adapt to them.
+
+| option     | default | meaning |
+| ---------- | ------- | ------- |
+| `HAVE_X11` | `0`     | `1` if an X11 server (CubXWindow or similar) and its development headers and libraries are installed |
+
+An environment variable of the same name sets the default, and the file overrides it.
+
 ## Architecture
 
 `pkg` detects the machine with `arch(1)` (`i386`, `sparc`, `m68k` or `hppa`; i386 if
