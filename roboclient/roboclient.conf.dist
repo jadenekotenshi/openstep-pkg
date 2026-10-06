@@ -1,4 +1,4 @@
-# dhcpc configuration (shell syntax; also read by the dhcpc binary).
+# roboclient configuration (shell syntax; also read by the roboclient binary).
 # Hardware address of the interface, needed because OPENSTEP offers no way to
 # read it.  Find it with: /usr/etc/arp -a (your own entry) or the boot banner.
 #MAC_en0=0:0:c0:12:34:56

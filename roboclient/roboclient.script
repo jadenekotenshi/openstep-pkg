@@ -1,24 +1,24 @@
 #!/bin/sh
-# dhcpc.script - applies a DHCP lease on OPENSTEP.
+# roboclient.script - applies a DHCP lease on OPENSTEP.
 #
-# dhcpc runs this with the reason as $1 and the lease in the environment:
+# roboclient runs this with the reason as $1 and the lease in the environment:
 #   interface ip subnet broadcast router dns domain hostname ntpsrv lease serverid
 # Reasons: PREINIT BOUND RENEW EXPIRE TIMEOUT.
 #
-# Settings may be placed in /usr/local/etc/dhcpc.conf (shell syntax):
+# Settings may be placed in /usr/local/etc/roboclient.conf (shell syntax):
 #   UPDATE_ROUTE=yes   install the default route from the lease (default yes)
 #   UPDATE_RESOLV=no   rewrite /etc/resolv.conf from the lease (default no)
-#   MAC_en0=0:0:c0:12:34:56   hardware address (read by dhcpc itself)
-#   HOSTNAME=name             name sent to the server (read by dhcpc itself)
+#   MAC_en0=0:0:c0:12:34:56   hardware address (read by roboclient itself)
+#   HOSTNAME=name             name sent to the server (read by roboclient itself)
 
 PREFIX=/usr/local
 UPDATE_ROUTE=yes
 UPDATE_RESOLV=no
 IFCONFIG=/usr/etc/ifconfig
 ROUTE=/usr/etc/route
-[ -f $PREFIX/etc/dhcpc.conf ] && . $PREFIX/etc/dhcpc.conf
-[ -n "$DHCPC_VAR" ] || DHCPC_VAR=$PREFIX/var/dhcpc
-[ -d "$DHCPC_VAR" ] || mkdir -p "$DHCPC_VAR" 2>/dev/null
+[ -f $PREFIX/etc/roboclient.conf ] && . $PREFIX/etc/roboclient.conf
+[ -n "$ROBOCLIENT_VAR" ] || ROBOCLIENT_VAR=$PREFIX/var/roboclient
+[ -d "$ROBOCLIENT_VAR" ] || mkdir -p "$ROBOCLIENT_VAR" 2>/dev/null
 
 case "$1" in
 PREINIT)
@@ -42,7 +42,7 @@ BOUND|RENEW)
         {
             [ -n "$domain" ] && echo "domain $domain"
             for ns in $dns; do echo "nameserver $ns"; done
-        } > /etc/resolv.conf.dhcpc && mv /etc/resolv.conf.dhcpc /etc/resolv.conf
+        } > /etc/resolv.conf.roboclient && mv /etc/resolv.conf.roboclient /etc/resolv.conf
     fi
     {
         echo "interface=$interface"
@@ -55,10 +55,10 @@ BOUND|RENEW)
         echo "ntpsrv=\"$ntpsrv\""
         echo "serverid=$serverid"
         echo "lease=$lease"
-    } > "$DHCPC_VAR/$interface.info"
+    } > "$ROBOCLIENT_VAR/$interface.info"
     ;;
 EXPIRE)
-    rm -f "$DHCPC_VAR/$interface.info"
+    rm -f "$ROBOCLIENT_VAR/$interface.info"
     ;;
 TIMEOUT)
     ;;

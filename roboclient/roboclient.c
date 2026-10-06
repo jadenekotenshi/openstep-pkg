@@ -1,14 +1,14 @@
 /*
- * dhcpc - a small IPv4 DHCP client for OPENSTEP 4.2.
+ * roboclient - a small IPv4 DHCP client for OPENSTEP 4.2.
  *
  * OPENSTEP has no BPF, no routing sockets and no way to read an interface's
  * hardware address with an ioctl, so this client uses a plain UDP socket bound
  * to port 68 and asks servers to answer by broadcast (RFC 2131, section 4.1,
  * the BROADCAST flag).  Addresses and routes are applied by a script; see
- * dhcpc.script.  Written in conservative C for the old NeXT libc (no snprintf,
+ * roboclient.script.  Written in conservative C for the old NeXT libc (no snprintf,
  * no stdint.h, no poll).
  *
- * Usage: dhcpc [-fqn] [-m mac] [-h hostname] [-s script] [-p pidfile]
+ * Usage: roboclient [-fqn] [-m mac] [-h hostname] [-s script] [-p pidfile]
  *              [-t tries] interface
  *
  * Public domain.
@@ -30,11 +30,11 @@
 #include <syslog.h>
 #include <unistd.h>
 
-#ifndef DHCPC_PREFIX
-#define DHCPC_PREFIX "/usr/local"
+#ifndef ROBOCLIENT_PREFIX
+#define ROBOCLIENT_PREFIX "/usr/local"
 #endif
-#ifndef DHCPC_ARP
-#define DHCPC_ARP "/usr/etc/arp -a"
+#ifndef ROBOCLIENT_ARP
+#define ROBOCLIENT_ARP "/usr/etc/arp -a"
 #endif
 
 #ifndef IFNAMSIZ
@@ -106,7 +106,7 @@ logmsg(int pri, const char *fmt, const char *arg)
     if (daemonized)
 	syslog(pri, "%s", line);
     else
-	fprintf(stderr, "dhcpc: %s\n", line);
+	fprintf(stderr, "roboclient: %s\n", line);
 }
 
 static void
@@ -200,7 +200,7 @@ trim(char *s)
 	s[--n] = 0;
 }
 
-/* Read KEY=value lines from dhcpc.conf (the same file the script sources). */
+/* Read KEY=value lines from roboclient.conf (the same file the script sources). */
 static int
 conf_lookup(const char *key, char *out, size_t outlen)
 {
@@ -209,7 +209,7 @@ conf_lookup(const char *key, char *out, size_t outlen)
     size_t kl = strlen(key);
     int found = 0;
 
-    f = fopen(DHCPC_PREFIX "/etc/dhcpc.conf", "r");
+    f = fopen(ROBOCLIENT_PREFIX "/etc/roboclient.conf", "r");
     if (f == 0)
 	return 0;
     while (fgets(line, sizeof line, f) != 0) {
@@ -270,7 +270,7 @@ mac_from_arp(u8 *out)
 	return 0;
     ia.s_addr = htonl(a);
     sprintf(key, "(%s)", inet_ntoa(ia));
-    p = popen(DHCPC_ARP, "r");
+    p = popen(ROBOCLIENT_ARP, "r");
     if (p == 0)
 	return 0;
     while (!ok && fgets(line, sizeof line, p) != 0) {
@@ -304,7 +304,7 @@ find_mac(void)
 	return;
     }
     logmsg(LOG_ERR,
-	   "cannot determine the hardware address of %s; use -m or set MAC_%s in dhcpc.conf",
+	   "cannot determine the hardware address of %s; use -m or set MAC_%s in roboclient.conf",
 	   ifname);
     exit(1);
 }
@@ -580,7 +580,7 @@ run_script(const char *reason, const struct lease *l)
     for (i = 0; i < envn; i++)
 	free(envv[i]);
     envn = 0;
-    addenv("PATH", DHCPC_PREFIX "/bin:/usr/ucb:/bin:/usr/bin:/usr/etc:/etc");
+    addenv("PATH", ROBOCLIENT_PREFIX "/bin:/usr/ucb:/bin:/usr/bin:/usr/etc:/etc");
     addenv("interface", ifname);
     addenv("reason", reason);
     if (l != 0 && l->ip != 0) {
@@ -766,7 +766,7 @@ go_background(void)
     dup(0);
     dup(0);
     signal(SIGHUP, SIG_IGN);
-    openlog("dhcpc", LOG_PID, LOG_DAEMON);
+    openlog("roboclient", LOG_PID, LOG_DAEMON);
     daemonized = 1;
     write_pid();
 }
@@ -775,7 +775,7 @@ static void
 usage(void)
 {
     fprintf(stderr,
-	    "usage: dhcpc [-fqn] [-m mac] [-h hostname] [-s script] [-p pidfile]"
+	    "usage: roboclient [-fqn] [-m mac] [-h hostname] [-s script] [-p pidfile]"
 	    " [-t tries] interface\n"
 	    "  -f  stay in the foreground     -q  quit once a lease is obtained\n"
 	    "  -n  never reconfigure the interface before the lease is bound\n"
@@ -794,7 +794,7 @@ main(int argc, char **argv)
     extern char *optarg;
     extern int optind;
 
-    scriptpath = DHCPC_PREFIX "/share/dhcpc/dhcpc.script";
+    scriptpath = ROBOCLIENT_PREFIX "/share/roboclient/roboclient.script";
     while ((c = getopt(argc, argv, "fqnm:h:s:p:t:")) != EOF) {
 	switch (c) {
 	case 'f': foreground = 1; break;
@@ -802,7 +802,7 @@ main(int argc, char **argv)
 	case 'n': no_preinit = 1; break;
 	case 'm':
 	    if (!parse_mac(optarg, mac)) {
-		fprintf(stderr, "dhcpc: bad hardware address: %s\n", optarg);
+		fprintf(stderr, "roboclient: bad hardware address: %s\n", optarg);
 		return 2;
 	    }
 	    have_mac = 1;
@@ -827,12 +827,12 @@ main(int argc, char **argv)
     ifname = argv[optind];
     if (strlen(ifname) >= IFNAMSIZ)
 	usage();
-    if ((ep = getenv("DHCPC_SERVER")) != 0) server_dest = test_dest = ep;
-    if ((ep = getenv("DHCPC_SERVER_PORT")) != 0) sport = atoi(ep);
-    if ((ep = getenv("DHCPC_CLIENT_PORT")) != 0) cport = atoi(ep);
+    if ((ep = getenv("ROBOCLIENT_SERVER")) != 0) server_dest = test_dest = ep;
+    if ((ep = getenv("ROBOCLIENT_SERVER_PORT")) != 0) sport = atoi(ep);
+    if ((ep = getenv("ROBOCLIENT_CLIENT_PORT")) != 0) cport = atoi(ep);
 
     if (getuid() != 0) {
-	fprintf(stderr, "dhcpc: must be run as root\n");
+	fprintf(stderr, "roboclient: must be run as root\n");
 	return 1;
     }
     find_mac();

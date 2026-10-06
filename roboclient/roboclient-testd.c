@@ -1,7 +1,7 @@
 /*
- * dhcpc-testd - a one-shot fake DHCP server used by dhcpc's package test.
+ * roboclient-testd - a one-shot fake DHCP server used by roboclient's package test.
  * Answers one DISCOVER with an OFFER and one REQUEST with an ACK, always to
- * 127.0.0.1, then exits.  Usage: dhcpc-testd server-port client-port
+ * 127.0.0.1, then exits.  Usage: roboclient-testd server-port client-port
  */
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -71,7 +71,7 @@ main(int argc, char **argv)
     me.sin_port = htons((unsigned short) atoi(argv[1]));
     me.sin_addr.s_addr = inet_addr("127.0.0.1");
     if (bind(s, (struct sockaddr *) &me, sizeof me) < 0) {
-	perror("dhcpc-testd: bind");
+	perror("roboclient-testd: bind");
 	return 1;
     }
     memset(&to, 0, sizeof to);
