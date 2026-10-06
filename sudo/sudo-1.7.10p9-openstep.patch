@@ -34,6 +34,30 @@ diff -ruN pa/sudo-1.7.10p9/exec_pty.c pc/sudo-1.7.10p9/exec_pty.c
  # include <termio.h>
  #endif /* HAVE_TERMIOS_H */
  #include <sys/ioctl.h>
+diff -ruN pa/sudo-1.7.10p9/fixman.sh pc/sudo-1.7.10p9/fixman.sh
+--- a/fixman.sh	2015-02-10 17:05:31.000000000 +0000
++++ b/fixman.sh	2026-10-06 02:17:51.292553488 +0000
+@@ -2,7 +2,7 @@
+ 
+ OUTFILE="$1"
+ rm -f "$OUTFILE"
+-> "$OUTFILE"
++: > "$OUTFILE"
+ 
+ # HP-UX friendly header/footer for all man pages
+ if [ X"`uname 2>&1`" = X"HP-UX" ]; then
+diff -ruN pa/sudo-1.7.10p9/fixmdoc.sh pc/sudo-1.7.10p9/fixmdoc.sh
+--- a/fixmdoc.sh	2015-02-10 17:05:31.000000000 +0000
++++ b/fixmdoc.sh	2026-10-06 02:17:51.293004929 +0000
+@@ -2,7 +2,7 @@
+ 
+ OUTFILE="$1"
+ rm -f "$OUTFILE"
+-> "$OUTFILE"
++: > "$OUTFILE"
+ 
+ # Page specific hacks
+ case "$OUTFILE" in
 diff -ruN pa/sudo-1.7.10p9/glob.c pc/sudo-1.7.10p9/glob.c
 --- a/glob.c	2015-02-10 17:05:31.000000000 +0000
 +++ b/glob.c	2026-10-06 01:06:34.597680725 +0000
