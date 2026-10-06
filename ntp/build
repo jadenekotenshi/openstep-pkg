@@ -180,12 +180,107 @@ GLEOF
 # Mach CThreads; ntpd copes without threads (name lookups use a child process).
 # Everything stays under /usr/local; configuration is /usr/local/etc/ntpd.conf
 # (start ntpd with -c /usr/local/etc/ntpd.conf).
+# ntp wants arc4random_buf() for random numbers when OpenSSL is absent, and
+# otherwise falls back to libevent's copy -- but the libevent tearoff does not
+# compile here (no IPv6 types) and nothing else needs it.  Supply a small
+# arc4random_buf(): an RC4 keystream keyed from the system clock, process ids
+# and /dev/random or /dev/urandom when they exist.  The configure step is told
+# the function exists, the libevent directory is left unbuilt, and ntp-keygen
+# and ntpd link this object instead.
+/bin/cat > openstep_rand.c <<'REOF'
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
+static unsigned char rc4_s[256];
+static unsigned char rc4_i, rc4_j;
+static int rc4_ready;
+static unsigned long rc4_count;
+
+static void
+rc4_seed(void)
+{
+    unsigned char key[256];
+    struct timeval tv;
+    unsigned long mix;
+    int i, j, n;
+    unsigned char t;
+    FILE *fp;
+    static const char *devs[] = { "/dev/urandom", "/dev/random", 0 };
+
+    memset(key, 0, sizeof(key));
+    n = 0;
+    for (i = 0; devs[i] != 0 && n == 0; i++) {
+	fp = fopen(devs[i], "r");
+	if (fp != 0) {
+	    n = (int)fread(key, 1, 128, fp);
+	    fclose(fp);
+	}
+    }
+    gettimeofday(&tv, (struct timezone *)0);
+    mix = (unsigned long)tv.tv_sec ^ ((unsigned long)tv.tv_usec << 12)
+	^ ((unsigned long)getpid() << 5) ^ (unsigned long)clock()
+	^ (unsigned long)(char *)&tv ^ (unsigned long)getppid();
+    for (i = 0; i < 16; i++) {
+	key[128 + i] ^= (unsigned char)(mix >> ((i & 3) * 8));
+	mix = mix * 1103515245UL + 12345UL;
+    }
+    for (i = 0; i < 256; i++)
+	rc4_s[i] = (unsigned char)i;
+    j = 0;
+    for (i = 0; i < 256; i++) {
+	j = (j + rc4_s[i] + key[i]) & 255;
+	t = rc4_s[i]; rc4_s[i] = rc4_s[j]; rc4_s[j] = t;
+    }
+    rc4_i = rc4_j = 0;
+    for (i = 0; i < 3072; i++) {	/* discard the weak start of the stream */
+	rc4_i++;
+	rc4_j += rc4_s[rc4_i];
+	t = rc4_s[rc4_i]; rc4_s[rc4_i] = rc4_s[rc4_j]; rc4_s[rc4_j] = t;
+    }
+    rc4_ready = 1;
+    rc4_count = 0;
+}
+
+void
+arc4random_buf(void *buf, size_t nbytes)
+{
+    unsigned char *p = (unsigned char *)buf;
+    unsigned char t;
+
+    if (!rc4_ready || rc4_count > 1600000UL)
+	rc4_seed();
+    while (nbytes-- > 0) {
+	rc4_i++;
+	rc4_j += rc4_s[rc4_i];
+	t = rc4_s[rc4_i]; rc4_s[rc4_i] = rc4_s[rc4_j]; rc4_s[rc4_j] = t;
+	*p++ = rc4_s[(unsigned char)(rc4_s[rc4_i] + rc4_s[rc4_j])];
+	rc4_count++;
+    }
+}
+REOF
+$CC $CFLAGS -c openstep_rand.c -o openstep_rand.o
+LIBS="`pwd`/openstep_rand.o"
+ac_cv_func_arc4random_buf=yes
+export LIBS ac_cv_func_arc4random_buf
+
 run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --build=$PKG_TARGET --host=$PKG_TARGET \
     --without-crypto --without-sntp --without-ntpsnmpd --disable-debugging \
     --disable-thread-support --disable-dependency-tracking
-/bin/gnumake
-/bin/gnumake install DESTDIR="$DESTDIR"
+# Leave the libevent tearoff unbuilt (see above).
+/bin/sed 's|cd $(top_builddir)/sntp/libevent && $(MAKE) $(AM_MAKEFLAGS)|: libevent is not needed|' \
+    libntp/Makefile > libntp/Makefile.new
+/bin/mv libntp/Makefile.new libntp/Makefile
+/bin/sed 's|^am__append_1 = libevent$|am__append_1 =|' sntp/Makefile > sntp/Makefile.new
+/bin/mv sntp/Makefile.new sntp/Makefile
+/bin/gnumake LDADD_LIBEVENT=
+/bin/gnumake install DESTDIR="$DESTDIR" LDADD_LIBEVENT=
 
 # ntp installs the daemon into bin; it belongs in sbin.
 /usr/local/bin/mkdir -p "$DESTDIR/usr/local/sbin"
