@@ -1,6 +1,6 @@
-diff -ruN a/CPP/Common/MyString.h b/CPP/Common/MyString.h
+diff -ruN p7a/p7zip_16.02/CPP/Common/MyString.h p7b/p7zip_16.02/CPP/Common/MyString.h
 --- a/CPP/Common/MyString.h	2016-02-17 18:39:30.000000000 +0000
-+++ b/CPP/Common/MyString.h	2026-10-05 20:45:05.732586768 +0000
++++ b/CPP/Common/MyString.h	2026-10-06 01:09:43.102510897 +0000
 @@ -12,7 +12,7 @@
  #ifdef ENV_HAVE_WCTYPE_H
  #include <wctype.h>
@@ -10,9 +10,30 @@ diff -ruN a/CPP/Common/MyString.h b/CPP/Common/MyString.h
  int wcscmp(const wchar_t *s1, const wchar_t *s2);
  wchar_t * wmemcpy(wchar_t *dest, const wchar_t *src, size_t num);
  wchar_t * wcsstr(const wchar_t *wcs1, const wchar_t *wcs2);
-diff -ruN a/CPP/myWindows/config.h b/CPP/myWindows/config.h
+diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/StdAfx.h
+--- a/CPP/myWindows/StdAfx.h	2015-10-03 18:34:40.000000000 +0000
++++ b/CPP/myWindows/StdAfx.h	2026-10-06 01:09:54.998332727 +0000
+@@ -29,6 +29,17 @@
+ #include <stddef.h>
+ #include <ctype.h>
+ #include <unistd.h>
++#ifdef ENV_OPENSTEP
++/* OPENSTEP's <unistd.h> declares almost nothing; read(), write(), close(),
++   open(), lseek() and friends are declared by <libc.h>. */
++#ifdef __cplusplus
++extern "C" {
++#endif
++#include <libc.h>
++#ifdef __cplusplus
++}
++#endif
++#endif
+ #include <errno.h>
+ #include <math.h>
+ 
+diff -ruN p7a/p7zip_16.02/CPP/myWindows/config.h p7b/p7zip_16.02/CPP/myWindows/config.h
 --- a/CPP/myWindows/config.h	2016-03-23 19:12:45.000000000 +0000
-+++ b/CPP/myWindows/config.h	2026-10-05 20:45:05.732438579 +0000
++++ b/CPP/myWindows/config.h	2026-10-06 01:09:43.102691022 +0000
 @@ -5,7 +5,10 @@
    #define FILESYSTEM_IS_CASE_SENSITIVE 1
  #endif
@@ -34,9 +55,9 @@ diff -ruN a/CPP/myWindows/config.h b/CPP/myWindows/config.h
        #define ENV_HAVE_TIMEGM
      #endif
  
-diff -ruN a/makefile.openstep b/makefile.openstep
+diff -ruN p7a/p7zip_16.02/makefile.openstep p7b/p7zip_16.02/makefile.openstep
 --- a/makefile.openstep	1970-01-01 00:00:00.000000000 +0000
-+++ b/makefile.openstep	2026-10-05 20:45:05.748262541 +0000
++++ b/makefile.openstep	2026-10-06 01:09:43.102771671 +0000
 @@ -0,0 +1,22 @@
 +#
 +# makefile.machine for OPENSTEP (i386, sparc) with gcc-4.2, single-threaded.
@@ -60,9 +81,9 @@ diff -ruN a/makefile.openstep b/makefile.openstep
 +
 +OBJ_CRC32=$(OBJ_CRC32_C)
 +OBJ_AES=
-diff -ruN a/openstep/dirent.h b/openstep/dirent.h
+diff -ruN p7a/p7zip_16.02/openstep/dirent.h p7b/p7zip_16.02/openstep/dirent.h
 --- a/openstep/dirent.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/dirent.h	2026-10-05 20:45:05.744001926 +0000
++++ b/openstep/dirent.h	2026-10-06 01:09:43.102827606 +0000
 @@ -0,0 +1,13 @@
 +/* OPENSTEP's libc returns the BSD "struct direct" from readdir() (d_name at a
 +   different offset from SVID "struct dirent"), so use <sys/dir.h> and rename
@@ -77,9 +98,9 @@ diff -ruN a/openstep/dirent.h b/openstep/dirent.h
 +#include <sys/dir.h>
 +#define dirent direct
 +#endif
-diff -ruN a/openstep/pthread.h b/openstep/pthread.h
+diff -ruN p7a/p7zip_16.02/openstep/pthread.h p7b/p7zip_16.02/openstep/pthread.h
 --- a/openstep/pthread.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/pthread.h	2026-10-05 20:46:06.234083106 +0000
++++ b/openstep/pthread.h	2026-10-06 01:09:43.102856035 +0000
 @@ -0,0 +1,54 @@
 +/* Single-thread stand-in for <pthread.h> on OPENSTEP, which has none.
 +   p7zip is built with -D_7ZIP_ST, so no second thread ever exists: mutexes are
@@ -135,9 +156,9 @@ diff -ruN a/openstep/pthread.h b/openstep/pthread.h
 +static __inline__ int pthread_detach(pthread_t t) { (void)t; return ESRCH; }
 +
 +#endif
-diff -ruN a/openstep/wchar.h b/openstep/wchar.h
+diff -ruN p7a/p7zip_16.02/openstep/wchar.h p7b/p7zip_16.02/openstep/wchar.h
 --- a/openstep/wchar.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/wchar.h	2026-10-05 20:45:05.739633696 +0000
++++ b/openstep/wchar.h	2026-10-06 01:09:43.102899319 +0000
 @@ -0,0 +1,8 @@
 +/* OPENSTEP has no <wchar.h>.  p7zip (ENV_OPENSTEP) supplies its own wcslen(),
 +   wcscmp(), wmemcpy() and friends, so this only has to exist; wchar_t itself
@@ -147,9 +168,9 @@ diff -ruN a/openstep/wchar.h b/openstep/wchar.h
 +#include <stddef.h>
 +#include <stdlib.h>
 +#endif
-diff -ruN a/openstep/wctype.h b/openstep/wctype.h
+diff -ruN p7a/p7zip_16.02/openstep/wctype.h p7b/p7zip_16.02/openstep/wctype.h
 --- a/openstep/wctype.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/openstep/wctype.h	2026-10-05 20:45:05.739733259 +0000
++++ b/openstep/wctype.h	2026-10-06 01:09:43.102925130 +0000
 @@ -0,0 +1,5 @@
 +/* OPENSTEP has no <wctype.h>; p7zip (ENV_OPENSTEP) does not include it. */
 +#ifndef P7ZIP_OPENSTEP_WCTYPE_H
