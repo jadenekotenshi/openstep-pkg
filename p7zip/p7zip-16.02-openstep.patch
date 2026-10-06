@@ -28,8 +28,8 @@ diff -ruN p7a/p7zip_16.02/CPP/Common/MyString.h p7b/p7zip_16.02/CPP/Common/MyStr
  wchar_t * wcsstr(const wchar_t *wcs1, const wchar_t *wcs2);
 diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/StdAfx.h
 --- a/CPP/myWindows/StdAfx.h	2015-10-03 18:34:40.000000000 +0000
-+++ b/CPP/myWindows/StdAfx.h	2026-10-06 01:29:11.857975034 +0000
-@@ -29,6 +29,19 @@
++++ b/CPP/myWindows/StdAfx.h	2026-10-06 02:47:54.803708508 +0000
+@@ -29,8 +29,47 @@
  #include <stddef.h>
  #include <ctype.h>
  #include <unistd.h>
@@ -48,7 +48,35 @@ diff -ruN p7a/p7zip_16.02/CPP/myWindows/StdAfx.h p7b/p7zip_16.02/CPP/myWindows/S
 +#endif
  #include <errno.h>
  #include <math.h>
++#ifdef ENV_OPENSTEP
++/* OPENSTEP's libc has no snprintf().  p7zip only formats short messages and
++   paths with it, so format into a large local buffer and copy out what fits. */
++#include <stdarg.h>
++#include <stdio.h>
++#include <string.h>
++static inline int openstep_snprintf(char *buf, size_t size, const char *fmt, ...)
++{
++  char tmp[8192];
++  va_list ap;
++  int n;
++  va_start(ap, fmt);
++  n = vsprintf(tmp, fmt, ap);
++  va_end(ap);
++  if (n < 0)
++    return n;
++  if (size > 0)
++  {
++    size_t m = ((size_t)n < size - 1) ? (size_t)n : size - 1;
++    memcpy(buf, tmp, m);
++    buf[m] = 0;
++  }
++  return n;
++}
++#define snprintf openstep_snprintf
++#endif
  
+ #ifdef __NETWARE__
+ #include <sys/types.h>
 diff -ruN p7a/p7zip_16.02/CPP/myWindows/config.h p7b/p7zip_16.02/CPP/myWindows/config.h
 --- a/CPP/myWindows/config.h	2016-03-23 19:12:45.000000000 +0000
 +++ b/CPP/myWindows/config.h	2026-10-06 01:09:43.102691022 +0000
