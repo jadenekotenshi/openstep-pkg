@@ -93,6 +93,8 @@ struct timespec {
 };
 /* libntp's realpath and work_fork code use ssize_t, which OPENSTEP lacks. */
 typedef int ssize_t;
+/* <sys/resource.h> has no rlim_t; struct rlimit's fields are plain ints here. */
+typedef int rlim_t;
 /* <sys/stat.h> hides the POSIX permission and file-type macros unless
    _POSIX_SOURCE is defined (the standard BSD values). */
 #include <sys/stat.h>
