@@ -59,8 +59,8 @@ diff -ruN p7a/p7zip_16.02/CPP/myWindows/config.h p7b/p7zip_16.02/CPP/myWindows/c
  
 diff -ruN p7a/p7zip_16.02/makefile.openstep p7b/p7zip_16.02/makefile.openstep
 --- a/makefile.openstep	1970-01-01 00:00:00.000000000 +0000
-+++ b/makefile.openstep	2026-10-06 01:09:43.102771671 +0000
-@@ -0,0 +1,22 @@
++++ b/makefile.openstep	2026-10-06 01:48:13.682147023 +0000
+@@ -0,0 +1,23 @@
 +#
 +# makefile.machine for OPENSTEP (i386, sparc) with gcc-4.2, single-threaded.
 +#
@@ -72,6 +72,7 @@ diff -ruN p7a/p7zip_16.02/makefile.openstep p7b/p7zip_16.02/makefile.openstep
 +ALLFLAGS=${OPTFLAGS} -pipe \
 +	-D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE \
 +	-DNDEBUG -D_REENTRANT -DENV_UNIX -DENV_OPENSTEP -D_7ZIP_ST -DNeXT \
++	-DCLOCKS_PER_SEC=CLK_TCK \
 +	-I$(OPENSTEP_INC) \
 +	$(LOCAL_FLAGS)
 +
