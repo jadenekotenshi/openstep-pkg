@@ -155,6 +155,19 @@ diff -ruN -x '*.o' a/x/lib/sh/Makefile.in b/lib/sh/Makefile.in
  strvis.o: strvis.c
  strlcpy.o: strlcpy.c
  strscpy.o: strscpy.c
+diff -ruN -x '*.o' a/x/lib/sh/input_avail.c b/lib/sh/input_avail.c
+--- a/lib/sh/input_avail.c	2022-12-29 18:36:19.000000000 +0000
++++ b/lib/sh/input_avail.c	2026-10-06 00:38:40.308474119 +0000
+@@ -35,6 +35,9 @@
+ 
+ #include <signal.h>
+ 
++/* Without POSIX signals, sig.h supplies SIG_BLOCK and the sigset_t macros. */
++#include "sig.h"
++
+ #if defined (HAVE_UNISTD_H)
+ #  include <unistd.h>
+ #endif /* HAVE_UNISTD_H */
 diff -ruN -x '*.o' a/x/lib/sh/openstep.c b/lib/sh/openstep.c
 --- a/lib/sh/openstep.c	1970-01-01 00:00:00.000000000 +0000
 +++ b/lib/sh/openstep.c	2026-10-06 00:22:49.075251108 +0000
