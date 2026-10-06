@@ -1,0 +1,14 @@
+diff -ruN tca/tcsh-6.24.13/configure tcb/tcsh-6.24.13/configure
+--- a/configure	2024-06-12 05:52:47.000000000 +0000
++++ b/configure	2026-10-06 02:52:24.776204814 +0000
+@@ -6089,6 +6089,10 @@
+   *-qnx6*) :
+         tcsh_config_file=qnx6
+    ;; #(
++  ## NeXT, OPENSTEP (Mach); system/mach has the NeXT settings
++  *-next-*) :
++        tcsh_config_file=mach
++   ;; #(
+   *) :
+     as_fn_error $? "Tcsh can't guess the configuration file name
+ for \`${host}' systems.
