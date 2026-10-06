@@ -66,7 +66,7 @@ has not been attempted.
 | ntp | written; never built on OPENSTEP | — |
 | openssh | validated | validated |
 | openssl | validated | validated |
-| p7zip | in progress; fixes pushed, no result yet | — |
+| p7zip | validated | — |
 | patch | validated | validated |
 | pdksh | validated | validated |
 | perl | not recorded | building; fixes pushed, no result yet |
