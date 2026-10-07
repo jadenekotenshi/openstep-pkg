@@ -1,0 +1,44 @@
+cctools-as 806 for OPENSTEP 4.2/i386
+
+Install with: sh ./pkg install cctools-as
+Test with:    sh ./pkg test cctools-as
+
+Use the assembler directly:
+    /usr/local/bin/as-806 -o example.o example.s
+
+Select it explicitly with Apple GCC 4.2 (5666.3):
+    gcc-4.2 -specs=/usr/local/lib/cctools-as/gcc42.specs example.c -o example
+    g++-4.2 -specs=/usr/local/lib/cctools-as/gcc42.specs example.cc -o example
+
+The specs cover normal C, C++, Objective-C, Objective-C++, and assembly
+compilation, including -pipe. GCC still reports /bin/as with
+-print-prog-name=as; use -v to see the assembler actually invoked.
+Without the specs option GCC continues to use the stock assembler.
+Apple's optional PCH repository path (-fsave-repository) still uses stock as.
+The linker, system tools, compiler ABI, and CPU options are unchanged.
+
+Only the i386 backend is installed. Instruction encoding support does not
+imply runtime CPU or operating-system support. In particular, keep SSE/SSE2
+disabled unless kernel XMM-state support has been independently established.
+
+The build uses upstream's assembler makefile and seven private libstuff
+source files, with package-local integer/header compatibility fixes. Local
+section differences use the older scattered SECTDIFF relocation pair that
+stock OPENSTEP ld understands; normal dynamic object output is retained.
+No configure script, replacement system headers, or support libraries are
+installed. The pristine source is fetched with a pinned SHA-256 checksum;
+cctools-806-openstep.patch contains the source changes.
+
+Validated on 2026-10-06, OPENSTEP 4.2/i386 at 192.168.1.76:
+  - pkg build, pkg install, and pkg test passed as user me, without su.
+  - The installed test checks instruction bytes without executing SIMD,
+    global/local section differences, .quad, mixed stock/new objects,
+    direct assembly and GCC specs selection, -pipe, constructors,
+    C++ exceptions, Objective-C and Objective-C++ runtime calls.
+  - The existing gcc42/test suite also passed using temporary compiler
+    wrappers selecting this assembler, including the Objective-C return ABI.
+  - The source patch applies cleanly to pristine cctools-806.
+  - Compilation used upstream's assembler makefile with /bin/gnumake 3.74;
+    configure was not needed. Unused architecture packing and visibility
+    warnings were harmless. Transfer extraction reported clock-skew timestamp
+    warnings; package installation itself completed without those warnings.

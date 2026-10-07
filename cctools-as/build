@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
+CONFIG_SHELL=/usr/local/bin/ksh
+export PATH CONFIG_SHELL
+if test -d "cctools-cctools-$VERSION"; then cd "cctools-cctools-$VERSION"; fi
+patch -p1 < "cctools-$VERSION-openstep.patch"
+
+# Only the support objects referenced by the i386 assembler; no other tools.
+for unit in arch best_arch bytesex rnd allocate errors fatals; do
+    /usr/local/bin/gcc-4.2 -O2 -g -fno-strict-aliasing -D__OPENSTEP__ \
+        -Iinclude -include stdint.h -c "libstuff/$unit.c" -o "libstuff/$unit.o"
+done
+/bin/ar cr libstuff/libstuff.a libstuff/arch.o libstuff/best_arch.o \
+    libstuff/bytesex.o libstuff/rnd.o libstuff/allocate.o \
+    libstuff/errors.o libstuff/fatals.o
+/bin/ranlib libstuff/libstuff.a
+
+cd as
+# Avoid Apple's build-server version generator; this is generated build data.
+test -d a386_dir || mkdir a386_dir
+echo "const char apple_version[] = \"cctools-$VERSION\";" > a386_dir/apple_version.c
+/bin/gnumake a386_build CC=/usr/local/bin/gcc-4.2 SHELL="$CONFIG_SHELL" \
+    RC_OS=nextstep RC_CFLAGS=-D__OPENSTEP__ \
+    X_CFLAGS='-include stdint.h -fno-strict-aliasing' USE_DEPENDENCY_FILE=NO
+cd ..
+
+for dir in usr usr/local usr/local/bin usr/local/lib usr/local/lib/cctools-as \
+    usr/local/share usr/local/share/doc usr/local/share/doc/cctools-as; do
+    test -d "$DESTDIR/$dir" || mkdir "$DESTDIR/$dir"
+done
+/usr/bin/install -c -m 755 as/a386_dir/as "$DESTDIR/usr/local/bin/as-806"
+/usr/bin/install -c -m 644 gcc42.specs "$DESTDIR/usr/local/lib/cctools-as/gcc42.specs"
+for file in README APPLE_LICENSE as/COPYING; do
+    /usr/bin/install -c -m 644 "$file" "$DESTDIR/usr/local/share/doc/cctools-as/"
+done

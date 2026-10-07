@@ -1,0 +1,87 @@
+diff --git a/as/as.h b/as/as.h
+index 4e63938..58e77b7 100644
+--- a/as/as.h
++++ b/as/as.h
+@@ -59,6 +59,9 @@ extern char version_string[];
+ /* These #imports are for type definitions etc. */
+ #include <stdint.h>
+ #import <stdio.h>
++#ifdef __OPENSTEP__
++#define getc_unlocked getc
++#endif
+ #import <assert.h>
+ #import <mach/machine.h>
+ 
+diff --git a/as/dwarf2dbg.c b/as/dwarf2dbg.c
+index d2b3549..d6e4505 100644
+--- a/as/dwarf2dbg.c
++++ b/as/dwarf2dbg.c
+@@ -32,7 +32,11 @@
+ #include <string.h>
+ #include <unistd.h>
+ #include <sys/param.h>
++#ifdef __OPENSTEP__
++#include <libc.h>
++#else
+ #include <libgen.h>
++#endif
+ #define ATTRIBUTE_UNUSED
+ #define NO_LISTING
+ 
+diff --git a/as/write_object.c b/as/write_object.c
+index a751dae..4d382ce 100644
+--- a/as/write_object.c
++++ b/as/write_object.c
+@@ -76,7 +76,12 @@
+ #endif
+ #if defined(M68K) || defined(I386)
+ #define RELOC_SECTDIFF		GENERIC_RELOC_SECTDIFF
++#if defined(__OPENSTEP__) && defined(I386) && !defined(ARCH64)
++/* OPENSTEP ld predates LOCAL_SECTDIFF; use its ordinary scattered pair. */
++#define RELOC_LOCAL_SECTDIFF	GENERIC_RELOC_SECTDIFF
++#else
+ #define RELOC_LOCAL_SECTDIFF	GENERIC_RELOC_LOCAL_SECTDIFF
++#endif
+ #define RELOC_PAIR		GENERIC_RELOC_PAIR
+ #endif
+ #ifdef ARM
+diff --git a/include/mach/i386/thread_status.h b/include/mach/i386/thread_status.h
+new file mode 100644
+index 0000000..432a4bd
+--- /dev/null
++++ b/include/mach/i386/thread_status.h
+@@ -0,0 +1,6 @@
++#ifdef __OPENSTEP__
++/* Use the same fixed header as mach-o/loader.h; NeXT's header has no guard. */
++#import <mach/machine/thread_status.h>
++#else
++#include_next <mach/i386/thread_status.h>
++#endif
+diff --git a/include/stdint.h b/include/stdint.h
+new file mode 100644
+index 0000000..9c4ee95
+--- /dev/null
++++ b/include/stdint.h
+@@ -0,0 +1,22 @@
++#ifndef CCTOOLS_OPENSTEP_STDINT_H
++#define CCTOOLS_OPENSTEP_STDINT_H
++#ifndef __OPENSTEP__
++#include_next <stdint.h>
++#else
++/* OPENSTEP i386 is ILP32; these types are private to the cctools build. */
++typedef signed char int8_t;
++typedef unsigned char uint8_t;
++typedef short int16_t;
++typedef unsigned short uint16_t;
++typedef int int32_t;
++typedef unsigned int uint32_t;
++typedef long long int64_t;
++typedef unsigned long long uint64_t;
++typedef int intptr_t;
++typedef unsigned int uintptr_t;
++#define INT32_MAX 2147483647
++#define UINT32_MAX 4294967295U
++#define INT64_MAX 9223372036854775807LL
++#define UINT64_MAX 18446744073709551615ULL
++#endif
++#endif
