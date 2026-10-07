@@ -15,6 +15,25 @@ SED=/usr/local/bin/sed
 export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED
 . "$PKG_BUILD_HELPERS"
 
+# Private headers, first on the include path (configure and make both see them).
+/usr/local/bin/mkdir -p openstep/openssl
+
+# OPENSTEP's <dirent.h> does not give POSIX programs DIR and struct dirent; the
+# BSD <sys/dir.h> does (as struct direct).  gnulib's <dirent.h> wrapper reaches
+# the system header with #include_next, so it finds this one.
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#undef _POSIX_SOURCE
+#ifndef _NEXT_SOURCE
+# define _NEXT_SOURCE 1
+#endif
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+
 # gnulib replaces the missing socklen_t with a macro ("#define socklen_t int"),
 # and an OpenSSL installed before its e_os2.h was fixed typedefs socklen_t
 # unconditionally, which then reads "typedef unsigned int int;".  Until the
@@ -22,16 +41,13 @@ export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED
 # the include path.
 OSSL_H=/usr/local/include/openssl/e_os2.h
 if /usr/local/bin/grep '^typedef unsigned int socklen_t;$' "$OSSL_H" > /dev/null; then
-    /usr/local/bin/mkdir -p openstep/openssl
     /usr/local/bin/sed -e 's/^typedef unsigned int socklen_t;$/#ifndef socklen_t\
 typedef unsigned int socklen_t;\
 #endif/' -e 's/^typedef u_int32_t in_addr_t;$/#ifndef in_addr_t\
 typedef u_int32_t in_addr_t;\
 #endif/' "$OSSL_H" > openstep/openssl/e_os2.h
-    CPPFLAGS="-I`pwd`/openstep -I/usr/local/include"
-else
-    CPPFLAGS=-I/usr/local/include
 fi
+CPPFLAGS="-I`pwd`/openstep -I/usr/local/include"
 export CPPFLAGS
 
 # HTTPS goes through the OpenSSL package; its default certificate bundle is
