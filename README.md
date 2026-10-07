@@ -187,9 +187,9 @@ Rules:
 - local paths are copied from the package directory
 - `.tar.gz`, `.tgz`, and `.tar` archives are extracted into the build root
 - non-archive files are copied as plain files
-- `.tar.xz`, `.txz`, `.tar.zst` and `.tzst` are decompressed with `xz` or `zstd` and
-  unpacked with `gtar`; the package lists `xz` or `zstd` (and `tar`) in its `depends`
-- `.tar.bz2` and `.tbz2` are rejected
+- `.tar.xz`, `.txz`, `.tar.zst`, `.tzst`, `.tar.bz2` and `.tbz2` are decompressed with
+  `xz`, `zstd` or `bzip2` and unpacked with `gtar`; the package lists `xz`, `zstd` or
+  `bzip2` (and `tar`) in its `depends`
 
 The optional second field is the destination directory inside the build root.
 

@@ -652,7 +652,7 @@ archive_tool() {
 }
 
 # unpack_compressed ARCHIVE TARGET-DIR TOOL PACKAGE
-# Decompress ARCHIVE with TOOL (xz or zstd) to a temporary tar file, then
+# Decompress ARCHIVE with TOOL (xz, zstd or bzip2) to a temporary tar file, then
 # unpack that with archive_tar.  Two steps rather than a pipe, so that a
 # failing decompressor is noticed.
 unpack_compressed() {
@@ -702,7 +702,7 @@ extract_archive() {
             unpack_compressed "$archive" "$target_dir" zstd zstd
         ;;
         *.tar.bz2|*.tbz2)
-            die "unsupported archive format on this system: $archive"
+            unpack_compressed "$archive" "$target_dir" bzip2 bzip2
         ;;
         *)
             cp "$archive" "$target_dir/"
