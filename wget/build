@@ -51,7 +51,9 @@ typedef unsigned int socklen_t;\
 typedef u_int32_t in_addr_t;\
 #endif/' "$OSSL_H" > openstep/openssl/e_os2.h
 fi
-CPPFLAGS="-I`pwd`/openstep -I/usr/local/include"
+# OPENSTEP's <errno.h> has no ENOSYS (gnulib supplies other missing errno values
+# but not this one).
+CPPFLAGS="-I`pwd`/openstep -I/usr/local/include -DENOSYS=EOPNOTSUPP"
 export CPPFLAGS
 
 # configure's test for sig_atomic_t cannot see the type (it is not visible the way
