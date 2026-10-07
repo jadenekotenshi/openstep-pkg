@@ -8,7 +8,6 @@ coreutils
 pkg-config
 curl
 ffmpeg
-sdl12
 libiconv
 libmad
 liba52

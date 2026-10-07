@@ -8,9 +8,9 @@ CXX=/usr/local/bin/g++-4.2
 # Append caller flags so CPU tuning is opt-in; retain the portable defaults.
 CFLAGS="-std=gnu99 -O2 -fno-builtin-memset -fno-fast-math -march=i486 -DNeXT ${CFLAGS-}"
 CXXFLAGS="-O2 -fno-builtin-memset -fno-fast-math -march=i486 -DNeXT ${CXXFLAGS-}"
-CPPFLAGS="-I/usr/local/include/lua5.1 -I/usr/local/include -I/usr/local/include/libavutil `sdl-config --cflags`"
+CPPFLAGS='-I/usr/local/include/lua5.1 -I/usr/local/include -I/usr/local/include/libavutil'
 LDFLAGS='-L/usr/local/lib -F/NextLibrary/PrivateFrameworks'
-LIBS="`sdl-config --libs` -framework Interceptor -lgcrypt -lcurl -lssl -lcrypto -lz -lgpg-error"
+LIBS='-framework AppKit -framework Foundation -framework SoundKit -framework Interceptor -lgcrypt -lcurl -lssl -lcrypto -lz -lgpg-error'
 CONFIG_SHELL=/usr/local/bin/ksh
 AWK=/usr/local/bin/gawk
 GREP=/usr/local/bin/grep
@@ -29,7 +29,7 @@ run_configure --build=i386-next-openstep4 --prefix=/usr/local \
     --disable-shared --enable-static --disable-nls --disable-dependency-tracking \
     --disable-maintainer-mode \
     --disable-qt4 --disable-skins2 --disable-x11 --disable-xvideo --disable-glx \
-    --disable-macosx --disable-mmx --disable-sse
+    --disable-macosx --disable-mmx --disable-sse --disable-sdl --disable-sdl-image
 echo 'include $(top_srcdir)/modules/gui/openstep.mk' >> src/Makefile
 # Native sockets lack the descriptor-passing API used by vlc-wrapper.
 sed 's/^bin_PROGRAMS =.*/bin_PROGRAMS = vlc/' bin/Makefile > bin/Makefile.os
@@ -51,7 +51,7 @@ build
 
 "$CONFIG_SHELL" modules/gui/openstep-check.sh
 /bin/strip bin/vlc
-sdl-fix-macho-i486-subtype bin/vlc
+"$CONFIG_SHELL" modules/gui/openstep-fix-macho.sh bin/vlc
 ./bin/vlc --ignore-config -MachLaunch '1 30' --version
 
 # All modules are linked into the player; no runtime plugin directory is needed.

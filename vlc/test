@@ -70,6 +70,9 @@ player()
 player -MachLaunch '1 30' -NXAutoLaunch YES --version
 grep 'VLC version 0.9.10' vlc.log
 player --list
+if grep -i '^  .*sdl' vlc.log; then
+    echo 'Unexpected SDL module in the OPENSTEP build'; exit 1
+fi
 for module in openstep avcodec avformat mpgatofixed32 a52 libmpeg2 lua
 do
     grep "$module" vlc.log > /dev/null
