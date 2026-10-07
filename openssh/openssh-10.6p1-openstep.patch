@@ -26,7 +26,7 @@ diff -ruN a/channels.c b/channels.c
  			set_nonblock(efd);
 diff -ruN a/defines.h b/defines.h
 --- a/defines.h	2026-10-06 08:45:31.000000000 +0000
-+++ b/defines.h	2026-10-07 00:04:18.214310135 +0000
++++ b/defines.h	2026-10-07 00:24:45.221286264 +0000
 @@ -55,7 +55,9 @@
  /*
   * Definitions for IP type of service (ip_tos)
@@ -48,7 +48,7 @@ diff -ruN a/defines.h b/defines.h
  #ifndef HOST_NAME_MAX
  # include "netdb.h" /* for MAXHOSTNAMELEN */
  # if defined(_POSIX_HOST_NAME_MAX)
-@@ -138,6 +144,42 @@
+@@ -138,6 +144,47 @@
  # endif
  #endif /* HOST_NAME_MAX */
  
@@ -71,6 +71,11 @@ diff -ruN a/defines.h b/defines.h
 +# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
 +#endif
 +
++#if defined(HAVE_NEXT) && defined(HAVE_MMAP)
++/* OPENSTEP's libc has no munmap(); sshkey.c then uses calloc(). */
++# undef HAVE_MMAP
++#endif
++
 +#if defined(HAVE_NEXT)
 +/* Not declared by the system headers. */
 +extern char *realpath(const char *, char *);
@@ -91,7 +96,7 @@ diff -ruN a/defines.h b/defines.h
  #if defined(HAVE_DECL_MAXSYMLINKS) && HAVE_DECL_MAXSYMLINKS == 0
  # define MAXSYMLINKS 5
  #endif
-@@ -295,7 +337,7 @@
+@@ -295,7 +342,7 @@
  # endif
  #endif
  
@@ -100,7 +105,7 @@ diff -ruN a/defines.h b/defines.h
  typedef u_int8_t uint8_t;
  typedef u_int16_t uint16_t;
  typedef u_int32_t uint32_t;
-@@ -361,6 +403,35 @@
+@@ -361,6 +408,35 @@
  # endif
  #endif
  
@@ -136,7 +141,7 @@ diff -ruN a/defines.h b/defines.h
  #ifndef HAVE_SSIZE_T
  typedef int ssize_t;
  #define SSIZE_MAX INT_MAX
-@@ -403,7 +474,7 @@
+@@ -403,7 +479,7 @@
  };
  #endif /* HAVE_SYS_UN_H */
  
@@ -145,7 +150,7 @@ diff -ruN a/defines.h b/defines.h
  typedef u_int32_t	in_addr_t;
  #endif
  #ifndef HAVE_IN_PORT_T
-@@ -582,13 +653,23 @@
+@@ -582,13 +658,23 @@
  # define __P(x) x
  #endif
  
@@ -170,7 +175,7 @@ diff -ruN a/defines.h b/defines.h
  # define __attribute__(x)
  #endif /* !defined(__GNUC__) || (__GNUC__ < 2) */
  
-@@ -762,7 +843,7 @@
+@@ -762,7 +848,7 @@
  # define memmove(s1, s2, n) bcopy((s2), (s1), (n))
  #endif /* !defined(HAVE_MEMMOVE) && defined(HAVE_BCOPY) */
  
@@ -333,7 +338,7 @@ diff -ruN a/loginrec.c b/loginrec.c
  /*
 diff -ruN a/misc.c b/misc.c
 --- a/misc.c	2026-10-06 08:45:31.000000000 +0000
-+++ b/misc.c	2026-10-06 23:48:47.382383230 +0000
++++ b/misc.c	2026-10-07 00:24:45.220805609 +0000
 @@ -43,7 +43,9 @@
  #include <unistd.h>
  
@@ -408,6 +413,52 @@ diff -ruN a/misc.c b/misc.c
  int
  lib_contains_symbol(const char *path, const char *s)
  {
+@@ -3215,11 +3236,32 @@
+ 		goto out;
+ 	}
+ 	sz = (size_t)st.st_size;
++#ifdef HAVE_NEXT
++	/* OPENSTEP's libc has mmap() but no munmap(); read the file instead. */
++	{
++		size_t off = 0;
++		ssize_t n;
++
++		if ((m = malloc(sz)) == NULL) {
++			error_f("malloc: %s", strerror(errno));
++			goto out;
++		}
++		while (off < sz) {
++			n = read(fd, (char *)m + off, sz - off);
++			if (n <= 0) {
++				error_f("read %s: %s", path, strerror(errno));
++				goto out;
++			}
++			off += (size_t)n;
++		}
++	}
++#else
+ 	if ((m = mmap(NULL, sz, PROT_READ, MAP_PRIVATE, fd, 0)) == MAP_FAILED ||
+ 	    m == NULL) {
+ 		error_f("mmap %s: %s", path, strerror(errno));
+ 		goto out;
+ 	}
++#endif
+ 	if (memmem(m, sz, s, strlen(s)) == NULL) {
+ 		error_f("%s does not contain expected string %s", path, s);
+ 		goto out;
+@@ -3227,8 +3269,12 @@
+ 	/* success */
+ 	ret = 0;
+  out:
++#ifdef HAVE_NEXT
++	free(m);
++#else
+ 	if (m != NULL && m != MAP_FAILED)
+ 		munmap(m, sz);
++#endif
+ 	close(fd);
+ 	return ret;
+ #endif /* HAVE_NLIST */
 diff -ruN a/openbsd-compat/bsd-misc.c b/openbsd-compat/bsd-misc.c
 --- a/openbsd-compat/bsd-misc.c	2026-10-06 08:45:31.000000000 +0000
 +++ b/openbsd-compat/bsd-misc.c	2026-10-06 22:31:59.487585755 +0000
