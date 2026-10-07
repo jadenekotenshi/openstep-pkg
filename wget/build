@@ -40,6 +40,7 @@ export CPPFLAGS
 # optional libraries (libpsl, PCRE, IDN) are not packaged.
 run_configure --prefix=/usr/local \
   --build=$PKG_TARGET --host=$PKG_TARGET \
+  --disable-dependency-tracking \
   --disable-nls --disable-ipv6 --disable-threads --disable-rpath \
   --disable-pcre --disable-pcre2 --disable-iri --disable-ntlm \
   --disable-xattr --disable-opie \
