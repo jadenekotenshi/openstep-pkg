@@ -74,7 +74,11 @@ export CPPFLAGS
 # "typedef int int;".  The type exists in the headers; say so.
 ac_cv_type_sig_atomic_t=yes
 ac_cv_type_volatile_sig_atomic_t=yes
-export ac_cv_type_sig_atomic_t ac_cv_type_volatile_sig_atomic_t
+# OPENSTEP has getdtablesize() but declares it nowhere, which makes gnulib build
+# its own from getrlimit (RLIMIT_NOFILE), a limit this system does not define
+# under any name.  Use the system function.
+ac_cv_have_decl_getdtablesize=yes
+export ac_cv_type_sig_atomic_t ac_cv_type_volatile_sig_atomic_t ac_cv_have_decl_getdtablesize
 
 # HTTPS goes through the OpenSSL package; its default certificate bundle is
 # /usr/local/ssl/cert.pem, which the ca-certificates package installs.  The
