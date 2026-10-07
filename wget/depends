@@ -1,2 +1,8 @@
-patch
+gcc42
+openssl
+zlib
 grep
+gawk
+patch
+sed
+ca-certificates
