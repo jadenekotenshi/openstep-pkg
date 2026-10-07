@@ -26,7 +26,7 @@ diff -ruN a/channels.c b/channels.c
  			set_nonblock(efd);
 diff -ruN a/defines.h b/defines.h
 --- a/defines.h	2026-10-06 08:45:31.000000000 +0000
-+++ b/defines.h	2026-10-06 23:49:09.760009741 +0000
++++ b/defines.h	2026-10-07 00:04:18.214310135 +0000
 @@ -55,7 +55,9 @@
  /*
   * Definitions for IP type of service (ip_tos)
@@ -48,7 +48,7 @@ diff -ruN a/defines.h b/defines.h
  #ifndef HOST_NAME_MAX
  # include "netdb.h" /* for MAXHOSTNAMELEN */
  # if defined(_POSIX_HOST_NAME_MAX)
-@@ -138,6 +144,35 @@
+@@ -138,6 +144,42 @@
  # endif
  #endif /* HOST_NAME_MAX */
  
@@ -62,6 +62,13 @@ diff -ruN a/defines.h b/defines.h
 +
 +#ifndef O_ACCMODE
 +# define O_ACCMODE (O_RDONLY | O_WRONLY | O_RDWR)
++#endif
++
++#ifndef S_ISSOCK
++# define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
++#endif
++#ifndef S_ISFIFO
++# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
 +#endif
 +
 +#if defined(HAVE_NEXT)
@@ -84,7 +91,7 @@ diff -ruN a/defines.h b/defines.h
  #if defined(HAVE_DECL_MAXSYMLINKS) && HAVE_DECL_MAXSYMLINKS == 0
  # define MAXSYMLINKS 5
  #endif
-@@ -295,7 +330,7 @@
+@@ -295,7 +337,7 @@
  # endif
  #endif
  
@@ -93,7 +100,7 @@ diff -ruN a/defines.h b/defines.h
  typedef u_int8_t uint8_t;
  typedef u_int16_t uint16_t;
  typedef u_int32_t uint32_t;
-@@ -361,6 +396,35 @@
+@@ -361,6 +403,35 @@
  # endif
  #endif
  
@@ -129,7 +136,7 @@ diff -ruN a/defines.h b/defines.h
  #ifndef HAVE_SSIZE_T
  typedef int ssize_t;
  #define SSIZE_MAX INT_MAX
-@@ -403,7 +467,7 @@
+@@ -403,7 +474,7 @@
  };
  #endif /* HAVE_SYS_UN_H */
  
@@ -138,7 +145,7 @@ diff -ruN a/defines.h b/defines.h
  typedef u_int32_t	in_addr_t;
  #endif
  #ifndef HAVE_IN_PORT_T
-@@ -582,13 +646,23 @@
+@@ -582,13 +653,23 @@
  # define __P(x) x
  #endif
  
@@ -163,7 +170,7 @@ diff -ruN a/defines.h b/defines.h
  # define __attribute__(x)
  #endif /* !defined(__GNUC__) || (__GNUC__ < 2) */
  
-@@ -762,7 +836,7 @@
+@@ -762,7 +843,7 @@
  # define memmove(s1, s2, n) bcopy((s2), (s1), (n))
  #endif /* !defined(HAVE_MEMMOVE) && defined(HAVE_BCOPY) */
  
@@ -675,6 +682,82 @@ diff -ruN a/ssh-agent.c b/ssh-agent.c
  			fatal("LISTEN_FDS set but fd 3 unavailable");
  		pid = (int)strtonum(pidstr, 1, INT_MAX, &errstr);
  		if (errstr != NULL)
+diff -ruN a/ssh.c b/ssh.c
+--- a/ssh.c	2026-10-06 08:45:31.000000000 +0000
++++ b/ssh.c	2026-10-07 00:04:04.615165690 +0000
+@@ -46,7 +46,9 @@
+ #include <sys/socket.h>
+ #include <sys/stat.h>
+ #include <sys/wait.h>
++#ifndef HAVE_NEXT
+ #include <sys/utsname.h>
++#endif
+ 
+ #include <ctype.h>
+ #include <errno.h>
+@@ -633,7 +635,9 @@
+ 	struct addrinfo *addrs = NULL;
+ 	size_t n, len;
+ 	u_int j;
++#ifndef HAVE_NEXT
+ 	struct utsname utsname;
++#endif
+ 	struct ssh_conn_info *cinfo = NULL;
+ 
+ 	/* Ensure that fds 0, 1 and 2 are open or directed to /dev/null */
+@@ -1174,12 +1178,14 @@
+ 	    !use_syslog);
+ 
+ 	debug("%s, %s", SSH_RELEASE, SSH_OPENSSL_VERSION);
++#ifndef HAVE_NEXT
+ 	if (uname(&utsname) != 0) {
+ 		memset(&utsname, 0, sizeof(utsname));
+ 		strlcpy(utsname.sysname, "UNKNOWN", sizeof(utsname.sysname));
+ 	}
+ 	debug3("Running on %s %s %s %s", utsname.sysname, utsname.release,
+ 	    utsname.version, utsname.machine);
++#endif
+ 	debug3("Started with: %s", args);
+ 	free(args);
+ 
+diff -ruN a/sshd.c b/sshd.c
+--- a/sshd.c	2026-10-06 08:45:31.000000000 +0000
++++ b/sshd.c	2026-10-07 00:04:04.616119439 +0000
+@@ -33,7 +33,9 @@
+ #include <sys/time.h>
+ #include <sys/queue.h>
+ #include <sys/wait.h>
++#ifndef HAVE_NEXT
+ #include <sys/utsname.h>
++#endif
+ 
+ #include <errno.h>
+ #include <fcntl.h>
+@@ -1325,7 +1327,9 @@
+ 	struct sshkey *key;
+ 	struct sshkey *pubkey;
+ 	struct connection_info connection_info;
++#ifndef HAVE_NEXT
+ 	struct utsname utsname;
++#endif
+ 	sigset_t sigmask;
+ 
+ 	memset(&connection_info, 0, sizeof(connection_info));
+@@ -1541,12 +1545,14 @@
+ 		    "test mode (-T)");
+ 
+ 	debug("sshd version %s, %s", SSH_VERSION, SSH_OPENSSL_VERSION);
++#ifndef HAVE_NEXT
+ 	if (uname(&utsname) != 0) {
+ 		memset(&utsname, 0, sizeof(utsname));
+ 		strlcpy(utsname.sysname, "UNKNOWN", sizeof(utsname.sysname));
+ 	}
+ 	debug3("Running on %s %s %s %s", utsname.sysname, utsname.release,
+ 	    utsname.version, utsname.machine);
++#endif
+ 	debug3("Started with: %s", args);
+ 	free(args);
+ 
 diff -ruN a/uidswap.c b/uidswap.c
 --- a/uidswap.c	2026-10-06 08:45:31.000000000 +0000
 +++ b/uidswap.c	2026-10-06 21:59:56.608749383 +0000
