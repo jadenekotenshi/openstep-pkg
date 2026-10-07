@@ -616,7 +616,7 @@ copy_local_source() {
         )
     else
         case $path in
-            *.tar.gz|*.tgz|*.tar|*.tar.bz2|*.tbz2|*.tar.xz|*.txz)
+            *.tar.gz|*.tgz|*.tar|*.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
                 extract_archive "$path" "$dest"
             ;;
             *)
@@ -639,6 +639,42 @@ archive_tar() {
     echo gnutar
 }
 
+# archive_tool NAME PACKAGE
+# Print the path of a decompressor installed by PACKAGE, or fail.
+archive_tool() {
+    for at_dir in "$ROOT_DIR/usr/local/bin" /usr/local/bin; do
+        if [ -x "$at_dir/$1" ]; then
+            echo "$at_dir/$1"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# unpack_compressed ARCHIVE TARGET-DIR TOOL PACKAGE
+# Decompress ARCHIVE with TOOL (xz or zstd) to a temporary tar file, then
+# unpack that with archive_tar.  Two steps rather than a pipe, so that a
+# failing decompressor is noticed.
+unpack_compressed() {
+    uc_archive=$1
+    uc_target=$2
+    uc_tool=$3
+    uc_pkg=$4
+
+    uc_path=`archive_tool "$uc_tool"` ||
+        die "$uc_archive needs $uc_tool; install the $uc_pkg package"
+    uc_tar=${TMPDIR:-/tmp}/pkg-unpack.$$.tar
+    rm -f "$uc_tar"
+    if "$uc_path" -dc "$uc_archive" > "$uc_tar"; then
+        if `archive_tar` -xf "$uc_tar" -C "$uc_target"; then
+            rm -f "$uc_tar"
+            return 0
+        fi
+    fi
+    rm -f "$uc_tar"
+    die "cannot unpack $uc_archive"
+}
+
 extract_archive() {
     archive=$1
     dest=$2
@@ -659,7 +695,13 @@ extract_archive() {
         *.tar)
             `archive_tar` -xf "$archive" -C "$target_dir"
         ;;
-        *.tar.bz2|*.tbz2|*.tar.xz|*.txz)
+        *.tar.xz|*.txz)
+            unpack_compressed "$archive" "$target_dir" xz xz
+        ;;
+        *.tar.zst|*.tzst)
+            unpack_compressed "$archive" "$target_dir" zstd zstd
+        ;;
+        *.tar.bz2|*.tbz2)
             die "unsupported archive format on this system: $archive"
         ;;
         *)
