@@ -193,6 +193,18 @@ Rules:
 
 The optional second field is the destination directory inside the build root.
 
+An optional `sha256:<64 hex digits>` field pins the expected SHA-256 of the file.  It may
+follow the destination or replace it:
+
+```text
+https://download.gnome.org/sources/libxml2/2.15/libxml2-2.15.4.tar.xz sha256:98087f...
+https://example.org/a-1.0.tar.gz subdir sha256:0123...
+```
+
+A download, a cached copy or a package's own file that does not match stops the build; a
+downloaded or cached copy is deleted so that the next run fetches it again.  Checking
+needs `openssl` (the `openssl` package), `sha256sum` or `shasum`.
+
 Source archives are unpacked with `gtar` (from the `tar` package, in
 `/usr/local/bin`) when it is installed, and with the system `gnutar` otherwise.  The
 system `gnutar` cannot read tarballs written by current GNU tar, so a package with

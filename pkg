@@ -533,9 +533,104 @@ load_pkg() {
     INST_DIR=$DB_ROOT/installed/$PKG_NAME
 }
 
+# parse_source_fields DEST EXTRA
+# A line in "sources" is "SOURCE [DEST] [sha256:HEX]".  Sets src_destdir (the
+# destination directory, possibly empty) and src_sum (the expected SHA-256,
+# possibly empty).
+parse_source_fields() {
+    ps_dest=$1
+    ps_extra=$2
+
+    src_sum=
+    src_destdir=$ps_dest
+
+    case $ps_dest in
+        sha256:*)
+            src_sum=`expr "$ps_dest" : 'sha256:\(.*\)'`
+            src_destdir=
+        ;;
+    esac
+
+    case $ps_extra in
+        '')
+            :
+        ;;
+        sha256:*)
+            src_sum=`expr "$ps_extra" : 'sha256:\(.*\)'`
+        ;;
+        *)
+            die "bad field in $PKG_DIR/sources: $ps_extra"
+        ;;
+    esac
+
+    if [ -n "$src_sum" ]; then
+        ps_len=`expr "$src_sum" : '.*'`
+        case $src_sum in
+            *[!0-9a-f]*)
+                ps_len=0
+            ;;
+        esac
+        [ "$ps_len" = 64 ] ||
+            die "bad sha256 in $PKG_DIR/sources (need 64 lowercase hex digits): $src_sum"
+    fi
+}
+
+# sha256_of FILE: print the SHA-256 of FILE.  Uses openssl (the openssl
+# package), or sha256sum / shasum when the machine has one.
+sha256_of() {
+    sh_file=$1
+
+    sh_tool=`archive_tool openssl 2>/dev/null` || sh_tool=`find_tool openssl 2>/dev/null`
+    if [ -n "$sh_tool" ]; then
+        "$sh_tool" dgst -sha256 "$sh_file" | sed 's/.*= *//'
+        return 0
+    fi
+
+    sh_tool=`archive_tool sha256sum 2>/dev/null` || sh_tool=`find_tool sha256sum 2>/dev/null`
+    if [ -n "$sh_tool" ]; then
+        "$sh_tool" "$sh_file" | sed 's/ .*//'
+        return 0
+    fi
+
+    sh_tool=`find_tool shasum 2>/dev/null`
+    if [ -n "$sh_tool" ]; then
+        "$sh_tool" -a 256 "$sh_file" | sed 's/ .*//'
+        return 0
+    fi
+
+    die "cannot check sha256 of $sh_file: install the openssl package"
+}
+
+# verify_source FILE NAME
+# Check FILE against src_sum (nothing to do when there is none).  A cached or
+# downloaded copy that does not match is removed so the next run fetches it
+# again; a package's own files are never removed.
+verify_source() {
+    vs_file=$1
+    vs_name=$2
+    vs_remove=$3
+
+    [ -n "$src_sum" ] || return 0
+
+    vs_got=`sha256_of "$vs_file"`
+    if [ "$vs_got" = "$src_sum" ]; then
+        return 0
+    fi
+
+    echo "error: sha256 mismatch for $vs_name" >&2
+    echo "  expected $src_sum" >&2
+    echo "  got      $vs_got" >&2
+    if [ -n "$vs_remove" ]; then
+        rm -f "$vs_file"
+        echo "  removed $vs_file" >&2
+    fi
+    exit 1
+}
+
 download_one() {
     src=$1
     dest=$2
+    extra=$3
 
     case $src in
         \#*|'')
@@ -545,6 +640,8 @@ download_one() {
 
     case $src in
         *://*)
+            parse_source_fields "$dest" "$extra"
+            dest=$src_destdir
             src_name=`path_leaf "$src"`
             dest_name=`default_value "$dest" "$src_name"`
             ensure_dir "$SRC_CACHE/`path_parent "$dest_name"`"
@@ -552,6 +649,7 @@ download_one() {
 
             if [ -f "$out" ]; then
                 log "using cached $src_name"
+                verify_source "$out" "$src_name" remove
                 return 0
             fi
 
@@ -559,13 +657,15 @@ download_one() {
 
             curl_path=`find_tool curl 2>/dev/null`
             if [ -n "$curl_path" ]; then
-                "$curl_path" -L -o "$out" "$src"
+                "$curl_path" -L -o "$out" "$src" || { rm -f "$out"; die "download failed: $src"; }
+                verify_source "$out" "$src_name" remove
                 return 0
             fi
 
             wget_path=`find_tool wget 2>/dev/null`
             if [ -n "$wget_path" ]; then
-                "$wget_path" -O "$out" "$src"
+                "$wget_path" -O "$out" "$src" || { rm -f "$out"; die "download failed: $src"; }
+                verify_source "$out" "$src_name" remove
                 return 0
             fi
 
@@ -581,8 +681,8 @@ download_pkg() {
 
     log "resolving sources for $PKG_NAME"
 
-    while read src dest || [ -n "$src" ]; do
-        download_one "$src" "$dest"
+    while read src dest extra || [ -n "$src" ]; do
+        download_one "$src" "$dest" "$extra"
     done < "$PKG_DIR/sources"
 }
 
@@ -713,17 +813,32 @@ extract_archive() {
 stage_source() {
     src=$1
     dest=$2
+    extra=$3
 
     case $src in
         \#*|'')
             return 0
         ;;
+    esac
+
+    parse_source_fields "$dest" "$extra"
+    dest=$src_destdir
+
+    case $src in
         *://*)
             src_name=`path_leaf "$src"`
             dest_name=`default_value "$dest" "$src_name"`
+            verify_source "$SRC_CACHE/$dest_name" "$src_name" remove
             extract_archive "$SRC_CACHE/$dest_name" "$dest"
         ;;
         *)
+            case $src in
+                /*) local_path=$src ;;
+                *) local_path=$PKG_DIR/$src ;;
+            esac
+            if [ -f "$local_path" ]; then
+                verify_source "$local_path" "$src"
+            fi
             copy_local_source "$src" "$dest"
         ;;
     esac
@@ -750,7 +865,7 @@ prepare_build_root() {
     ensure_dir "$IMAGE_DIR"
 
     if [ -z "$resume_build" ] && [ -f "$PKG_DIR/sources" ]; then
-        while read src dest || [ -n "$src" ]; do
+        while read src dest extra || [ -n "$src" ]; do
             case $src in
                 ''|\#*)
                     :
@@ -759,7 +874,7 @@ prepare_build_root() {
                     log "staging source $src"
                 ;;
             esac
-            stage_source "$src" "$dest"
+            stage_source "$src" "$dest" "$extra"
         done < "$PKG_DIR/sources"
     fi
 
