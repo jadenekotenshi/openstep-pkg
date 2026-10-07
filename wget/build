@@ -7,7 +7,6 @@ CC=/usr/local/bin/gcc-4.2
 # PKG_WGET_OPT overrides the optimization flags (gcc 4.2 on SPARC has
 # miscompiled other packages at -O2).
 CFLAGS="$PKG_GCC42_ARCH_FLAGS ${PKG_WGET_OPT--O2} -std=gnu99"
-CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
@@ -15,6 +14,25 @@ AWK=/usr/local/bin/gawk
 SED=/usr/local/bin/sed
 export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED
 . "$PKG_BUILD_HELPERS"
+
+# gnulib replaces the missing socklen_t with a macro ("#define socklen_t int"),
+# and an OpenSSL installed before its e_os2.h was fixed typedefs socklen_t
+# unconditionally, which then reads "typedef unsigned int int;".  Until the
+# OpenSSL package has been rebuilt, put a guarded copy of that header first on
+# the include path.
+OSSL_H=/usr/local/include/openssl/e_os2.h
+if /usr/local/bin/grep '^typedef unsigned int socklen_t;$' "$OSSL_H" > /dev/null; then
+    /usr/local/bin/mkdir -p openstep/openssl
+    /usr/local/bin/sed -e 's/^typedef unsigned int socklen_t;$/#ifndef socklen_t\
+typedef unsigned int socklen_t;\
+#endif/' -e 's/^typedef u_int32_t in_addr_t;$/#ifndef in_addr_t\
+typedef u_int32_t in_addr_t;\
+#endif/' "$OSSL_H" > openstep/openssl/e_os2.h
+    CPPFLAGS="-I`pwd`/openstep -I/usr/local/include"
+else
+    CPPFLAGS=-I/usr/local/include
+fi
+export CPPFLAGS
 
 # HTTPS goes through the OpenSSL package; its default certificate bundle is
 # /usr/local/ssl/cert.pem, which the ca-certificates package installs.  The
