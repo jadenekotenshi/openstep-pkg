@@ -54,6 +54,14 @@ fi
 CPPFLAGS="-I`pwd`/openstep -I/usr/local/include"
 export CPPFLAGS
 
+# configure's test for sig_atomic_t cannot see the type (it is not visible the way
+# the test includes <signal.h>), so it would define a macro "sig_atomic_t" that
+# turns the real typedef in /NextDeveloper/Headers/ansi/signal.h into
+# "typedef int int;".  The type exists in the headers; say so.
+ac_cv_type_sig_atomic_t=yes
+ac_cv_type_volatile_sig_atomic_t=yes
+export ac_cv_type_sig_atomic_t ac_cv_type_volatile_sig_atomic_t
+
 # HTTPS goes through the OpenSSL package; its default certificate bundle is
 # /usr/local/ssl/cert.pem, which the ca-certificates package installs.  The
 # rest is switched off: OPENSTEP has no pthreads, IPv6 or xattr, and the
