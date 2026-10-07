@@ -1,2 +1,2 @@
-libxml2-2.9.14.tar.gz
-libxml2-2.9.14-openstep.patch libxml2-2.9.14
+libxml2-2.15.4.tar.gz
+xml_snprintf.h libxml2-2.15.4

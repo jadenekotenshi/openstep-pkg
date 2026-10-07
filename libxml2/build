@@ -4,23 +4,34 @@ DESTDIR=$1
 VERSION=$2
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
 CC=/usr/local/bin/gcc-4.2
-CFLAGS="$PKG_GCC42_ARCH_FLAGS "'-O2 -DNeXT'
+# PKG_XML2_OPT overrides the optimization flags (gcc 4.2 on SPARC has
+# miscompiled other packages at -O2).
+xml2_opt=${PKG_XML2_OPT--O2}
+CFLAGS="$PKG_GCC42_ARCH_FLAGS $xml2_opt -std=gnu99"
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
 AWK=/usr/local/bin/gawk
 SED=/bin/sed
-# configure tests snprintf after choosing its bundled Trio source list.
-NEED_TRIO=1
-export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED NEED_TRIO
+# OPENSTEP has mmap() but no munmap(); xmllint uses both for --memory.
+ac_cv_func_mmap=no
+export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED ac_cv_func_mmap
 . "$PKG_BUILD_HELPERS"
-patch -p1 < "libxml2-$VERSION-openstep.patch"
+# xml_snprintf.h (next to this script's sources) supplies snprintf() and
+# vsnprintf(), which OPENSTEP's libc lacks.  It is forced into every file at
+# make time only: configure's own tests do not cope with it.
+SHIM=`pwd`/xml_snprintf.h
+test -f "$SHIM" || { echo "libxml2: xml_snprintf.h is missing" >&2; exit 1; }
 run_configure --prefix=/usr/local \
   --build=$PKG_TARGET --host=$PKG_TARGET \
   --disable-shared --enable-static --disable-dependency-tracking \
-  --without-python --with-iconv=/usr/local --with-zlib=/usr/local
-# The shipped Makefile omits trionan from the bundled Trio objects.
-/bin/gnumake 'am__objects_2=triostr.lo trio.lo trionan.lo'
-/bin/gnumake install 'am__objects_2=triostr.lo trio.lo trionan.lo' DESTDIR="$DESTDIR"
+  --without-python --without-threads --without-modules --without-lzma \
+  --without-icu --without-readline --with-iconv=/usr/local --with-zlib=/usr/local
+# Keep make from re-running configure or automake over the extracted tree.
+/bin/sleep 1
+/usr/local/bin/touch aclocal.m4 configure Makefile.in config.h.in
+/usr/local/bin/touch config.status Makefile config.h
+/bin/gnumake CFLAGS="$CFLAGS -include $SHIM"
+/bin/gnumake install CFLAGS="$CFLAGS -include $SHIM" DESTDIR="$DESTDIR"
 ranlib "$DESTDIR/usr/local/lib/libxml2.a"
