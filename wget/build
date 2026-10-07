@@ -80,10 +80,13 @@ ac_cv_type_volatile_sig_atomic_t=yes
 ac_cv_have_decl_getdtablesize=yes
 # getgroups(0, NULL) fails here, so gnulib wants to replace getgroups(); but its
 # replacement is declared with gid_t while this system's takes an int array, and
-# the two clash.  Only wget's group-permission test uses it; keep the system one.
+# the two clash.  Nothing in wget calls it; keep the system one.  gnulib also
+# replaces it whenever the array type is not gid_t, so claim that too.
+ac_cv_type_getgroups=gid_t
+ac_cv_func_getgroups_works=yes
 gl_cv_func_getgroups_works=yes
 export ac_cv_type_sig_atomic_t ac_cv_type_volatile_sig_atomic_t ac_cv_have_decl_getdtablesize
-export gl_cv_func_getgroups_works
+export ac_cv_type_getgroups ac_cv_func_getgroups_works gl_cv_func_getgroups_works
 
 # HTTPS goes through the OpenSSL package; its default certificate bundle is
 # /usr/local/ssl/cert.pem, which the ca-certificates package installs.  The
