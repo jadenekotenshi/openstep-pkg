@@ -73,7 +73,7 @@ has not been attempted.
 | patch | validated | validated |
 | pdksh | validated | validated |
 | perl | validated | validated |
-| pkg-config | validated | — |
+| pkgconf | 3.0.7 untested (replaces pkg-config 0.29, which was validated on x86) | — |
 | python311 | validated | — |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | — |
 | quickjs | validated | — |
