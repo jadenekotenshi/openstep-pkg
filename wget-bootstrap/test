@@ -1,0 +1,12 @@
+#!/bin/sh
+set -e
+WGET="$LOCAL_ROOT/bin/wget-bootstrap"
+features=`"$WGET" --version`
+case $features in *+https*+ssl/openssl*) : ;; *) exit 1 ;; esac
+TMP=/tmp/wget-bootstrap-test.$$
+trap 'rm -f "$TMP"' 0
+trap 'exit 1' 1 2 3 15
+"$WGET" --timeout=30 --tries=1 -O "$TMP" \
+    https://download.videolan.org/pub/videolan/vlc/0.7.0/contrib/a52dec-0.7.4.tar.gz
+actual=`"$LOCAL_ROOT/bin/openssl" dgst -sha256 "$TMP" | sed 's/^.*= *//'`
+test "$actual" = a21d724ab3b3933330194353687df82c475b5dfb997513eef4c25de6c865ec33

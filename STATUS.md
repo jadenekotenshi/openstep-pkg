@@ -106,7 +106,7 @@ has not been attempted.
   so do not expose a machine running it.  I/O logging (`log_output`) and
   `sudoreplay` are built (with zlib), but the `log_output` path has only been
   checked by compiling, not exercised.
-- **tar** installs as `gtar`; it never installs `tar` or `gnutar`.
+- **tar** (1.15.1, upstream's) installs `/usr/local/bin/gnutar`; `pkg` prefers it for unpacking sources and for xz/zstd/bzip2 archives. It never replaces the system `tar`.
 - **termcap** never installs `/etc/termcap`.
 - **bash** is 5.3, built with `-DGETCWD_BROKEN` and a compat patch for
   `waitpid`, `tcgetattr` and friends.

@@ -42,8 +42,13 @@ echo excluded > "$work/src/skip"
 "$rsync" -aH --delete --exclude=skip "$work/src/" "$work/dst/"
 test ! -e "$work/dst/extra"
 test ! -e "$work/dst/skip"
-"$rsync" -aHnci --exclude=skip "$work/src/" "$work/dst/" > "$work/unchanged"
-test ! -s "$work/unchanged"
+# Repeated quick child exits expose signal-handler re-entry into NeXT's dyld.
+repeat=0
+while test "$repeat" -lt 32; do
+    "$rsync" -aHnci --exclude=skip "$work/src/" "$work/dst/" > "$work/unchanged"
+    test ! -s "$work/unchanged"
+    repeat=$((repeat + 1))
+done
 
 # Exercise actual TCP sockets on loopback, with both daemon directions.
 port=$((20000 + $$ % 20000))

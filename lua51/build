@@ -1,0 +1,39 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+if test -d "lua-$2"; then cd "lua-$2"; fi
+patch -p1 < "lua-$2-openstep.patch"
+(
+    cd src
+    /bin/gnumake all CC=/usr/local/bin/gcc-4.2 \
+        'MYCFLAGS=-DNeXT -D_POSIX_SOURCE -D_NEXT_SOURCE -fno-builtin-memset -march=i486'
+    ./lua -v
+    ./luac -v
+)
+for dir in usr usr/local usr/local/bin usr/local/include usr/local/include/lua5.1 \
+    usr/local/lib usr/local/lib/pkgconfig usr/local/share usr/local/share/lua \
+    usr/local/share/lua/5.1 usr/local/lib/lua usr/local/lib/lua/5.1 \
+    usr/local/man usr/local/man/man1 usr/local/share/doc usr/local/share/doc/lua51
+do
+    test -d "$DESTDIR/$dir" || /bin/mkdir "$DESTDIR/$dir"
+done
+cp src/lua "$DESTDIR/usr/local/bin/lua5.1"
+cp src/luac "$DESTDIR/usr/local/bin/luac5.1"
+chmod 755 "$DESTDIR/usr/local/bin/lua5.1" "$DESTDIR/usr/local/bin/luac5.1"
+cp src/lua.h src/luaconf.h src/lualib.h src/lauxlib.h etc/lua.hpp "$DESTDIR/usr/local/include/lua5.1/"
+cp src/liblua.a "$DESTDIR/usr/local/lib/liblua5.1.a"
+/bin/ranlib "$DESTDIR/usr/local/lib/liblua5.1.a"
+cp doc/lua.1 "$DESTDIR/usr/local/man/man1/lua5.1.1"
+cp doc/luac.1 "$DESTDIR/usr/local/man/man1/luac5.1.1"
+cp doc/*.html doc/*.css doc/*.gif doc/*.png COPYRIGHT "$DESTDIR/usr/local/share/doc/lua51/"
+cat > "$DESTDIR/usr/local/lib/pkgconfig/lua5.1.pc" <<'EOF'
+prefix=/usr/local
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include/lua5.1
+Name: Lua
+Description: Lua 5.1 interpreter and embedding library
+Version: 5.1.5
+Libs: -L${libdir} -llua5.1 -lm
+Cflags: -I${includedir}
+EOF

@@ -1,0 +1,27 @@
+--- a/src/strerror.c
++++ b/src/strerror.c
+@@ -112,7 +112,23 @@
+       int saved_errno = errno;
+ 
+       if (saved_errno != EINVAL)
+-	snprintf (buf, buflen, "strerror failed: %i\n", errno);
++        {
++#ifdef NeXT
++          /* One fixed integer format; OPENSTEP has no snprintf. */
++          char message[32 + 3 * sizeof (int)];
++          size_t length;
++          sprintf (message, "strerror failed: %i\n", saved_errno);
++          length = strlen (message);
++          if (buflen)
++            {
++              if (length >= buflen) length = buflen - 1;
++              memcpy (buf, message, length);
++              buf[length] = 0;
++            }
++#else
++          snprintf (buf, buflen, "strerror failed: %i\n", saved_errno);
++#endif
++        }
+       return saved_errno;
+     }
+   else

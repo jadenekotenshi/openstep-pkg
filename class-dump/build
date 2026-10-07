@@ -8,7 +8,10 @@ PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 
 export DESTDIR VERSION PATH
 
-cd src
+# Old gnutar leaves GitHub's pax_global_header beside the source directory.
+if [ ! -f gram.y ]; then
+    cd class-dump-*
+fi
 
 test -d derived_src || mkdir derived_src
 test -d obj-i386-opt || mkdir obj-i386-opt

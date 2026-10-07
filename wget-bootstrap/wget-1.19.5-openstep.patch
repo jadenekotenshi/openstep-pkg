@@ -1,0 +1,378 @@
+diff --git a/lib/error.h b/lib/error.h
+index 36401e1..1ab248c 100644
+--- a/lib/error.h
++++ b/lib/error.h
+@@ -25,7 +25,7 @@
+    We enable _GL_ATTRIBUTE_FORMAT only if these are supported too, because
+    gnulib and libintl do '#define printf __printf__' when they override
+    the 'printf' function.  */
+-#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
++#if __GNUC__ > 2 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7 && !defined NeXT)
+ # define _GL_ATTRIBUTE_FORMAT(spec) __attribute__ ((__format__ spec))
+ #else
+ # define _GL_ATTRIBUTE_FORMAT(spec) /* empty */
+diff --git a/lib/getgroups.c b/lib/getgroups.c
+index ec137c1..e53d004 100644
+--- a/lib/getgroups.c
++++ b/lib/getgroups.c
+@@ -25,7 +25,7 @@
+ #include <stdlib.h>
+ #include <stdint.h>
+ 
+-#if !HAVE_GETGROUPS
++#if !HAVE_GETGROUPS && !defined NeXT
+ 
+ /* Provide a stub that fails with ENOSYS, since there is no group
+    information available on mingw.  */
+diff --git a/lib/getprogname.c b/lib/getprogname.c
+index c824b47..29a20c2 100644
+--- a/lib/getprogname.c
++++ b/lib/getprogname.c
+@@ -83,6 +83,9 @@ getprogname (void)
+   extern char *__progname;
+   const char *p = __progname;
+   return p && p[0] ? p : "?";
++# elif defined NeXT
++  extern const char *program_name;
++  return program_name ? last_component (program_name) : "?";
+ # elif _AIX                                                 /* AIX */
+   /* Idea by Bastien ROUCARIÈS,
+      https://lists.gnu.org/r/bug-gnulib/2010-12/msg00095.html
+diff --git a/lib/openstep.h b/lib/openstep.h
+new file mode 100644
+index 0000000..e9b8d93
+--- /dev/null
++++ b/lib/openstep.h
+@@ -0,0 +1,21 @@
++#ifndef WGET_OPENSTEP_H
++#define WGET_OPENSTEP_H
++#ifdef NeXT
++#include <sys/types.h>
++#include <sys/param.h>
++#include <errno.h>
++#ifndef PATH_MAX
++#define PATH_MAX MAXPATHLEN
++#endif
++#ifndef ENOSYS
++#define ENOSYS 87
++#endif
++#ifndef _POSIX_SOURCE
++struct utimbuf {
++  time_t actime;
++  time_t modtime;
++};
++extern int utime (const char *, const struct utimbuf *);
++#endif
++#endif
++#endif
+diff --git a/lib/sigaction.c b/lib/sigaction.c
+index da46b1c..f2c91c2 100644
+--- a/lib/sigaction.c
++++ b/lib/sigaction.c
+@@ -51,7 +51,7 @@
+    with this module should stick with only sigaction().  */
+ 
+ /* Check some of our assumptions.  */
+-#if defined SIGCHLD || defined HAVE_SIGALTSTACK || defined HAVE_SIGINTERRUPT
++#if !defined NeXT && (defined SIGCHLD || defined HAVE_SIGALTSTACK || defined HAVE_SIGINTERRUPT)
+ # error "Revisit the assumptions made in the sigaction module"
+ #endif
+ 
+@@ -104,6 +104,12 @@ sigaction_handler (int sig)
+      reinstall the handler will trigger the default handler; oh
+      well.  */
+   handler = action_array[sig].sa_handler;
++#ifdef NeXT
++  /* BSD signal() keeps handlers installed but blocks the current signal.
++     Reinstalling is harmless; explicitly honor SA_NODEFER. */
++  if (action_array[sig].sa_flags & SA_NODEFER)
++    sigsetmask (sigblock (0) & ~sigmask (sig));
++#endif
+   if ((action_array[sig].sa_flags & SA_RESETHAND) == 0)
+     signal (sig, sigaction_handler);
+   else
+@@ -192,6 +198,10 @@ sigaction (int sig, const struct sigaction *restrict act,
+             goto failure;
+           action_array[sig] = *act;
+         }
++#ifdef NeXT
++      /* Unlike Windows, BSD system calls can be interrupted. */
++      siginterrupt (sig, (act->sa_flags & SA_RESTART) == 0);
++#endif
+     }
+   sigprocmask (SIG_SETMASK, &oldmask, NULL);
+   return 0;
+diff --git a/lib/spawni.c b/lib/spawni.c
+index ab77dfe..fd9d5cd 100644
+--- a/lib/spawni.c
++++ b/lib/spawni.c
+@@ -39,6 +39,9 @@
+ #include <stdlib.h>
+ #include <string.h>
+ #include <unistd.h>
++#ifdef NeXT
++# define setpgid(pid, pgid) setpgrp ((pid), (pgid) ? (pgid) : getpid ())
++#endif
+ 
+ #if _LIBC
+ # include <not-cancel.h>
+diff --git a/lib/stdbool.in.h b/lib/stdbool.in.h
+index ebf1a2f..a7a8a8d 100644
+--- a/lib/stdbool.in.h
++++ b/lib/stdbool.in.h
+@@ -70,7 +70,9 @@
+ # define _Bool bool
+ # define bool bool
+ #else
+-# if defined __BEOS__ && !defined __HAIKU__
++# if defined NeXT
++typedef unsigned char _Bool;
++# elif defined __BEOS__ && !defined __HAIKU__
+   /* A compiler known to have 'bool'.  */
+   /* If the compiler already has both 'bool' and '_Bool', we can assume they
+      are the same types.  */
+diff --git a/lib/stddef.in.h b/lib/stddef.in.h
+index 8329a9b..e40a582 100644
+--- a/lib/stddef.in.h
++++ b/lib/stddef.in.h
+@@ -91,7 +91,7 @@
+    and the C11 standard allows this.  Work around this problem by
+    using __alignof__ (which returns 8 for double) rather than _Alignof
+    (which returns 4), and align each union member accordingly.  */
+-#  ifdef __GNUC__
++#  if defined __GNUC__ && !defined NeXT
+ #   define _GL_STDDEF_ALIGNAS(type) \
+       __attribute__ ((__aligned__ (__alignof__ (type))))
+ #  else
+diff --git a/lib/strerror_r.c b/lib/strerror_r.c
+index c556c26..26d0f27 100644
+--- a/lib/strerror_r.c
++++ b/lib/strerror_r.c
+@@ -106,7 +106,7 @@ gl_lock_define_initialized(static, strerror_lock)
+    It is of lower quality, but sufficient for the simple use here.
+    We only have to make sure to NUL terminate the result (_snprintf
+    does not NUL terminate, like strncpy).  */
+-#if !HAVE_SNPRINTF
++#if !HAVE_SNPRINTF && !defined NeXT
+ static int
+ local_snprintf (char *buf, size_t buflen, const char *format, ...)
+ {
+diff --git a/lib/sys_wait.in.h b/lib/sys_wait.in.h
+index 15a80dd..aff8483 100644
+--- a/lib/sys_wait.in.h
++++ b/lib/sys_wait.in.h
+@@ -42,6 +42,17 @@
+ #if !((defined _WIN32 || defined __WIN32__) && ! defined __CYGWIN__)
+ /* Unix API.  */
+ 
++#ifdef NeXT
++/* OPENSTEP's BSD macros take union wait; gnulib uses an int status. */
++# undef WIFSIGNALED
++# undef WIFEXITED
++# undef WIFSTOPPED
++# undef WTERMSIG
++# undef WEXITSTATUS
++# undef WSTOPSIG
++# undef WCOREDUMP
++#endif
++
+ /* The following macros apply to an argument x, that is a status of a process,
+    as returned by waitpid().
+    On nearly all systems, including Linux/x86, WEXITSTATUS are bits 15..8 and
+diff --git a/lib/unused-parameter.h b/lib/unused-parameter.h
+index 40a0ff8..cafa09a 100644
+--- a/lib/unused-parameter.h
++++ b/lib/unused-parameter.h
+@@ -28,7 +28,7 @@
+        _GL_UNUSED_PARAMETER int *(*param)(void)
+  */
+ #ifndef _GL_UNUSED_PARAMETER
+-# if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
++# if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7 && !defined NeXT)
+ #  define _GL_UNUSED_PARAMETER __attribute__ ((__unused__))
+ # else
+ #  define _GL_UNUSED_PARAMETER
+diff --git a/lib/utimens.c b/lib/utimens.c
+index c0b0704..4da557b 100644
+--- a/lib/utimens.c
++++ b/lib/utimens.c
+@@ -20,6 +20,7 @@
+ /* derived from a function in touch.c */
+ 
+ #include <config.h>
++#include "openstep.h"
+ 
+ #define _GL_UTIMENS_INLINE _GL_EXTERN_INLINE
+ #include "utimens.h"
+diff --git a/lib/xalloc-oversized.h b/lib/xalloc-oversized.h
+index 3426e10..5729421 100644
+--- a/lib/xalloc-oversized.h
++++ b/lib/xalloc-oversized.h
+@@ -44,7 +44,7 @@ typedef size_t __xalloc_count_type;
+ #if 7 <= __GNUC__
+ # define xalloc_oversized(n, s) \
+    __builtin_mul_overflow_p (n, s, (__xalloc_count_type) 1)
+-#elif 5 <= __GNUC__ && !defined __ICC && !__STRICT_ANSI__
++#elif 5 <= __GNUC__ && !defined __ICC && !defined __STRICT_ANSI__
+ # define xalloc_oversized(n, s) \
+    (__builtin_constant_p (n) && __builtin_constant_p (s) \
+     ? __xalloc_oversized (n, s) \
+diff --git a/m4/gnulib-common.m4 b/m4/gnulib-common.m4
+index de65f6b..a51628a 100644
+--- a/m4/gnulib-common.m4
++++ b/m4/gnulib-common.m4
+@@ -40,7 +40,7 @@ AC_DEFUN([gl_COMMON_BODY], [
+ [/* Define as a marker that can be attached to declarations that might not
+     be used.  This helps to reduce warnings, such as from
+     GCC -Wunused-parameter.  */
+-#if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
++#if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7 && !defined NeXT)
+ # define _GL_UNUSED __attribute__ ((__unused__))
+ #else
+ # define _GL_UNUSED
+diff --git a/src/config.h.in b/src/config.h.in
+index 3179044..bfd57dd 100644
+--- a/src/config.h.in
++++ b/src/config.h.in
+@@ -2841,7 +2841,7 @@
+ /* Define as a marker that can be attached to declarations that might not
+     be used.  This helps to reduce warnings, such as from
+     GCC -Wunused-parameter.  */
+-#if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7)
++#if __GNUC__ >= 3 || (__GNUC__ == 2 && __GNUC_MINOR__ >= 7 && !defined NeXT)
+ # define _GL_UNUSED __attribute__ ((__unused__))
+ #else
+ # define _GL_UNUSED
+diff --git a/src/log.c b/src/log.c
+index d879dff..eb7ce6d 100644
+--- a/src/log.c
++++ b/src/log.c
+@@ -34,6 +34,10 @@ as that of the covered work.  */
+ #include <stdlib.h>
+ #include <stdarg.h>
+ #include <unistd.h>
++#ifdef NeXT
++# include <sys/ioctl.h>
++# define getpgrp() getpgrp (0)
++#endif
+ #include <assert.h>
+ #include <errno.h>
+ 
+@@ -972,7 +976,12 @@ check_redirect_output (void)
+    * we check if process is fg or bg before every line is printed.*/
+   if (!redirect_request_signal_name && shell_is_interactive && !opt.lfilename)
+     {
++#ifdef NeXT
++      pid_t foreground_pgrp = -1;
++      ioctl (STDIN_FILENO, TIOCGPGRP, &foreground_pgrp);
++#else
+       pid_t foreground_pgrp = tcgetpgrp (STDIN_FILENO);
++#endif
+ 
+       if (foreground_pgrp != -1 && foreground_pgrp != getpgrp ())
+         {
+diff --git a/src/main.c b/src/main.c
+index 81db931..88cabd4 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -1357,11 +1357,12 @@ main (int argc, char **argv)
+   bool use_userconfig = false;
+   bool noconfig = false;
+   bool append_to_log = false;
++  double start_time;
+ 
+   cleaned_up = 0; /* do cleanup later */
+ 
+   timer = ptimer_new ();
+-  double start_time = ptimer_measure (timer);
++  start_time = ptimer_measure (timer);
+ 
+   total_downloaded_bytes = 0;
+   program_name = argv[0];
+diff --git a/src/openssl.c b/src/openssl.c
+index 6cf4afe..449bd78 100644
+--- a/src/openssl.c
++++ b/src/openssl.c
+@@ -28,6 +28,10 @@ Corresponding Source for a non-source form of such a combination
+ shall include the source code for the parts of OpenSSL used as well
+ as that of the covered work.  */
+ 
++#ifdef NeXT
++/* Load the OpenSSL port's integer typedefs before gnulib aliases them. */
++# include <openssl/e_os2.h>
++#endif
+ #include "wget.h"
+ 
+ #include <assert.h>
+diff --git a/src/url.c b/src/url.c
+index 2e0b730..8101431 100644
+--- a/src/url.c
++++ b/src/url.c
+@@ -28,6 +28,9 @@ shall include the source code for the parts of OpenSSL used as well
+ as that of the covered work.  */
+ 
+ #include "wget.h"
++#ifdef NeXT
++# include <sys/dir.h>
++#endif
+ 
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -1801,7 +1804,11 @@ url_file_name (const struct url *u, char *replaced_filename)
+       max_length = 0;
+     }
+ #else
++# ifdef NeXT
++  max_length = MAXNAMLEN - CHOMP_BUFFER;
++# else
+   max_length = get_max_length (fnres.base, fnres.tail, _PC_NAME_MAX) - CHOMP_BUFFER;
++# endif
+ #endif
+   if (max_length > 0 && strlen (temp_fnres.base) > max_length)
+     {
+diff --git a/src/utils.c b/src/utils.c
+index ec55f2e..aef2c90 100644
+--- a/src/utils.c
++++ b/src/utils.c
+@@ -28,6 +28,7 @@ shall include the source code for the parts of OpenSSL used as well
+ as that of the covered work.  */
+ 
+ #include "wget.h"
++#include "openstep.h"
+ 
+ #include "sha256.h"
+ #include <stdio.h>
+@@ -507,7 +508,11 @@ fork_to_background (void)
+     }
+ 
+   /* child: give up the privileges and keep running. */
++#ifdef NeXT
++  setpgrp (0, getpid ());
++#else
+   setsid ();
++#endif
+   if (freopen ("/dev/null", "r", stdin) == NULL)
+     DEBUGP (("Failed to redirect stdin to /dev/null.\n"));
+   if (freopen ("/dev/null", "w", stdout) == NULL)
+@@ -2056,14 +2061,20 @@ static jmp_buf run_with_timeout_env;
+ static void _Noreturn
+ abort_run_with_timeout (int sig _GL_UNUSED)
+ {
++#ifndef NeXT
++  sigset_t set;
++#endif
+   assert (sig == SIGALRM);
+   /* We don't have siglongjmp to preserve the set of blocked signals;
+      if we longjumped out of the handler at this point, SIGALRM would
+      remain blocked.  We must unblock it manually. */
+-  sigset_t set;
++#ifdef NeXT
++  sigsetmask (sigblock (0) & ~sigmask (SIGALRM));
++#else
+   sigemptyset (&set);
+   sigaddset (&set, SIGALRM);
+   sigprocmask (SIG_BLOCK, &set, NULL);
++#endif
+ 
+   /* Now it's safe to longjump. */
+   longjmp (run_with_timeout_env, -1);

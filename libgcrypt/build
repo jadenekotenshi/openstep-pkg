@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC=/usr/local/bin/gcc-4.2
+CFLAGS='-O2 -fno-builtin-memset -march=i486 -DNeXT -D_POSIX_SOURCE -D_NEXT_SOURCE'
+AWK=/usr/local/bin/gawk
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+CHARSET=ASCII
+CPPFLAGS=-I/usr/local/include
+LIBS="`/usr/local/bin/curl-config --static-libs`"
+ac_cv_func_mmap=no
+export CPPFLAGS LIBS ac_cv_func_mmap
+export PATH CC CFLAGS AWK GREP EGREP CHARSET
+if test -d "libgcrypt-$2"; then cd "libgcrypt-$2"; fi
+patch -p1 < "libgcrypt-$2-openstep.patch"
+. "$PKG_BUILD_HELPERS"
+run_configure --build=i386-next-openstep4 --prefix=/usr/local \
+    --disable-asm --disable-padlock-support --disable-aesni-support --disable-shared --enable-static --disable-dependency-tracking
+/bin/gnumake SHELL="$CONFIG_SHELL"
+"$CC" $CFLAGS $CPPFLAGS -I. tests/t-openstep.c $LIBS -o tests/t-openstep
+./tests/t-openstep
+./tests/aeswrap
+/bin/gnumake SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"
+/bin/ranlib "$DESTDIR/usr/local/lib/libgcrypt.a"

@@ -1,0 +1,13 @@
+# Explicit opt-in for Apple GCC 4.2 (5666.3), i386-next-openstep4.
+# The absolute executable bypasses GCC's configured /bin/as preference.
+# ponytail: -fsave-repository keeps stock as; add header specs if it is needed.
+*invoke_as:
+%{!S:-o %|.s |
+ /usr/local/bin/as-806 %(asm_options) %m.s %A }
+
+@assembler:
+%{!M:%{!MM:%{!E:%{!S:/usr/local/bin/as-806 %(asm_debug) %(asm_options) %i %A }}}}
+
+@assembler-with-cpp:
+%(trad_capable_cpp) -lang-asm %(cpp_options) %{E|M|MM:%(cpp_debug_options)} %{!M:%{!MM:%{!E:%{!S:-o %|.s |
+ /usr/local/bin/as-806 %(asm_debug) %(asm_options) %m.s %A }}}}

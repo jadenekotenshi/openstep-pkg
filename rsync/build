@@ -7,7 +7,7 @@ CC=/usr/local/bin/gcc-4.2
 CXX="/usr/local/bin/g++-4.2 $PKG_GCC42_ARCH_FLAGS"
 CFLAGS='-O2 '"$PKG_GCC42_ARCH_FLAGS"
 CPPFLAGS='-D_POSIX_SOURCE -I./openstep -I/usr/local/include -I/NextDeveloper/Headers/bsd'
-# Eager binding prevents dyld re-entry from child-exit signal handlers.
+# Bind executable imports eagerly on OPENSTEP.
 LDFLAGS='-L/usr/local/lib -Wl,-bind_at_load'
 AWK=/usr/local/bin/gawk
 CONFIG_SHELL=/usr/local/bin/ksh

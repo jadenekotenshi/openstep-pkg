@@ -1,0 +1,52 @@
+#!/bin/sh
+set -e
+TMP=/usr/tmp/lua51-test.$$
+/bin/mkdir "$TMP"
+trap '/bin/rm -f "$TMP"/*; /bin/rmdir "$TMP"' 0
+trap 'exit 1' 1 2 15
+cat > "$TMP/check.lua" <<'EOF'
+assert(_VERSION == 'Lua 5.1')
+assert('a\000b' < 'a\000c' and 'a' < 'a\000')
+local values = {'z', 'b', 'a\000z', 'a'}
+table.sort(values)
+assert(values[1] == 'a' and values[2] == 'a\000z' and values[4] == 'z')
+local f = assert(loadstring(string.dump(function(x) return x*x+1 end)))
+assert(f(9) == 82)
+local c = coroutine.create(function() coroutine.yield(17); return 23 end)
+local ok, n = coroutine.resume(c); assert(ok and n == 17)
+ok, n = coroutine.resume(c); assert(ok and n == 23)
+assert(not pcall(function() error('expected') end))
+assert(math.abs(math.sin(math.pi/2)-1) < 1e-12)
+assert(string.format('%.3f', math.sqrt(2)) == '1.414')
+local pipe = assert(io.popen('echo lua51-pipe', 'r'))
+assert(pipe:read('*l') == 'lua51-pipe'); assert(pipe:close())
+local name = os.tmpname()
+local file = assert(io.open(name, 'wb')); assert(file:write('a\000b')); assert(file:close())
+file = assert(io.open(name, 'rb')); assert(file:read('*a') == 'a\000b'); file:close(); assert(os.remove(name))
+local start = os.clock()
+local total = 0; for i=1,2000000 do total = total+i end
+assert(total == 2000001000000 and os.clock() >= start and os.clock()-start < 60)
+print('Lua 5.1 native runtime checks passed')
+EOF
+"$LOCAL_ROOT/bin/lua5.1" "$TMP/check.lua"
+"$LOCAL_ROOT/bin/luac5.1" -o "$TMP/check.luac" "$TMP/check.lua"
+"$LOCAL_ROOT/bin/lua5.1" "$TMP/check.luac"
+cat > "$TMP/api.c" <<'EOF'
+#include <lua.h>
+#include <lauxlib.h>
+#include <lualib.h>
+#include <assert.h>
+static int twice(lua_State *L) { lua_pushinteger(L, 2*luaL_checkint(L,1)); return 1; }
+int main(void) {
+    lua_State *L=luaL_newstate();
+    const luaL_Reg functions[]={{"twice",twice},{NULL,NULL}};
+    assert(L); luaL_openlibs(L); luaL_register(L,"native",functions);
+    assert(luaL_dostring(L,"assert(native.twice(21)==42); return _VERSION") == 0);
+    assert(lua_isstring(L,-1)); lua_close(L); return 0;
+}
+EOF
+/usr/local/bin/gcc-4.2 -O2 -march=i486 -fno-builtin-memset -DNeXT \
+    -I"$LOCAL_ROOT/include/lua5.1" "$TMP/api.c" \
+    -L"$LOCAL_ROOT/lib" -llua5.1 -lm -o "$TMP/api"
+"$TMP/api"
+echo 'Lua 5.1 installed API checks passed'

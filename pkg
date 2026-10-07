@@ -299,6 +299,7 @@ package layout:
   depends       optional, one package name per line (?OPTION:name = only when OPTION is 1)
   requires      optional, pkg.conf options: HAVE_X11 (needed) or ?HAVE_X11 (extra features)
   sources       optional, one source per line
+  checksums     SHA-256 and filename for each remote source
   post-install  optional shell hook
   pre-remove    optional shell hook
   test          optional installed-package test hook
@@ -448,6 +449,7 @@ find_tool() {
 }
 
 is_bootstrap_pkg() {
+    # Only the shell bootstrap must build without package dependencies.
     case $1 in
         pdksh)
             return 0
@@ -533,104 +535,109 @@ load_pkg() {
     INST_DIR=$DB_ROOT/installed/$PKG_NAME
 }
 
-# parse_source_fields DEST EXTRA
-# A line in "sources" is "SOURCE [DEST] [sha256:HEX]".  Sets src_destdir (the
-# destination directory, possibly empty) and src_sum (the expected SHA-256,
-# possibly empty).
-parse_source_fields() {
-    ps_dest=$1
-    ps_extra=$2
+source_name() {
+    source_leaf=`echo "$1" | sed 's/[?#].*$//; s#.*/##'`
+    case $source_leaf in
+        ''|.|..|*[!A-Za-z0-9._+-]*) die "invalid source filename: $1" ;;
+    esac
+    echo "$source_leaf"
+}
 
-    src_sum=
-    src_destdir=$ps_dest
+source_checksum() (
+    checksum_name=$1
+    require_file "$PKG_DIR/checksums"
+    # Stock sh runs a redirected loop in a subshell; capture its output.
+    entries=`while read checksum filename extra || [ -n "$checksum" ]; do
+        case $checksum in ''|\#*) continue ;; esac
+        if [ "$filename" = "$checksum_name" ]; then
+            echo "$checksum $filename $extra"
+        fi
+    done < "$PKG_DIR/checksums"`
+    [ -n "$entries" ] || die "missing checksum for $checksum_name"
+    set -f
+    set -- $entries
+    [ $# -eq 2 ] || die "invalid or duplicate checksum entry for $checksum_name"
+    expected=$1
+    case $expected in *[!0-9a-f]*) die "invalid SHA-256 for $checksum_name" ;; esac
+    [ "`expr "$expected" : '.*'`" = 64 ] || die "invalid SHA-256 for $checksum_name"
+    echo "$expected"
+)
 
-    case $ps_dest in
-        sha256:*)
-            src_sum=`expr "$ps_dest" : 'sha256:\(.*\)'`
-            src_destdir=
+install_download_bootstrap() {
+    case :$PKG_INSTALL_STACK:$PKG_NAME: in
+        *:wget-bootstrap:*)
+            die "download tools unavailable while bootstrapping wget-bootstrap; its dependencies must use local sources"
         ;;
     esac
 
-    case $ps_extra in
-        '')
-            :
-        ;;
-        sha256:*)
-            src_sum=`expr "$ps_extra" : 'sha256:\(.*\)'`
-        ;;
-        *)
-            die "bad field in $PKG_DIR/sources: $ps_extra"
-        ;;
-    esac
-
-    if [ -n "$src_sum" ]; then
-        ps_len=`expr "$src_sum" : '.*'`
-        case $src_sum in
-            *[!0-9a-f]*)
-                ps_len=0
-            ;;
-        esac
-        [ "$ps_len" = 64 ] ||
-            die "bad sha256 in $PKG_DIR/sources (need 64 lowercase hex digits): $src_sum"
-    fi
+    bootstrap_pkg_dir=`resolve_dep_pkg_dir wget-bootstrap` ||
+        die "need to install wget-bootstrap but could not locate its local package directory"
+    log "installing required download tools wget-bootstrap for $PKG_NAME" >&2
+    # A fresh shell keeps install's set -e active inside a download error check.
+    /bin/sh "$bootstrap_pkg_dir/../pkg" install "$bootstrap_pkg_dir" < /dev/null >&2
 }
 
-# sha256_of FILE: print the SHA-256 of FILE.  Uses openssl (the openssl
-# package), or sha256sum / shasum when the machine has one.
-sha256_of() {
-    sh_file=$1
+hash_file() (
+    hash_path=$1
+    PATH=$PATH:${LOCAL_ROOT:-/usr/local}/bin
+    export PATH
+    for attempt in existing bootstrap; do
+        if [ "$attempt" = bootstrap ]; then
+            install_download_bootstrap || exit 1
+        fi
+        hash_tool=`find_tool sha256sum 2>/dev/null || :`
+        if [ -n "$hash_tool" ]; then
+            hash_output=`"$hash_tool" "$hash_path"` || exit 1
+            echo "$hash_output" | sed 's/ .*//'
+            exit 0
+        fi
+        hash_tool=`find_tool openssl 2>/dev/null || :`
+        if [ -n "$hash_tool" ]; then
+            hash_output=`"$hash_tool" dgst -sha256 "$hash_path"` || exit 1
+            echo "$hash_output" | sed 's/^.*= *//'
+            exit 0
+        fi
+    done
+    die "wget-bootstrap did not provide a usable sha256sum or openssl"
+)
 
-    sh_tool=`archive_tool openssl 2>/dev/null` || sh_tool=`find_tool openssl 2>/dev/null`
-    if [ -n "$sh_tool" ]; then
-        "$sh_tool" dgst -sha256 "$sh_file" | sed 's/.*= *//'
-        return 0
-    fi
+fetch_source() (
+    url=$1
+    output=$2
+    scheme=`echo "$url" | sed 's/:.*//'`
+    PATH=$PATH:${LOCAL_ROOT:-/usr/local}/bin
+    export PATH
+    for attempt in existing bootstrap; do
+        if [ "$attempt" = bootstrap ]; then
+            install_download_bootstrap || exit 1
+        fi
+        curl_path=`find_tool curl 2>/dev/null || :`
+        if [ -n "$curl_path" ]; then
+            protocols=`"$curl_path" -V 2>/dev/null | sed -n 's/^Protocols: *//p'`
+            case " $protocols " in
+                *" $scheme "*)
+                    "$curl_path" -fL --connect-timeout 30 -o "$output" "$url"
+                    exit $?
+                ;;
+            esac
+        fi
+        for tool in wget-bootstrap wget; do
+            wget_path=`find_tool "$tool" 2>/dev/null || :`
+            [ -n "$wget_path" ] || continue
+            if [ "$scheme" = https ]; then
+                features=`"$wget_path" --version 2>/dev/null || :`
+                case $features in *+https*) : ;; *) continue ;; esac
+            fi
+            "$wget_path" --timeout=30 --tries=2 -O "$output" "$url"
+            exit $?
+        done
+    done
+    die "wget-bootstrap did not provide a downloader supporting $scheme"
+)
 
-    sh_tool=`archive_tool sha256sum 2>/dev/null` || sh_tool=`find_tool sha256sum 2>/dev/null`
-    if [ -n "$sh_tool" ]; then
-        "$sh_tool" "$sh_file" | sed 's/ .*//'
-        return 0
-    fi
-
-    sh_tool=`find_tool shasum 2>/dev/null`
-    if [ -n "$sh_tool" ]; then
-        "$sh_tool" -a 256 "$sh_file" | sed 's/ .*//'
-        return 0
-    fi
-
-    die "cannot check sha256 of $sh_file: install the openssl package"
-}
-
-# verify_source FILE NAME
-# Check FILE against src_sum (nothing to do when there is none).  A cached or
-# downloaded copy that does not match is removed so the next run fetches it
-# again; a package's own files are never removed.
-verify_source() {
-    vs_file=$1
-    vs_name=$2
-    vs_remove=$3
-
-    [ -n "$src_sum" ] || return 0
-
-    vs_got=`sha256_of "$vs_file"`
-    if [ "$vs_got" = "$src_sum" ]; then
-        return 0
-    fi
-
-    echo "error: sha256 mismatch for $vs_name" >&2
-    echo "  expected $src_sum" >&2
-    echo "  got      $vs_got" >&2
-    if [ -n "$vs_remove" ]; then
-        rm -f "$vs_file"
-        echo "  removed $vs_file" >&2
-    fi
-    exit 1
-}
-
-download_one() {
+download_one() (
     src=$1
     dest=$2
-    extra=$3
 
     case $src in
         \#*|'')
@@ -639,40 +646,37 @@ download_one() {
     esac
 
     case $src in
-        *://*)
-            parse_source_fields "$dest" "$extra"
-            dest=$src_destdir
-            src_name=`path_leaf "$src"`
-            dest_name=`default_value "$dest" "$src_name"`
-            ensure_dir "$SRC_CACHE/`path_parent "$dest_name"`"
-            out=$SRC_CACHE/$dest_name
+        http://*|https://*|ftp://*)
+            src_name=`source_name "$src"` || exit 1
+            expected=`source_checksum "$src_name"` || exit 1
+            ensure_dir "$SRC_CACHE"
+            out=$SRC_CACHE/$src_name
 
             if [ -f "$out" ]; then
-                log "using cached $src_name"
-                verify_source "$out" "$src_name" remove
-                return 0
+                actual=`hash_file "$out"` || exit 1
+                if [ "$actual" = "$expected" ]; then
+                    log "using verified cached $src_name"
+                    exit 0
+                fi
+                log "discarding corrupt cached $src_name"
+                rm -f "$out"
             fi
 
             log "downloading $src"
-
-            curl_path=`find_tool curl 2>/dev/null`
-            if [ -n "$curl_path" ]; then
-                "$curl_path" -L -o "$out" "$src" || { rm -f "$out"; die "download failed: $src"; }
-                verify_source "$out" "$src_name" remove
-                return 0
-            fi
-
-            wget_path=`find_tool wget 2>/dev/null`
-            if [ -n "$wget_path" ]; then
-                "$wget_path" -O "$out" "$src" || { rm -f "$out"; die "download failed: $src"; }
-                verify_source "$out" "$src_name" remove
-                return 0
-            fi
-
-            die "need curl or wget to download sources"
+            partial=$out.part-$$
+            # Stock sh can report zero in an EXIT trap after an error.
+            cleanup_status=1
+            trap 'rm -f "$partial"; exit "$cleanup_status"' 0
+            trap 'exit 1' 1 2 3 15
+            fetch_source "$src" "$partial" || die "download failed: $src"
+            actual=`hash_file "$partial"` || exit 1
+            [ "$actual" = "$expected" ] || die "SHA-256 mismatch: $src"
+            mv "$partial" "$out" || die "cannot cache $src_name"
+            cleanup_status=0
         ;;
+        *://*) die "unsupported source URL: $src" ;;
     esac
-}
+)
 
 download_pkg() {
     ensure_dir "$SRC_CACHE"
@@ -681,10 +685,20 @@ download_pkg() {
 
     log "resolving sources for $PKG_NAME"
 
-    while read src dest extra || [ -n "$src" ]; do
-        download_one "$src" "$dest" "$extra"
+    while read src dest || [ -n "$src" ]; do
+        download_one "$src" "$dest"
     done < "$PKG_DIR/sources"
 }
+
+pkg_tar() (
+    PATH=${LOCAL_ROOT:-/usr/local}/bin:$PATH
+    export PATH
+    if [ -x "${LOCAL_ROOT:-/usr/local}/bin/gnutar" ]; then
+        "${LOCAL_ROOT:-/usr/local}/bin/gnutar" "$@"
+    else
+        gnutar "$@"
+    fi
+)
 
 copy_local_source() {
     src=$1
@@ -707,13 +721,7 @@ copy_local_source() {
     ensure_dir "$target_dir"
 
     if [ -d "$path" ]; then
-        (
-            cd "$path"
-            tar cf - .
-        ) | (
-            cd "$target_dir"
-            tar xpf -
-        )
+        copy_tree "$path" "$target_dir"
     else
         case $path in
             *.tar.gz|*.tgz|*.tar|*.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
@@ -724,55 +732,6 @@ copy_local_source() {
             ;;
         esac
     fi
-}
-
-# The system gnutar cannot read tarballs written by current tar (extended
-# headers, long names).  Use GNU tar from the "tar" package (installed as
-# gtar) when it is there; packages whose sources need it depend on "tar".
-archive_tar() {
-    for at_dir in "$ROOT_DIR/usr/local/bin" /usr/local/bin; do
-        if [ -x "$at_dir/gtar" ]; then
-            echo "$at_dir/gtar"
-            return 0
-        fi
-    done
-    echo gnutar
-}
-
-# archive_tool NAME PACKAGE
-# Print the path of a decompressor installed by PACKAGE, or fail.
-archive_tool() {
-    for at_dir in "$ROOT_DIR/usr/local/bin" /usr/local/bin; do
-        if [ -x "$at_dir/$1" ]; then
-            echo "$at_dir/$1"
-            return 0
-        fi
-    done
-    return 1
-}
-
-# unpack_compressed ARCHIVE TARGET-DIR TOOL PACKAGE
-# Decompress ARCHIVE with TOOL (xz, zstd or bzip2) to a temporary tar file, then
-# unpack that with archive_tar.  Two steps rather than a pipe, so that a
-# failing decompressor is noticed.
-unpack_compressed() {
-    uc_archive=$1
-    uc_target=$2
-    uc_tool=$3
-    uc_pkg=$4
-
-    uc_path=`archive_tool "$uc_tool"` ||
-        die "$uc_archive needs $uc_tool; install the $uc_pkg package"
-    uc_tar=${TMPDIR:-/tmp}/pkg-unpack.$$.tar
-    rm -f "$uc_tar"
-    if "$uc_path" -dc "$uc_archive" > "$uc_tar"; then
-        if `archive_tar` -xf "$uc_tar" -C "$uc_target"; then
-            rm -f "$uc_tar"
-            return 0
-        fi
-    fi
-    rm -f "$uc_tar"
-    die "cannot unpack $uc_archive"
 }
 
 extract_archive() {
@@ -790,19 +749,30 @@ extract_archive() {
 
     case $archive in
         *.tar.gz|*.tgz)
-            `archive_tar` -xzf "$archive" -C "$target_dir"
+            pkg_tar -xzf "$archive" -C "$target_dir"
         ;;
         *.tar)
-            `archive_tar` -xf "$archive" -C "$target_dir"
+            pkg_tar -xf "$archive" -C "$target_dir"
         ;;
-        *.tar.xz|*.txz)
-            unpack_compressed "$archive" "$target_dir" xz xz
-        ;;
-        *.tar.zst|*.tzst)
-            unpack_compressed "$archive" "$target_dir" zstd zstd
-        ;;
-        *.tar.bz2|*.tbz2)
-            unpack_compressed "$archive" "$target_dir" bzip2 bzip2
+        *.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
+            (
+                case $archive in
+                    *.tar.bz2|*.tbz2) unpacker=bzip2 ;;
+                    *.tar.zst|*.tzst) unpacker=zstd ;;
+                    *) unpacker=xz ;;
+                esac
+                unpack_path=`find_tool "$unpacker" 2>/dev/null || :`
+                [ -n "$unpack_path" ] ||
+                    die "need $unpacker to extract $archive; declare it in depends"
+                unpack_tmp=$BUILD_ROOT/.unpack-$$.tar
+                cleanup_status=1
+                trap 'rm -f "$unpack_tmp"; exit "$cleanup_status"' 0
+                trap 'exit 1' 1 2 3 15
+                "$unpack_path" -dc "$archive" > "$unpack_tmp" ||
+                    die "decompression failed: $archive"
+                pkg_tar -xf "$unpack_tmp" -C "$target_dir" || exit 1
+                cleanup_status=0
+            )
         ;;
         *)
             cp "$archive" "$target_dir/"
@@ -813,32 +783,16 @@ extract_archive() {
 stage_source() {
     src=$1
     dest=$2
-    extra=$3
 
     case $src in
         \#*|'')
             return 0
         ;;
-    esac
-
-    parse_source_fields "$dest" "$extra"
-    dest=$src_destdir
-
-    case $src in
         *://*)
-            src_name=`path_leaf "$src"`
-            dest_name=`default_value "$dest" "$src_name"`
-            verify_source "$SRC_CACHE/$dest_name" "$src_name" remove
-            extract_archive "$SRC_CACHE/$dest_name" "$dest"
+            src_name=`source_name "$src"`
+            extract_archive "$SRC_CACHE/$src_name" "$dest"
         ;;
         *)
-            case $src in
-                /*) local_path=$src ;;
-                *) local_path=$PKG_DIR/$src ;;
-            esac
-            if [ -f "$local_path" ]; then
-                verify_source "$local_path" "$src"
-            fi
             copy_local_source "$src" "$dest"
         ;;
     esac
@@ -865,7 +819,7 @@ prepare_build_root() {
     ensure_dir "$IMAGE_DIR"
 
     if [ -z "$resume_build" ] && [ -f "$PKG_DIR/sources" ]; then
-        while read src dest extra || [ -n "$src" ]; do
+        while read src dest || [ -n "$src" ]; do
             case $src in
                 ''|\#*)
                     :
@@ -874,7 +828,7 @@ prepare_build_root() {
                     log "staging source $src"
                 ;;
             esac
-            stage_source "$src" "$dest" "$extra"
+            stage_source "$src" "$dest"
         done < "$PKG_DIR/sources"
     fi
 
@@ -921,13 +875,20 @@ copy_tree() {
     dst=$2
 
     ensure_dir "$dst"
+    copy_tar=tar
+    copy_tar_flags=
+    if [ -x "${LOCAL_ROOT:-/usr/local}/bin/gnutar" ]; then
+        copy_tar=${LOCAL_ROOT:-/usr/local}/bin/gnutar
+        # Shared ancestors such as /usr belong to the system, not the package.
+        copy_tar_flags=--no-overwrite-dir
+    fi
 
     (
         cd "$src"
-        tar cf - .
+        "$copy_tar" cf - .
     ) | (
         cd "$dst"
-        tar xpf -
+        "$copy_tar" xpf - $copy_tar_flags
     )
 }
 

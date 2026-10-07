@@ -475,7 +475,7 @@
 +#endif
 --- /dev/null
 +++ b/tests/openstep.c
-@@ -0,0 +1,28 @@
+@@ -0,0 +1,32 @@
 +/* OPENSTEP libc compatibility regression, LGPL 2.1 or later. */
 +#include "libavutil/openstep.h"
 +#include "libavcodec/avcodec.h"
@@ -485,6 +485,10 @@
 +int main(void)
 +{
 +    char buffer[64], shortbuf[4];
++    unsigned char fill[8];
++    int i;
++    memset(fill, 0xa6, sizeof fill);
++    for (i = 0; i < sizeof fill; ++i) assert(fill[i] == 0xa6);
 +    assert(snprintf(buffer, sizeof(buffer), "%lld/%llu/%zu",
 +        (long long)INT64_MIN, (unsigned long long)UINT64_MAX, (size_t)123) == 45);
 +    assert(!strcmp(buffer, "-9223372036854775808/18446744073709551615/123"));

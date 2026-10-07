@@ -1,0 +1,163 @@
+#!/bin/sh
+set -e
+AS="$ROOT_DIR/usr/local/bin/as-806"
+CC="$ROOT_DIR/usr/local/bin/gcc-4.2"
+CXX="$ROOT_DIR/usr/local/bin/g++-4.2"
+SPECS="$ROOT_DIR/usr/local/lib/cctools-as/gcc42.specs"
+TMP=/tmp/pkg-cctools-as-$$
+mkdir "$TMP"
+trap '/bin/rm -rf "$TMP"' 0
+trap 'exit 1' 1 2 3 15
+cd "$TMP"
+
+"$AS" -v -o empty.o /dev/null > version.log 2>&1
+grep 'cctools-806' version.log >/dev/null
+[ "`"$CC" -print-prog-name=as`" = /bin/as ]
+[ "`"$CC" -print-prog-name=ld`" = /bin/ld ]
+
+cat > probe.s <<'EOF'
+.text
+.align 4
+.globl _asm_answer
+_asm_answer:
+Ltext:
+    movl $25,%eax
+    ret
+.globl _encoding
+_encoding:
+    cmovne %eax,%edx
+    xaddl %eax,%edx
+    cmpxchgl %ecx,(%eax)
+    emms
+    paddb %mm0,%mm1
+    movdqa %xmm0,%xmm1
+    addps %xmm0,%xmm1
+    pshufb %xmm0,%xmm1
+.globl _encoding_end
+_encoding_end:
+.data
+.align 3
+.globl _quad_value
+_quad_value:
+Ldata:
+    .quad 0x1122334455667788
+.globl _quad_pointer
+_quad_pointer:
+    .long _quad_value
+.globl _section_difference
+_section_difference:
+    .long _asm_answer - _quad_value
+.globl _local_difference
+_local_difference:
+    .long Ltext - Ldata
+EOF
+cat > stock.c <<'EOF'
+int stock_answer(void) { return 17; }
+EOF
+"$CC" -v -c stock.c -o stock.o > stock.log 2>&1
+grep '/bin/as ' stock.log >/dev/null
+cat > probe.c <<'EOF'
+#include <string.h>
+extern int asm_answer(void), stock_answer(void);
+extern unsigned char encoding[], encoding_end[];
+extern unsigned long long quad_value, *quad_pointer;
+extern int section_difference, local_difference;
+static const unsigned char expected[] = {
+    0x0f,0x45,0xd0, 0x0f,0xc1,0xc2, 0x0f,0xb1,0x08, 0x0f,0x77,
+    0x0f,0xfc,0xc8, 0x66,0x0f,0x6f,0xc8, 0x0f,0x58,0xc8,
+    0x66,0x0f,0x38,0x00,0xc8
+};
+int main(void) {
+    if (asm_answer() + stock_answer() != 42) return 1;
+    if (quad_value != 0x1122334455667788ULL) return 2;
+    if (quad_pointer != &quad_value) return 3;
+    if ((unsigned long)asm_answer - (unsigned long)&quad_value !=
+        (unsigned long)section_difference) return 4;
+    if (local_difference != section_difference) return 7;
+    if (encoding_end - encoding != sizeof expected) return 5;
+    /* Verify SIMD bytes without executing SIMD on an unverified kernel. */
+    if (memcmp(encoding, expected, sizeof expected)) return 6;
+    return 0;
+}
+EOF
+/bin/cp probe.s probe.S
+for mode in s S assembler assembler-with-cpp; do
+    case "$mode" in
+        s|S) set -- "probe.$mode" ;;
+        *) set -- -x "$mode" probe.s ;;
+    esac
+    "$CC" -specs="$SPECS" -v -c "$@" -o probe.o > asm.log 2>&1
+    grep '/usr/local/bin/as-806 ' asm.log >/dev/null
+    "$CC" -specs="$SPECS" -O2 -g probe.c probe.o stock.o -o probe
+    ./probe
+done
+"$AS" -o direct.o probe.s
+"$CC" probe.c direct.o stock.o -o direct
+./direct
+/bin/nm direct.o > symbols.log
+grep '_asm_answer' symbols.log >/dev/null
+/bin/otool -l direct.o > headers.log
+grep 'LC_SYMTAB' headers.log >/dev/null
+
+cat > preprocessed.S <<'EOF'
+#define ANSWER 42
+.text
+.globl _main
+_main:
+    movl $ANSWER,%eax
+    subl $42,%eax
+    ret
+EOF
+"$CC" -specs="$SPECS" -pipe preprocessed.S -o preprocessed
+./preprocessed
+echo 'this_is_not_an_instruction' > invalid.s
+if "$AS" -o invalid.o invalid.s > invalid.log 2>&1; then
+    echo 'cctools-as accepted an invalid instruction' >&2
+    exit 1
+fi
+if "$AS" -arch ppc -o wrong-arch.o probe.s > invalid.log 2>&1; then
+    echo 'cctools-as accepted a non-i386 target' >&2
+    exit 1
+fi
+
+cat > probe.cc <<'EOF'
+#include <cstdlib>
+static int alive;
+struct Lifetime {
+    Lifetime() { ++alive; }
+    ~Lifetime() { if (--alive) std::abort(); }
+} lifetime;
+int main() {
+    if (alive != 1) return 1;
+    try { throw 42; }
+    catch (int value) { return value == 42 ? 0 : 2; }
+    return 3;
+}
+EOF
+"$CXX" -specs="$SPECS" -v -pipe -O2 -g probe.cc -o cxx > cxx.log 2>&1
+grep '/usr/local/bin/as-806 ' cxx.log >/dev/null
+./cxx
+
+cat > probe.m <<'EOF'
+#import <Foundation/Foundation.h>
+@interface As806Probe : NSObject
++ (int)answer;
+@end
+@implementation As806Probe
++ (int)answer { return 42; }
+@end
+int main(void) {
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    int result = [As806Probe answer];
+    [pool release];
+    return result == 42 ? 0 : 1;
+}
+EOF
+"$CC" -specs="$SPECS" -v -pipe -O2 -g probe.m -framework Foundation -o objc > objc.log 2>&1
+grep '/usr/local/bin/as-806 ' objc.log >/dev/null
+./objc
+"$CXX" -specs="$SPECS" -v -pipe -O2 -g -x objective-c++ probe.m \
+    -framework Foundation -o objcpp > objcpp.log 2>&1
+grep '/usr/local/bin/as-806 ' objcpp.log >/dev/null
+./objcpp
+echo 'cctools-as 806: encodings, relocations, stock linking and GCC opt-in passed'

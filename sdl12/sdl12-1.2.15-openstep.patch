@@ -1,0 +1,2378 @@
+diff --git a/NOTICE b/NOTICE
+new file mode 100644
+index 0000000..369619b
+--- /dev/null
++++ b/NOTICE
+@@ -0,0 +1,25 @@
++This tree contains an OPENSTEP 4.2 native backend for Simple DirectMedia
++Layer 1.2.15.  It is a modified SDL source distribution when the overlay is
++applied; it is not an unmodified upstream SDL release.
++
++SDL 1.2.15 copyright and license notices remain in
++upstream/SDL-1.2.15/.  The OPENSTEP backend and integration patches are
++distributed under the same GNU Lesser General Public License 2.1.  The full
++license text is in upstream/SDL-1.2.15/COPYING.
++
++The native backend uses OPENSTEP AppKit, Display PostScript, SoundKit/native
++Sound APIs, BSD timer services, and Mach cthreads.  It does not use X11.
++
++The compatibility demos under external/ retain their own permissive terms
++and original notices; they are not relicensed as SDL/LGPL code:
++
++- external/stars-1.0: the original source header states there is no
++  copyright or restriction, permits any use, and asks that credit be given.
++- external/plasma-1.0: the retained upstream README declares the demo public
++  domain.
++- external/xflame-1.0: the retained source header calls the code freeware,
++  permits copying, modification and any use, and prohibits claiming copyright
++  on code wholly or partly based on it.
++
++Each external subdirectory has a SOURCE.md with the exact mirror commit,
++source path, SHA-256 values, authorship and license evidence.
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..19e03cc
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,235 @@
++# SDL 1.2 for OPENSTEP
++
++This project is a native SDL 1.2.15 port for OPENSTEP 4.2 on Intel i386.
++It uses Application Kit, Display PostScript, SoundKit, BSD system services,
++and Mach cthreads directly. It does **not** use X11, Xlib, an X server, Quartz,
++or a modern Cocoa compatibility layer.
++
++Status: **the native backend and the final OPENSTEP hardware acceptance suite
++passed on 2026-08-11.**
++
++The pristine SDL 1.2.15 source is retained under `upstream/SDL-1.2.15/`.
++OPENSTEP code is maintained as a separate overlay under `port/openstep/`,
++with small bootstrap patches kept for review and redistribution.
++
++## OPENSTEP-specific features
++
++| SDL subsystem | Native OPENSTEP implementation |
++|---|---|
++| Video | Windowed software surfaces in 8, 16, 24, or 32 bpp, converted to a 24-bit `NSBitmapImageRep` and displayed by an AppKit `NSView` |
++| Presentation | `SDL_Flip()` and clipped `SDL_UpdateRect(s)` through `-[NSView displayRect:]` |
++| Resize | `SDL_RESIZABLE`, `NSResizableWindowMask`, and `windowDidResize:` translated to `SDL_VIDEORESIZE` |
++| Events | AppKit `NSEvent` translation for keyboard, mouse, focus, expose, and window close |
++| Cursor | Native `NSCursor` for cursors up to 16x16; larger SDL cursors retain SDL's software fallback |
++| Mouse warp | Display PostScript `PSsetmouse` in the flipped SDL view coordinate system |
++| Audio | SoundKit `SNDStartPlaying(..., preempt=0)` FCFS queue with retained 0.25-second PCM blocks |
++| Timer | BSD `gettimeofday`, `select`, `signal`, and `setitimer`, including SDL's documented approximately 49-day `Uint32` wrap |
++| Threads | Mach cthreads implementation of SDL threads, recursive mutexes, semaphores, and condition variables |
++
++### Display PostScript details
++
++SDL surfaces use a top-left origin. The OPENSTEP `NSBitmapImageRep` backing
++store was verified on the target to store its first row at the lower edge.
++The presenter therefore reverses bitmap rows exactly once while preserving
++SDL coordinates for events and dirty rectangles. Cursor image rows are not
++reversed; doing so would invert the Window Server cursor itself.
++
++No raw framebuffer access is used. Redraw, exposure, and clipping remain
++inside the supported AppKit/Display PostScript path.
++
++### Native cursor behavior
++
++The OPENSTEP cursor documentation limits the displayed native cursor image to
++16x16 pixels. Smaller SDL cursors are padded to 16x16 and use `NSCursor`.
++Larger cursors deliberately return to SDL's size-preserving software cursor
++path. Cursor hiding uses a transparent native cursor, preventing the native
++and software cursor from being drawn simultaneously.
++
++### Native audio behavior
++
++The audio driver accepts these target formats:
++
++- 22050 or 44100 Hz
++- mono or stereo
++- signed 16-bit PCM, little- or big-endian at the SDL boundary
++
++SoundKit consumes big-endian `SND_FORMAT_LINEAR_16`, so little-endian samples
++are byte-swapped before submission. Four chunks are normally kept queued and
++the oldest tag is reclaimed with `SNDWait()`. This avoids the audible gaps
++caused by starting and waiting for each chunk serially. The SDL audio callback
++only fills its mix buffer; SoundKit buffer lifetime is managed afterward by
++the backend.
++
++## Target and toolchain
++
++- OS: OPENSTEP 4.2
++- CPU: Intel i386/i486-compatible target
++- Compiler: NeXT `cc-744.13`, based on GCC 2.7.2.1
++- Language baseline: C89 and the historical NeXT Objective-C runtime
++- Output: static `libSDL.a`
++
++The compiler emits an i586 Mach-O subtype even when `-m486` is used. OPENSTEP
++on the target machine rejects that subtype, so every linked executable is
++processed by `fix-macho-i486-subtype.csh`. The helper changes only the
++Mach-O CPU subtype from 5 to 4 after a successful `-m486` link.
++
++## Building on OPENSTEP
++
++The NFS source is mounted at `/ndrv/openstep-sdl12`. Treat that directory as
++read-only: the export may use NFS root-squash, including when logged into
++OPENSTEP as root.
++
++All target-side source copies, objects, binaries, and logs belong under the
++project-specific `/tmp/SDL12` tree.
++
++```csh
++# Run in an OPENSTEP shell.
++/ndrv/openstep-sdl12/build/stage-openstep.csh
++/bin/csh -f /tmp/SDL12/src/build/prepare-openstep-tree.csh
++
++cd /tmp/SDL12/build/SDL-1.2.15-openstep
++make
++
++cd /tmp/SDL12/src/test/openstep
++make
++
++/bin/csh -f /tmp/SDL12/src/build/test-openstep.csh
++```
++
++The stage script deletes and recreates only `/tmp/SDL12/src`. It never writes
++below `/ndrv/openstep-sdl12` and does not share a temporary directory with
++other OPENSTEP projects.
++
++GUI applications must be run from a WindowServer GUI Terminal. A headless
++remote shell is suitable for builds and timer/thread tests, but it has no
++WindowServer connection. Site-specific remote access procedures are not part
++of this source package.
++
++## Linking an SDL application
++
++A minimal native link uses the static SDL library and the three OPENSTEP
++frameworks:
++
++```csh
++set SDLROOT = /tmp/SDL12/build/SDL-1.2.15-openstep
++
++cc -m486 -O -I${SDLROOT}/include -o my-sdl-app my-sdl-app.c \
++    ${SDLROOT}/libSDL.a \
++    -framework AppKit -framework Foundation -framework SoundKit
++
++/bin/csh -f ${SDLROOT}/fix-macho-i486-subtype.csh my-sdl-app
++```
++
++The resulting program uses the `openstep` video and audio drivers. No X11
++include path or library should be added.
++
++## Verified on real OPENSTEP hardware
++
++The following paths were built and exercised on the target:
++
++- 8/16/24/32-bit software surfaces, palettes, dirty rectangles, expose, and resize
++- key down/up, function and navigation keys, mouse motion/drag/button, focus, and quit
++- native cursor show/hide, custom cursors, software fallback, and DPS mouse warp
++- SDL audio load/callback/pause/resume/close
++- 300-second audio-only playback and 300-second simultaneous audio/video stress
++- timer callback, interrupted delay, monotonic clock handling, and 49-day wrap arithmetic
++- thread creation/join, recursive mutexes, semaphores, condition timeout/signal/broadcast, and contention
++- pristine SDL tests: `testwm`, `loopwave`, `testbitmap`, `graywin`, and `testcursor`
++- unmodified external SDL programs: `stars-1.0` and `xflame-1.0`
++
++The seven-stage final WindowServer suite passed, including partial display,
++cursor direction and residue, resize patterns, palette animation, and clean
++input-driven exits.
++
++Re-run it from a GUI Terminal with:
++
++```csh
++/bin/csh -f /ndrv/openstep-sdl12/test/openstep/run-final-gui-tests.csh
++```
++
++Detailed commands, measured results, and known hardware-input coverage limits
++are in [TESTING.md](TESTING.md). The final evidence transcript is in
++[notes/final-gui-20260811.log](notes/final-gui-20260811.log).
++
++## Supported scope and limitations
++
++This is a native software SDL 1.2 backend. It intentionally does not advertise
++features that were not implemented or verified.
++
++Supported:
++
++- windowed software video
++- 8/16/24/32-bit SDL surfaces and 8-bit software palettes
++- dirty updates, expose redraw, resize, and window captions
++- absolute keyboard and mouse input
++- native cursor visibility and absolute mouse warp
++- SoundKit PCM playback
++- SDL timer and thread APIs used by SDL 1.2 applications
++
++Not supported:
++
++- X11 or X11 compatibility layers
++- OpenGL
++- exclusive fullscreen
++- hardware surfaces or accelerated blits
++- mouse grab and relative mouse mode
++- CD-ROM and joystick backends
++- dynamic library loading
++
++Some physical keys could not be covered by the available keyboard: F13-F15,
++keypad/Num Lock, and Caps Lock. The console input path also did not expose a
++distinct physical right-button or modifier flag in every session. The backend
++contains the documented AppKit translations, but these hardware paths remain
++explicit coverage limitations.
++
++## Repository layout
++
++```text
++openstep-sdl12/
++|-- upstream/                 pristine SDL 1.2.15 source and source record
++|-- port/openstep/            native backend, build overlay, and patches
++|-- build/                    staging, preparation, test, and package scripts
++|-- test/openstep/            target regression programs and runners
++|-- external/                 third-party SDL compatibility programs
++|-- spikes/                   isolated OPENSTEP API probes
++|-- notes/                    API inventory and preserved target evidence
++|-- dist/                     reproducible source archive and SHA-256 sidecar
++|-- PLAN_SDL12.md             implementation plan and completed phase gates
++|-- TESTING.md                detailed verification record
++|-- COPYING                   LGPL 2.1 notice pointer
++`-- NOTICE                    modification and third-party notices
++```
++
++## Source archive
++
++The verified source archive is attached to the GitHub release as
++`openstep-sdl12-20260811-src.tar.gz`, with its SHA-256 sidecar. It expands to a
++single `openstep-sdl12/` directory and needs no other download to build.
++
++To reproduce it on the Linux host:
++
++```sh
++# Defaults to /tmp; the argument is the output file path, not a directory.
++./openstep-sdl12/build/package-source.sh
++./openstep-sdl12/build/package-source.sh dist/openstep-sdl12-20260811-src.tar.gz
++```
++
++The archive and this repository carry the same file set, so a clone and an
++unpacked archive build identically. Test MP3/WAV media, target build products,
++and the local `dist/` directory are excluded from both.
++
++## License and provenance
++
++SDL 1.2.15 and this OPENSTEP backend are distributed under the GNU Lesser
++General Public License 2.1. The complete license text is retained at
++`upstream/SDL-1.2.15/COPYING`; see [COPYING](COPYING) and [NOTICE](NOTICE).
++
++Upstream files are carried unmodified, but not all of them are carried. The
++tree holds what this port builds from -- `include/`, `src/`, `test/`,
++`configure`, `Makefile.minimal` -- plus `COPYING`, `CREDITS`, and `README`. The
++other-platform IDE projects (VisualC, VisualCE, Xcode), the autotools helpers,
++and the HTML manual are left out; nothing here builds from them. The pristine
++release URL and SHA-256 for the complete archive are recorded in
++[upstream/SDL-1.2.15.SOURCE.md](upstream/SDL-1.2.15.SOURCE.md).
++Each program under `external/` retains its own license statement and an exact
++commit/path/hash record in its `SOURCE.md`.
+diff --git a/build-openstep.csh b/build-openstep.csh
+new file mode 100644
+index 0000000..4620183
+--- /dev/null
++++ b/build-openstep.csh
+@@ -0,0 +1,45 @@
++#!/bin/csh -f
++# OPENSTEP's make does not expand wildcard source lists.  Let csh do that
++# expansion and compile each C89 source explicitly.  Run from the copied
++# /tmp/SDL12/build/SDL-1.2.15-openstep tree.
++
++set cflags = "-m486 -O -Wall -D__OPENSTEP__ -I./include"
++set nonomatch
++set objects = ()
++set number = 0
++
++rm -f libSDL.a
++if (! -d obj) mkdir obj
++rm -f obj/*.o
++
++foreach source (src/*.c src/audio/*.c src/cdrom/*.c src/cpuinfo/*.c src/events/*.c src/file/*.c src/joystick/*.c src/stdlib/*.c src/thread/*.c src/timer/*.c src/video/*.c src/audio/dummy/*.c src/cdrom/dummy/*.c src/joystick/dummy/*.c src/thread/openstep/*.c src/timer/openstep/*.c src/loadso/dummy/*.c)
++    @ number = $number + 1
++    set object = obj/$number.o
++    echo "CC $source"
++    cc $cflags -c $source -o $object
++    if ($status != 0) exit 1
++    set objects = ($objects $object)
++end
++
++foreach source (src/video/openstep/*.m)
++    @ number = $number + 1
++    set object = obj/$number.o
++    echo "CC $source"
++    cc $cflags -c $source -o $object
++    if ($status != 0) exit 1
++    set objects = ($objects $object)
++end
++
++foreach source (src/audio/openstep/*.m)
++    @ number = $number + 1
++    set object = obj/$number.o
++    echo "CC $source"
++    cc $cflags -c $source -o $object
++    if ($status != 0) exit 1
++    set objects = ($objects $object)
++end
++
++ar cr libSDL.a $objects
++if ($status != 0) exit 1
++ranlib libSDL.a
++exit $status
+diff --git a/fix-macho-i486-subtype.csh b/fix-macho-i486-subtype.csh
+new file mode 100644
+index 0000000..53fd68a
+--- /dev/null
++++ b/fix-macho-i486-subtype.csh
+@@ -0,0 +1,18 @@
++#!/bin/csh -f
++# OPENSTEP cc-744.13 emits an i586 Mach-O subtype even with -m486.  The
++# target loader rejects it on the i486 system used for this port.  After a
++# successful -m486 link, rewrite only mach_header.cpusubtype (offset 8) from
++# 5 to 4 in the generated executable.  This never touches source or NFS.
++
++if ($#argv != 1) then
++    echo "usage: fix-macho-i486-subtype.csh executable"
++    exit 2
++endif
++if (! -f $argv[1]) then
++    echo "fix-macho-i486-subtype: file not found: $argv[1]"
++    exit 2
++endif
++
++/usr/bin/perl -0777 -pi -e 'substr($_,8,1)=chr(4)' $argv[1]
++if ($status != 0) exit 1
++otool -h $argv[1]
+diff --git a/include/SDL_config.h b/include/SDL_config.h
+index 09ba38a..54e355f 100644
+--- a/include/SDL_config.h
++++ b/include/SDL_config.h
+@@ -30,6 +30,8 @@
+ #include "SDL_config_dreamcast.h"
+ #elif defined(__MACOS__)
+ #include "SDL_config_macos.h"
++#elif defined(__OPENSTEP__)
++#include "SDL_config_openstep.h"
+ #elif defined(__MACOSX__)
+ #include "SDL_config_macosx.h"
+ #elif defined(__SYMBIAN32__)
+diff --git a/include/SDL_config_openstep.h b/include/SDL_config_openstep.h
+new file mode 100644
+index 0000000..bd43f1f
+--- /dev/null
++++ b/include/SDL_config_openstep.h
+@@ -0,0 +1,62 @@
++/* OPENSTEP 4.2 i386 baseline configuration for SDL 1.2.15.
++ * Keep this C89/cc 2.7 compatible: no stdint.h, C99 feature tests, or
++ * assumptions about pthreads.  The enabled audio and cthreads backends use
++ * OPENSTEP SoundKit and Mach cthreads rather than POSIX substitutes.
++ */
++#ifndef _SDL_config_openstep_h
++#define _SDL_config_openstep_h
++
++#include <sys/types.h>
++
++/* OPENSTEP's sys/types.h provides signed intN_t and BSD u_intN_t, but not
++ * the unsigned C99 spellings SDL uses. */
++typedef u_int8_t uint8_t;
++typedef u_int16_t uint16_t;
++typedef u_int32_t uint32_t;
++typedef unsigned long uintptr_t;
++
++#define HAVE_SYS_TYPES_H 1
++#define HAVE_STDIO_H 1
++#define HAVE_STDLIB_H 1
++#define HAVE_STDDEF_H 1
++#define HAVE_STDARG_H 1
++#define HAVE_STRING_H 1
++#define HAVE_STRINGS_H 1
++#define HAVE_CTYPE_H 1
++#define HAVE_MATH_H 1
++#define HAVE_SIGNAL_H 1
++#define STDC_HEADERS 1
++
++#define HAVE_MALLOC 1
++#define HAVE_CALLOC 1
++#define HAVE_REALLOC 1
++#define HAVE_FREE 1
++#define HAVE_GETENV 1
++#define HAVE_QSORT 1
++#define HAVE_ABS 1
++#define HAVE_MEMSET 1
++#define HAVE_MEMCPY 1
++#define HAVE_MEMMOVE 1
++#define HAVE_MEMCMP 1
++#define HAVE_STRLEN 1
++#define HAVE_STRCHR 1
++#define HAVE_STRRCHR 1
++#define HAVE_STRSTR 1
++#define HAVE_STRTOL 1
++#define HAVE_STRTOD 1
++#define HAVE_ATOI 1
++#define HAVE_ATOF 1
++#define HAVE_STRCMP 1
++#define HAVE_STRNCMP 1
++#define HAVE_SSCANF 1
++
++/* No X11, OpenGL, hardware surface, or pthread fallback. */
++#define SDL_AUDIO_DRIVER_OPENSTEP 1
++#define SDL_CDROM_DISABLED 1
++#define SDL_JOYSTICK_DISABLED 1
++#define SDL_LOADSO_DISABLED 1
++#define SDL_THREAD_OPENSTEP 1
++#define SDL_TIMER_OPENSTEP 1
++#define SDL_VIDEO_DRIVER_OPENSTEP 1
++
++#endif /* _SDL_config_openstep_h */
+diff --git a/src/audio/SDL_audio.c b/src/audio/SDL_audio.c
+index beb26e0..35b3bd3 100644
+--- a/src/audio/SDL_audio.c
++++ b/src/audio/SDL_audio.c
+@@ -36,6 +36,9 @@
+ 
+ /* Available audio drivers */
+ static AudioBootStrap *bootstrap[] = {
++#if SDL_AUDIO_DRIVER_OPENSTEP
++	&OPENSTEP_AUDIO_bootstrap,
++#endif
+ #if SDL_AUDIO_DRIVER_PULSE
+ 	&PULSE_bootstrap,
+ #endif
+diff --git a/src/audio/SDL_sysaudio.h b/src/audio/SDL_sysaudio.h
+index 74ac21d..8397994 100644
+--- a/src/audio/SDL_sysaudio.h
++++ b/src/audio/SDL_sysaudio.h
+@@ -102,6 +102,9 @@ typedef struct AudioBootStrap {
+ 	SDL_AudioDevice *(*create)(int devindex);
+ } AudioBootStrap;
+ 
++#if SDL_AUDIO_DRIVER_OPENSTEP
++extern AudioBootStrap OPENSTEP_AUDIO_bootstrap;
++#endif
+ #if SDL_AUDIO_DRIVER_BSD
+ extern AudioBootStrap BSD_AUDIO_bootstrap;
+ #endif
+diff --git a/src/audio/openstep/SDL_openstepaudio.h b/src/audio/openstep/SDL_openstepaudio.h
+new file mode 100644
+index 0000000..0c6fccb
+--- /dev/null
++++ b/src/audio/openstep/SDL_openstepaudio.h
+@@ -0,0 +1,22 @@
++#ifndef _SDL_openstepaudio_h
++#define _SDL_openstepaudio_h
++
++#include "../SDL_sysaudio.h"
++
++#define _THIS SDL_AudioDevice *this
++#define OPENSTEP_LEGACY_SOUND_POOL 8
++#define OPENSTEP_LEGACY_SOUND_KEEP 4
++
++struct SDL_PrivateAudioData {
++    Uint8 *mixbuf;
++    Uint32 mixlen;
++    Uint32 delay;
++    void *legacy_sounds[OPENSTEP_LEGACY_SOUND_POOL];
++    int legacy_tags[OPENSTEP_LEGACY_SOUND_POOL];
++    int legacy_tag;
++    int legacy_head;
++    int legacy_count;
++    int use_legacy_sound_api;
++};
++
++#endif /* _SDL_openstepaudio_h */
+diff --git a/src/audio/openstep/SDL_openstepaudio.m b/src/audio/openstep/SDL_openstepaudio.m
+new file mode 100644
+index 0000000..84d9f93
+--- /dev/null
++++ b/src/audio/openstep/SDL_openstepaudio.m
+@@ -0,0 +1,233 @@
++/* OPENSTEP native SoundKit C API streaming audio backend for SDL 1.2. */
++#include "SDL_config.h"
++
++#if SDL_AUDIO_DRIVER_OPENSTEP
++
++#import <SoundKit/SoundKit.h>
++#import <sound/sound.h>
++
++#include "SDL_audio.h"
++#include "SDL_timer.h"
++#include "../SDL_audiomem.h"
++#include "../SDL_sysaudio.h"
++#include "SDL_openstepaudio.h"
++
++/* SDL 1.2 keeps this internal helper out of the installed public header. */
++extern void SDL_CalculateAudioSpec(SDL_AudioSpec *spec);
++
++#define OPENSTEPAUD_DRIVER_NAME "openstep"
++
++static int OPENSTEP_AUDIO_Available(void);
++static SDL_AudioDevice *OPENSTEP_AUDIO_CreateDevice(int devindex);
++static void OPENSTEP_AUDIO_DeleteDevice(SDL_AudioDevice *device);
++static int OPENSTEP_AUDIO_OpenAudio(_THIS, SDL_AudioSpec *spec);
++static void OPENSTEP_AUDIO_WaitAudio(_THIS);
++static void OPENSTEP_AUDIO_PlayAudio(_THIS);
++static Uint8 *OPENSTEP_AUDIO_GetAudioBuf(_THIS);
++static void OPENSTEP_AUDIO_CloseAudio(_THIS);
++static int OPENSTEP_AUDIO_UseLegacySoundAPI(_THIS, SDL_AudioSpec *spec);
++static void OPENSTEP_AUDIO_DrainLegacySound(_THIS);
++
++static int OPENSTEP_AUDIO_Available(void)
++{
++    const char *requested;
++
++    requested = SDL_getenv("SDL_AUDIODRIVER");
++    if ((requested != NULL) &&
++        (SDL_strcasecmp(requested, OPENSTEPAUD_DRIVER_NAME) != 0)) return 0;
++    return 1;
++}
++
++static void OPENSTEP_AUDIO_DeleteDevice(SDL_AudioDevice *device)
++{
++    SDL_free(device->hidden);
++    SDL_free(device);
++}
++
++static SDL_AudioDevice *OPENSTEP_AUDIO_CreateDevice(int devindex)
++{
++    SDL_AudioDevice *device;
++
++    device = (SDL_AudioDevice *)SDL_malloc(sizeof(*device));
++    if (device == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    SDL_memset(device, 0, sizeof(*device));
++    device->hidden = (struct SDL_PrivateAudioData *)SDL_malloc(
++        sizeof(*device->hidden));
++    if (device->hidden == NULL) {
++        SDL_free(device);
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    SDL_memset(device->hidden, 0, sizeof(*device->hidden));
++    device->OpenAudio = OPENSTEP_AUDIO_OpenAudio;
++    device->WaitAudio = OPENSTEP_AUDIO_WaitAudio;
++    device->PlayAudio = OPENSTEP_AUDIO_PlayAudio;
++    device->GetAudioBuf = OPENSTEP_AUDIO_GetAudioBuf;
++    device->CloseAudio = OPENSTEP_AUDIO_CloseAudio;
++    device->free = OPENSTEP_AUDIO_DeleteDevice;
++    return device;
++}
++
++AudioBootStrap OPENSTEP_AUDIO_bootstrap = {
++    OPENSTEPAUD_DRIVER_NAME, "OPENSTEP SoundKit stream audio driver",
++    OPENSTEP_AUDIO_Available, OPENSTEP_AUDIO_CreateDevice
++};
++
++static int OPENSTEP_AUDIO_OpenAudio(_THIS, SDL_AudioSpec *spec)
++{
++    float bytes_per_second;
++
++    if ((spec->channels < 1) || (spec->channels > 2)) {
++        SDL_SetError("OPENSTEP SoundKit supports one or two channels");
++        return -1;
++    }
++    /* SNDStartPlaying(..., preempt=0) is the SoundKit documented FCFS
++       queue.  It owns distinct queued buffers, accepts NeXT big-endian
++       LINEAR_16 data, and remains continuous while the AppKit UI is busy.
++       NXPlayStream needs a separate DMA-safe buffer pool before it can
++       safely replace this proven path. */
++    if (OPENSTEP_AUDIO_UseLegacySoundAPI(this, spec) != 0) return -1;
++    this->hidden->mixlen = spec->size;
++    this->hidden->mixbuf = (Uint8 *)SDL_AllocAudioMem(spec->size);
++    if (this->hidden->mixbuf == NULL) {
++        OPENSTEP_AUDIO_CloseAudio(this);
++        SDL_OutOfMemory();
++        return -1;
++    }
++    SDL_memset(this->hidden->mixbuf, spec->silence, spec->size);
++    bytes_per_second = (float)((spec->format & 0xff) / 8) *
++                       (float)spec->channels * (float)spec->freq;
++    if (bytes_per_second <= 0.0f) {
++        OPENSTEP_AUDIO_CloseAudio(this);
++        SDL_SetError("OPENSTEP invalid audio specification");
++        return -1;
++    }
++    this->hidden->delay = (Uint32)(((float)spec->size / bytes_per_second) *
++                                    1000.0f);
++    if (this->hidden->delay == 0) this->hidden->delay = 1;
++    return 0;
++}
++
++static void OPENSTEP_AUDIO_WaitAudio(_THIS)
++{
++    if (this->hidden->use_legacy_sound_api) {
++        /* Queue ahead before waiting.  SNDStartPlaying(..., preempt=0)
++           is FCFS, so this prevents the DAC gaps caused by per-block waits. */
++        if (this->hidden->legacy_count >= OPENSTEP_LEGACY_SOUND_KEEP) {
++            OPENSTEP_AUDIO_DrainLegacySound(this);
++        }
++        return;
++    }
++    SDL_Delay(this->hidden->delay);
++}
++
++static void OPENSTEP_AUDIO_PlayAudio(_THIS)
++{
++    SNDSoundStruct *sound;
++    Uint8 *source;
++    Uint8 *target;
++    Uint32 i;
++    int slot;
++    int error;
++
++    if (this->hidden->legacy_count >= OPENSTEP_LEGACY_SOUND_POOL) {
++        SDL_SetError("OPENSTEP legacy sound queue overflow");
++        return;
++    }
++    sound = (SNDSoundStruct *)SDL_malloc(sizeof(*sound) +
++                                         this->hidden->mixlen);
++    if (sound == NULL) {
++        SDL_OutOfMemory();
++        return;
++    }
++    sound->magic = SND_MAGIC;
++    sound->dataLocation = sizeof(*sound);
++    sound->dataSize = this->hidden->mixlen;
++    sound->dataFormat = SND_FORMAT_LINEAR_16;
++    sound->samplingRate = this->spec.freq;
++    sound->channelCount = this->spec.channels;
++    source = this->hidden->mixbuf;
++    target = ((Uint8 *)sound) + sizeof(*sound);
++    if (this->spec.format == AUDIO_S16MSB) {
++        SDL_memcpy(target, source, this->hidden->mixlen);
++    } else {
++        /* SND_FORMAT_LINEAR_16 data is big-endian, even on i486. */
++        for (i = 0; i < this->hidden->mixlen; i += 2) {
++            target[i] = source[i + 1];
++            target[i + 1] = source[i];
++        }
++    }
++    ++this->hidden->legacy_tag;
++    if (this->hidden->legacy_tag <= 0) this->hidden->legacy_tag = 1;
++    error = SNDStartPlaying(sound, this->hidden->legacy_tag, 0, 0,
++                            SND_NULL_FUN, SND_NULL_FUN);
++    if (error != SND_ERR_NONE) {
++        SDL_free(sound);
++        SDL_SetError("OPENSTEP legacy sound play failed (%d)", error);
++        return;
++    }
++    slot = (this->hidden->legacy_head + this->hidden->legacy_count) %
++           OPENSTEP_LEGACY_SOUND_POOL;
++    this->hidden->legacy_sounds[slot] = (void *)sound;
++    this->hidden->legacy_tags[slot] = this->hidden->legacy_tag;
++    ++this->hidden->legacy_count;
++}
++
++static int OPENSTEP_AUDIO_UseLegacySoundAPI(_THIS, SDL_AudioSpec *spec)
++{
++    if ((spec->format != AUDIO_S16LSB) && (spec->format != AUDIO_S16MSB)) {
++        SDL_SetError("OPENSTEP legacy sound API requires signed 16-bit PCM");
++        return -1;
++    }
++    if ((spec->freq != 22050) && (spec->freq != 44100)) {
++        SDL_SetError("OPENSTEP legacy sound API requires 22050 or 44100 Hz");
++        return -1;
++    }
++    /* Match the proven OnionPlayer stream cadence: 0.25-second chunks and
++       several queued buffers.  The SND server then plays FCFS without gaps. */
++    spec->samples = (Uint16)(spec->freq / 4);
++    SDL_CalculateAudioSpec(spec);
++    this->hidden->use_legacy_sound_api = 1;
++    this->hidden->legacy_tag = 0;
++    this->hidden->legacy_head = 0;
++    this->hidden->legacy_count = 0;
++    return 0;
++}
++
++static void OPENSTEP_AUDIO_DrainLegacySound(_THIS)
++{
++    int slot;
++
++    if (this->hidden->legacy_count > 0) {
++        slot = this->hidden->legacy_head;
++        if (SNDWait(this->hidden->legacy_tags[slot]) != SND_ERR_NONE) {
++            SDL_SetError("OPENSTEP legacy sound wait failed");
++        }
++        SDL_free(this->hidden->legacy_sounds[slot]);
++        this->hidden->legacy_sounds[slot] = NULL;
++        this->hidden->legacy_head = (slot + 1) % OPENSTEP_LEGACY_SOUND_POOL;
++        --this->hidden->legacy_count;
++    }
++}
++
++static Uint8 *OPENSTEP_AUDIO_GetAudioBuf(_THIS)
++{
++    return this->hidden->mixbuf;
++}
++
++static void OPENSTEP_AUDIO_CloseAudio(_THIS)
++{
++    while (this->hidden->legacy_count > 0) {
++        OPENSTEP_AUDIO_DrainLegacySound(this);
++    }
++    if (this->hidden->mixbuf != NULL) {
++        SDL_FreeAudioMem(this->hidden->mixbuf);
++        this->hidden->mixbuf = NULL;
++    }
++    this->hidden->use_legacy_sound_api = 0;
++}
++
++#endif /* SDL_AUDIO_DRIVER_OPENSTEP */
+diff --git a/src/thread/SDL_thread_c.h b/src/thread/SDL_thread_c.h
+index 8af6e52..16fe917 100644
+--- a/src/thread/SDL_thread_c.h
++++ b/src/thread/SDL_thread_c.h
+@@ -37,6 +37,8 @@
+ #include "pth/SDL_systhread_c.h"
+ #elif SDL_THREAD_PTHREAD
+ #include "pthread/SDL_systhread_c.h"
++#elif SDL_THREAD_OPENSTEP
++#include "openstep/SDL_systhread_c.h"
+ #elif SDL_THREAD_SPROC
+ #include "irix/SDL_systhread_c.h"
+ #elif SDL_THREAD_WIN32
+diff --git a/src/thread/openstep/SDL_openstepthread.h b/src/thread/openstep/SDL_openstepthread.h
+new file mode 100644
+index 0000000..4a1715f
+--- /dev/null
++++ b/src/thread/openstep/SDL_openstepthread.h
+@@ -0,0 +1,13 @@
++#ifndef _SDL_openstepthread_h
++#define _SDL_openstepthread_h
++
++#include "SDL_thread.h"
++#include "SDL_systhread_c.h"
++
++struct SDL_mutex {
++    mutex_t mutex;
++    Uint32 owner;
++    int recursive;
++};
++
++#endif /* _SDL_openstepthread_h */
+diff --git a/src/thread/openstep/SDL_syscond.c b/src/thread/openstep/SDL_syscond.c
+new file mode 100644
+index 0000000..794f10f
+--- /dev/null
++++ b/src/thread/openstep/SDL_syscond.c
+@@ -0,0 +1,137 @@
++/* SDL condition variables over OPENSTEP Mach cthreads primitives.
++ *
++ * cthreads has condition_wait() but no timed wait.  This is SDL 1.2's
++ * generic semaphore handshake implementation, used unchanged in behaviour
++ * so SDL_CondWaitTimeout() can distinguish a signal from a timeout.
++ */
++#include "SDL_config.h"
++
++#if SDL_THREAD_OPENSTEP
++
++#include "SDL_thread.h"
++
++struct SDL_cond {
++    SDL_mutex *lock;
++    int waiting;
++    int signals;
++    SDL_sem *wait_sem;
++    SDL_sem *wait_done;
++};
++
++SDL_cond *SDL_CreateCond(void)
++{
++    SDL_cond *cond;
++
++    cond = (SDL_cond *)SDL_malloc(sizeof(*cond));
++    if (cond == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    cond->lock = NULL;
++    cond->wait_sem = NULL;
++    cond->wait_done = NULL;
++    cond->waiting = 0;
++    cond->signals = 0;
++    cond->lock = SDL_CreateMutex();
++    cond->wait_sem = SDL_CreateSemaphore(0);
++    cond->wait_done = SDL_CreateSemaphore(0);
++    if ((cond->lock == NULL) || (cond->wait_sem == NULL) ||
++        (cond->wait_done == NULL)) {
++        SDL_DestroyCond(cond);
++        return NULL;
++    }
++    return cond;
++}
++
++void SDL_DestroyCond(SDL_cond *cond)
++{
++    if (cond != NULL) {
++        if (cond->wait_sem != NULL) SDL_DestroySemaphore(cond->wait_sem);
++        if (cond->wait_done != NULL) SDL_DestroySemaphore(cond->wait_done);
++        if (cond->lock != NULL) SDL_DestroyMutex(cond->lock);
++        SDL_free(cond);
++    }
++}
++
++int SDL_CondSignal(SDL_cond *cond)
++{
++    if (cond == NULL) {
++        SDL_SetError("Passed a NULL condition variable");
++        return -1;
++    }
++    SDL_LockMutex(cond->lock);
++    if (cond->waiting > cond->signals) {
++        ++cond->signals;
++        SDL_SemPost(cond->wait_sem);
++        SDL_UnlockMutex(cond->lock);
++        SDL_SemWait(cond->wait_done);
++    } else {
++        SDL_UnlockMutex(cond->lock);
++    }
++    return 0;
++}
++
++int SDL_CondBroadcast(SDL_cond *cond)
++{
++    int index;
++    int number_waiting;
++
++    if (cond == NULL) {
++        SDL_SetError("Passed a NULL condition variable");
++        return -1;
++    }
++    SDL_LockMutex(cond->lock);
++    if (cond->waiting > cond->signals) {
++        number_waiting = cond->waiting - cond->signals;
++        cond->signals = cond->waiting;
++        for (index = 0; index < number_waiting; ++index) {
++            SDL_SemPost(cond->wait_sem);
++        }
++        SDL_UnlockMutex(cond->lock);
++        for (index = 0; index < number_waiting; ++index) {
++            SDL_SemWait(cond->wait_done);
++        }
++    } else {
++        SDL_UnlockMutex(cond->lock);
++    }
++    return 0;
++}
++
++int SDL_CondWaitTimeout(SDL_cond *cond, SDL_mutex *mutex, Uint32 ms)
++{
++    int result;
++
++    if ((cond == NULL) || (mutex == NULL)) {
++        SDL_SetError("Passed a NULL condition or mutex");
++        return -1;
++    }
++    SDL_LockMutex(cond->lock);
++    ++cond->waiting;
++    SDL_UnlockMutex(cond->lock);
++
++    SDL_UnlockMutex(mutex);
++    if (ms == SDL_MUTEX_MAXWAIT) {
++        result = SDL_SemWait(cond->wait_sem);
++    } else {
++        result = SDL_SemWaitTimeout(cond->wait_sem, ms);
++    }
++
++    SDL_LockMutex(cond->lock);
++    if (cond->signals > 0) {
++        if (result > 0) SDL_SemWait(cond->wait_sem);
++        SDL_SemPost(cond->wait_done);
++        --cond->signals;
++    }
++    --cond->waiting;
++    SDL_UnlockMutex(cond->lock);
++
++    SDL_LockMutex(mutex);
++    return result;
++}
++
++int SDL_CondWait(SDL_cond *cond, SDL_mutex *mutex)
++{
++    return SDL_CondWaitTimeout(cond, mutex, SDL_MUTEX_MAXWAIT);
++}
++
++#endif /* SDL_THREAD_OPENSTEP */
+diff --git a/src/thread/openstep/SDL_sysmutex.c b/src/thread/openstep/SDL_sysmutex.c
+new file mode 100644
+index 0000000..4170f93
+--- /dev/null
++++ b/src/thread/openstep/SDL_sysmutex.c
+@@ -0,0 +1,76 @@
++/* Recursive SDL mutexes over OPENSTEP Mach cthreads mutexes. */
++#include "SDL_config.h"
++
++#if SDL_THREAD_OPENSTEP
++
++#include "SDL_thread.h"
++#include "SDL_openstepthread.h"
++
++SDL_mutex *SDL_CreateMutex(void)
++{
++    SDL_mutex *mutex;
++
++    mutex = (SDL_mutex *)SDL_malloc(sizeof(*mutex));
++    if (mutex == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    mutex->mutex = mutex_alloc();
++    if (mutex->mutex == NULL) {
++        SDL_free(mutex);
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    mutex_init(mutex->mutex);
++    mutex->owner = 0;
++    mutex->recursive = 0;
++    return mutex;
++}
++
++void SDL_DestroyMutex(SDL_mutex *mutex)
++{
++    if (mutex != NULL) {
++        if (mutex->mutex != NULL) mutex_free(mutex->mutex);
++        SDL_free(mutex);
++    }
++}
++
++int SDL_mutexP(SDL_mutex *mutex)
++{
++    Uint32 self;
++
++    if (mutex == NULL) {
++        SDL_SetError("Passed a NULL mutex");
++        return -1;
++    }
++    self = SDL_ThreadID();
++    if (mutex->owner == self) {
++        ++mutex->recursive;
++        return 0;
++    }
++    mutex_lock(mutex->mutex);
++    mutex->owner = self;
++    mutex->recursive = 0;
++    return 0;
++}
++
++int SDL_mutexV(SDL_mutex *mutex)
++{
++    if (mutex == NULL) {
++        SDL_SetError("Passed a NULL mutex");
++        return -1;
++    }
++    if (mutex->owner != SDL_ThreadID()) {
++        SDL_SetError("mutex not owned by this thread");
++        return -1;
++    }
++    if (mutex->recursive != 0) {
++        --mutex->recursive;
++    } else {
++        mutex->owner = 0;
++        mutex_unlock(mutex->mutex);
++    }
++    return 0;
++}
++
++#endif /* SDL_THREAD_OPENSTEP */
+diff --git a/src/thread/openstep/SDL_syssem.c b/src/thread/openstep/SDL_syssem.c
+new file mode 100644
+index 0000000..3ff10b4
+--- /dev/null
++++ b/src/thread/openstep/SDL_syssem.c
+@@ -0,0 +1,119 @@
++/* SDL semaphores over OPENSTEP Mach cthreads mutexes and conditions. */
++#include "SDL_config.h"
++
++#if SDL_THREAD_OPENSTEP
++
++#include "SDL_timer.h"
++#include "SDL_thread.h"
++#include "SDL_openstepthread.h"
++
++struct SDL_semaphore {
++    Uint32 count;
++    mutex_t mutex;
++    condition_t condition;
++};
++
++SDL_sem *SDL_CreateSemaphore(Uint32 initial_value)
++{
++    SDL_sem *sem;
++
++    sem = (SDL_sem *)SDL_malloc(sizeof(*sem));
++    if (sem == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    sem->mutex = mutex_alloc();
++    sem->condition = condition_alloc();
++    if ((sem->mutex == NULL) || (sem->condition == NULL)) {
++        if (sem->mutex != NULL) mutex_free(sem->mutex);
++        if (sem->condition != NULL) condition_free(sem->condition);
++        SDL_free(sem);
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    mutex_init(sem->mutex);
++    condition_init(sem->condition);
++    sem->count = initial_value;
++    return sem;
++}
++
++void SDL_DestroySemaphore(SDL_sem *sem)
++{
++    if (sem != NULL) {
++        condition_free(sem->condition);
++        mutex_free(sem->mutex);
++        SDL_free(sem);
++    }
++}
++
++int SDL_SemTryWait(SDL_sem *sem)
++{
++    int result;
++
++    if (sem == NULL) return -1;
++    mutex_lock(sem->mutex);
++    result = SDL_MUTEX_TIMEDOUT;
++    if (sem->count != 0) {
++        --sem->count;
++        result = 0;
++    }
++    mutex_unlock(sem->mutex);
++    return result;
++}
++
++int SDL_SemWaitTimeout(SDL_sem *sem, Uint32 timeout)
++{
++    Uint32 start;
++    int result;
++
++    if (sem == NULL) return -1;
++    if (timeout == 0) return SDL_SemTryWait(sem);
++    start = SDL_GetTicks();
++    mutex_lock(sem->mutex);
++    while (sem->count == 0) {
++        if (timeout != SDL_MUTEX_MAXWAIT &&
++            (SDL_GetTicks() - start) >= timeout) {
++            mutex_unlock(sem->mutex);
++            return SDL_MUTEX_TIMEDOUT;
++        }
++        if (timeout == SDL_MUTEX_MAXWAIT) {
++            condition_wait(sem->condition, sem->mutex);
++        } else {
++            mutex_unlock(sem->mutex);
++            SDL_Delay(1);
++            mutex_lock(sem->mutex);
++        }
++    }
++    --sem->count;
++    result = 0;
++    mutex_unlock(sem->mutex);
++    return result;
++}
++
++int SDL_SemWait(SDL_sem *sem)
++{
++    return SDL_SemWaitTimeout(sem, SDL_MUTEX_MAXWAIT);
++}
++
++Uint32 SDL_SemValue(SDL_sem *sem)
++{
++    Uint32 value;
++
++    if (sem == NULL) return 0;
++    mutex_lock(sem->mutex);
++    value = sem->count;
++    mutex_unlock(sem->mutex);
++    return value;
++}
++
++int SDL_SemPost(SDL_sem *sem)
++{
++    if (sem == NULL) return -1;
++    mutex_lock(sem->mutex);
++    ++sem->count;
++    condition_signal(sem->condition);
++    mutex_unlock(sem->mutex);
++    return 0;
++}
++
++#endif /* SDL_THREAD_OPENSTEP */
+diff --git a/src/thread/openstep/SDL_systhread.c b/src/thread/openstep/SDL_systhread.c
+new file mode 100644
+index 0000000..bcb5d51
+--- /dev/null
++++ b/src/thread/openstep/SDL_systhread.c
+@@ -0,0 +1,51 @@
++/* SDL 1.2 Mach cthreads implementation for OPENSTEP. */
++#include "SDL_config.h"
++
++#if SDL_THREAD_OPENSTEP
++
++#include "SDL_thread.h"
++#include "../SDL_thread_c.h"
++#include "../SDL_systhread.h"
++
++static int openstep_cthreads_started = 0;
++
++static any_t OPENSTEP_RunThread(any_t data)
++{
++    SDL_RunThread(data);
++    return (any_t)0;
++}
++
++int SDL_SYS_CreateThread(SDL_Thread *thread, void *args)
++{
++    if (!openstep_cthreads_started) {
++        cthread_init();
++        openstep_cthreads_started = 1;
++    }
++    thread->handle = cthread_fork(OPENSTEP_RunThread, (any_t)args);
++    if (thread->handle == NO_CTHREAD) {
++        SDL_SetError("cthread_fork failed");
++        return -1;
++    }
++    return 0;
++}
++
++void SDL_SYS_SetupThread(void)
++{
++}
++
++Uint32 SDL_ThreadID(void)
++{
++    return (Uint32)(unsigned long)cthread_self();
++}
++
++void SDL_SYS_WaitThread(SDL_Thread *thread)
++{
++    if (thread->handle != NO_CTHREAD) cthread_join(thread->handle);
++}
++
++void SDL_SYS_KillThread(SDL_Thread *thread)
++{
++    if (thread->handle != NO_CTHREAD) cthread_abort(thread->handle);
++}
++
++#endif /* SDL_THREAD_OPENSTEP */
+diff --git a/src/thread/openstep/SDL_systhread_c.h b/src/thread/openstep/SDL_systhread_c.h
+new file mode 100644
+index 0000000..b6e920c
+--- /dev/null
++++ b/src/thread/openstep/SDL_systhread_c.h
+@@ -0,0 +1,9 @@
++/* OPENSTEP Mach cthreads private declarations. */
++#ifndef _SDL_systhread_c_h
++#define _SDL_systhread_c_h
++
++#import <mach/cthreads.h>
++
++typedef cthread_t SYS_ThreadHandle;
++
++#endif /* _SDL_systhread_c_h */
+diff --git a/src/timer/openstep/SDL_systimer.c b/src/timer/openstep/SDL_systimer.c
+new file mode 100644
+index 0000000..6be154c
+--- /dev/null
++++ b/src/timer/openstep/SDL_systimer.c
+@@ -0,0 +1,132 @@
++/* OPENSTEP 4.2 BSD/Mach timer backend for SDL 1.2.15.
++ *
++ * OPENSTEP's BSD headers predate POSIX sigaction.  Use gettimeofday(2),
++ * select(2), signal(3), and setitimer(2), all available in the base system.
++ */
++#include "SDL_config.h"
++
++#ifdef SDL_TIMER_OPENSTEP
++
++#include <sys/time.h>
++#include <errno.h>
++#include <libc.h>
++#include <signal.h>
++
++#include "SDL_timer.h"
++#include "../SDL_timer_c.h"
++
++static struct timeval start;
++static struct timeval last_time;
++
++/* Kept non-static so the target regression can exercise the 49-day boundary
++   without changing the process clock.  This remains an internal SDL symbol. */
++Uint32 SDL_OPENSTEP_TicksFromTime(const struct timeval *origin,
++                                 const struct timeval *sample)
++{
++    long seconds;
++    long microseconds;
++
++    seconds = sample->tv_sec - origin->tv_sec;
++    microseconds = sample->tv_usec - origin->tv_usec;
++    if (microseconds < 0) {
++        --seconds;
++        microseconds += 1000000;
++    }
++    if (seconds < 0) return 0;
++    /* Uint32 arithmetic deliberately wraps at 2^32 milliseconds, as the
++       public SDL_GetTicks() contract specifies.  Avoid a signed long value
++       holding the complete millisecond interval: it overflows after 24 days
++       on OPENSTEP/i386. */
++    return ((Uint32)seconds * 1000U) + (Uint32)(microseconds / 1000);
++}
++
++void SDL_StartTicks(void)
++{
++    gettimeofday(&start, NULL);
++    last_time = start;
++}
++
++Uint32 SDL_GetTicks(void)
++{
++    struct timeval now;
++
++    gettimeofday(&now, NULL);
++    /* Clamp a backwards wall-clock adjustment before converting to Uint32.
++       Comparing tick values would incorrectly suppress the documented
++       49-day wrap. */
++    if ((now.tv_sec < last_time.tv_sec) ||
++        ((now.tv_sec == last_time.tv_sec) &&
++         (now.tv_usec < last_time.tv_usec))) {
++        now = last_time;
++    } else {
++        last_time = now;
++    }
++    return SDL_OPENSTEP_TicksFromTime(&start, &now);
++}
++
++void SDL_Delay(Uint32 ms)
++{
++    struct timeval tv;
++    Uint32 then;
++    Uint32 now;
++    Uint32 elapsed;
++    int was_error;
++
++    /* Keep the SDL 1.2 Unix backend's contract: delay at least the requested
++       interval even when SIGALRM interrupts the blocking syscall.  OPENSTEP's
++       usleep path masks that delivery, so use the BSD select declaration from
++       <libc.h> instead. */
++    then = SDL_GetTicks();
++    do {
++        now = SDL_GetTicks();
++        elapsed = now - then;
++        then = now;
++        if (elapsed >= ms) break;
++        ms -= elapsed;
++        tv.tv_sec = ms / 1000;
++        tv.tv_usec = (ms % 1000) * 1000;
++        errno = 0;
++        was_error = select(0, NULL, NULL, NULL, &tv);
++    } while (was_error && (errno == EINTR));
++}
++
++static void HandleAlarm(int sig)
++{
++    Uint32 ms;
++
++    if (SDL_alarm_callback != NULL) {
++        ms = (*SDL_alarm_callback)(SDL_alarm_interval);
++        if (ms != SDL_alarm_interval) SDL_SetTimer(ms, SDL_alarm_callback);
++    }
++}
++
++int SDL_SYS_TimerInit(void)
++{
++    signal(SIGALRM, HandleAlarm);
++    return 0;
++}
++
++void SDL_SYS_TimerQuit(void)
++{
++    SDL_SetTimer(0, NULL);
++}
++
++int SDL_SYS_StartTimer(void)
++{
++    struct itimerval timer;
++
++    timer.it_value.tv_sec = SDL_alarm_interval / 1000;
++    timer.it_value.tv_usec = (SDL_alarm_interval % 1000) * 1000;
++    timer.it_interval = timer.it_value;
++    return setitimer(ITIMER_REAL, &timer, NULL);
++}
++
++void SDL_SYS_StopTimer(void)
++{
++    struct itimerval timer;
++
++    SDL_memset(&timer, 0, sizeof(timer));
++    setitimer(ITIMER_REAL, &timer, NULL);
++}
++
++#endif /* SDL_TIMER_OPENSTEP */
+diff --git a/src/video/SDL_sysvideo.h b/src/video/SDL_sysvideo.h
+index 436450e..d052f34 100644
+--- a/src/video/SDL_sysvideo.h
++++ b/src/video/SDL_sysvideo.h
+@@ -317,6 +317,9 @@ typedef struct VideoBootStrap {
+ 	SDL_VideoDevice *(*create)(int devindex);
+ } VideoBootStrap;
+ 
++#if SDL_VIDEO_DRIVER_OPENSTEP
++extern VideoBootStrap OPENSTEP_bootstrap;
++#endif
+ #if SDL_VIDEO_DRIVER_QUARTZ
+ extern VideoBootStrap QZ_bootstrap;
+ #endif
+diff --git a/src/video/SDL_video.c b/src/video/SDL_video.c
+index 46285c9..dd6225b 100644
+--- a/src/video/SDL_video.c
++++ b/src/video/SDL_video.c
+@@ -33,6 +33,9 @@
+ 
+ /* Available video drivers */
+ static VideoBootStrap *bootstrap[] = {
++#if SDL_VIDEO_DRIVER_OPENSTEP
++	&OPENSTEP_bootstrap,
++#endif
+ #if SDL_VIDEO_DRIVER_QUARTZ
+ 	&QZ_bootstrap,
+ #endif
+diff --git a/src/video/openstep/SDL_openstepvideo.h b/src/video/openstep/SDL_openstepvideo.h
+new file mode 100644
+index 0000000..7e984bd
+--- /dev/null
++++ b/src/video/openstep/SDL_openstepvideo.h
+@@ -0,0 +1,27 @@
++/* OPENSTEP AppKit video driver private state for SDL 1.2.15. */
++#ifndef _SDL_openstepvideo_h
++#define _SDL_openstepvideo_h
++
++#include "../SDL_sysvideo.h"
++
++#define _THIS SDL_VideoDevice *this
++
++struct SDL_PrivateVideoData {
++    void *pool;
++    void *window;
++    void *view;
++    void *bitmap;
++    void *invisible_cursor;
++    unsigned char *pixels;
++    unsigned char *present_pixels;
++    int width;
++    int height;
++    int pitch;
++    int bits_per_pixel;
++    int presenting;
++    int resizable;
++    unsigned int modifier_flags;
++    SDL_Color palette[256];
++};
++
++#endif /* _SDL_openstepvideo_h */
+diff --git a/src/video/openstep/SDL_openstepvideo.m b/src/video/openstep/SDL_openstepvideo.m
+new file mode 100644
+index 0000000..da3ce6c
+--- /dev/null
++++ b/src/video/openstep/SDL_openstepvideo.m
+@@ -0,0 +1,996 @@
++/*
++ * SDL 1.2.15 OPENSTEP AppKit video driver.
++ *
++ * This deliberately exposes only a software 24bpp RGB framebuffer.  The
++ * display path is Display PostScript through NSBitmapImageRep; it never
++ * creates, opens, or depends on an X11 display.
++ */
++#include "SDL_config.h"
++
++#import <AppKit/AppKit.h>
++#import <AppKit/psopsNeXT.h>
++
++#include "SDL_video.h"
++#include "SDL_mouse.h"
++#include "SDL_active.h"
++#include "../SDL_sysvideo.h"
++#include "../SDL_cursor_c.h"
++#include "../SDL_pixels_c.h"
++#include "../../events/SDL_events_c.h"
++
++#include "SDL_openstepvideo.h"
++
++#define OPENSTEPVID_DRIVER_NAME "openstep"
++
++static int OPENSTEP_Available(void);
++static SDL_VideoDevice *OPENSTEP_CreateDevice(int devindex);
++static void OPENSTEP_DeleteDevice(_THIS);
++static int OPENSTEP_VideoInit(_THIS, SDL_PixelFormat *vformat);
++static SDL_Rect **OPENSTEP_ListModes(_THIS, SDL_PixelFormat *format,
++                                     Uint32 flags);
++static SDL_Surface *OPENSTEP_SetVideoMode(_THIS, SDL_Surface *current,
++                                          int width, int height, int bpp,
++                                          Uint32 flags);
++static int OPENSTEP_SetColors(_THIS, int firstcolor, int ncolors,
++                              SDL_Color *colors);
++static void OPENSTEP_UpdateRects(_THIS, int numrects, SDL_Rect *rects);
++static void OPENSTEP_VideoQuit(_THIS);
++static int OPENSTEP_AllocHWSurface(_THIS, SDL_Surface *surface);
++static void OPENSTEP_FreeHWSurface(_THIS, SDL_Surface *surface);
++static int OPENSTEP_LockHWSurface(_THIS, SDL_Surface *surface);
++static void OPENSTEP_UnlockHWSurface(_THIS, SDL_Surface *surface);
++static void OPENSTEP_SetCaption(_THIS, const char *title, const char *icon);
++static int OPENSTEP_IconifyWindow(_THIS);
++static SDL_GrabMode OPENSTEP_GrabInput(_THIS, SDL_GrabMode mode);
++static void OPENSTEP_InitOSKeymap(_THIS);
++static void OPENSTEP_PumpEvents(_THIS);
++static void OPENSTEP_SendKey(SDL_VideoDevice *device, NSEvent *event,
++                             Uint8 state);
++static void OPENSTEP_SendMouse(SDL_VideoDevice *device, NSEvent *event,
++                               Uint8 state, Uint8 button);
++static WMcursor *OPENSTEP_CreateWMCursor(_THIS, Uint8 *data, Uint8 *mask,
++                                         int w, int h, int hot_x, int hot_y);
++static void OPENSTEP_FreeWMCursor(_THIS, WMcursor *cursor);
++static int OPENSTEP_ShowWMCursor(_THIS, WMcursor *cursor);
++static void OPENSTEP_WarpWMCursor(_THIS, Uint16 x, Uint16 y);
++static void OPENSTEP_ResetCursorRects(SDL_VideoDevice *device, NSView *view);
++static WMcursor *OPENSTEP_CreateInvisibleCursor(_THIS);
++static SDLKey OPENSTEP_KeyForCharacter(unsigned short character);
++static SDLMod OPENSTEP_Modifiers(SDL_VideoDevice *device, NSEvent *event);
++static void OPENSTEP_ConvertSurface(_THIS, int numrects, SDL_Rect *rects);
++static void OPENSTEP_ConvertRect(_THIS, int left, int top, int right,
++                                 int bottom);
++
++/* OPENSTEP's NSCursor is the Window Server cursor, distinct from SDL's
++   software framebuffer cursor.  Keep the native object behind SDL's opaque
++   WMcursor handle so SDL core selects this path and never stamps a cursor
++   into the application's surface. */
++struct WMcursor {
++    NSCursor *cursor;
++};
++
++@interface SDL12OpenStepWindow : NSWindow
++{
++    SDL_VideoDevice *_device;
++}
++- initWithContentRect:(NSRect)contentRect styleMask:(unsigned int)style
++              backing:(NSBackingStoreType)backing defer:(BOOL)deferFlag
++              device:(SDL_VideoDevice *)device;
++@end
++
++@implementation SDL12OpenStepWindow
++
++- initWithContentRect:(NSRect)contentRect styleMask:(unsigned int)style
++              backing:(NSBackingStoreType)backing defer:(BOOL)deferFlag
++              device:(SDL_VideoDevice *)device
++{
++    self = [super initWithContentRect:contentRect styleMask:style
++                              backing:backing defer:deferFlag];
++    _device = device;
++    return self;
++}
++
++- (void)becomeKeyWindow
++{
++    [super becomeKeyWindow];
++    if (_device != NULL) {
++        SDL_PrivateAppActive(1, SDL_APPACTIVE | SDL_APPINPUTFOCUS);
++    }
++}
++
++- (void)resignKeyWindow
++{
++    [super resignKeyWindow];
++    if (_device != NULL) {
++        _device->hidden->modifier_flags = 0;
++        SDL_PrivateAppActive(0, SDL_APPACTIVE | SDL_APPINPUTFOCUS);
++    }
++}
++
++@end
++
++@interface SDL12OpenStepView : NSView
++{
++    SDL_VideoDevice *_device;
++    NSBitmapImageRep *_bitmap;
++}
++- initWithFrame:(NSRect)frame device:(SDL_VideoDevice *)device
++          bitmap:(NSBitmapImageRep *)bitmap;
++@end
++
++@implementation SDL12OpenStepView
++
++- initWithFrame:(NSRect)frame device:(SDL_VideoDevice *)device
++          bitmap:(NSBitmapImageRep *)bitmap
++{
++    [super initWithFrame:frame];
++    _device = device;
++    _bitmap = [bitmap retain];
++    return self;
++}
++
++- (void)dealloc
++{
++    [_bitmap release];
++    [super dealloc];
++}
++
++- (BOOL)isFlipped
++{
++    return YES;
++}
++
++- (BOOL)acceptsFirstResponder
++{
++    return YES;
++}
++
++- (void)drawRect:(NSRect)rect
++{
++    [_bitmap drawInRect:[self bounds]];
++    /* SDL_UpdateRects() synchronously asks AppKit to draw.  That normal
++       present is not an SDL_VIDEOEXPOSE event: SDL reserves expose for a
++       window-system redraw outside of the application's update request. */
++    if ((_device != NULL) && !_device->hidden->presenting) {
++        SDL_PrivateExpose();
++    }
++}
++
++- (void)resetCursorRects
++{
++    OPENSTEP_ResetCursorRects(_device, self);
++}
++
++- (void)keyDown:(NSEvent *)event
++{
++    OPENSTEP_SendKey(_device, event, SDL_PRESSED);
++}
++
++- (void)keyUp:(NSEvent *)event
++{
++    OPENSTEP_SendKey(_device, event, SDL_RELEASED);
++}
++
++- (void)flagsChanged:(NSEvent *)event
++{
++    /* Some OPENSTEP console input paths report modifier flags only in this
++       event, not in the following keyDown:/keyUp:.  Preserve the state on
++       the SDL video device so ordinary keys receive the right SDLMod mask. */
++    if (_device != NULL) {
++        _device->hidden->modifier_flags = [event modifierFlags];
++    }
++}
++
++- (void)mouseDown:(NSEvent *)event
++{
++    OPENSTEP_SendMouse(_device, event, SDL_PRESSED, SDL_BUTTON_LEFT);
++}
++
++- (void)mouseUp:(NSEvent *)event
++{
++    OPENSTEP_SendMouse(_device, event, SDL_RELEASED, SDL_BUTTON_LEFT);
++}
++
++- (void)rightMouseDown:(NSEvent *)event
++{
++    OPENSTEP_SendMouse(_device, event, SDL_PRESSED, SDL_BUTTON_RIGHT);
++}
++
++- (void)rightMouseUp:(NSEvent *)event
++{
++    OPENSTEP_SendMouse(_device, event, SDL_RELEASED, SDL_BUTTON_RIGHT);
++}
++
++- (void)mouseMoved:(NSEvent *)event
++{
++    NSPoint point;
++    int x;
++    int y;
++
++    point = [self convertPoint:[event locationInWindow] fromView:nil];
++    x = (int)point.x;
++    y = (int)point.y;
++    SDL_PrivateMouseMotion(0, 0, (Sint16)x, (Sint16)y);
++}
++
++- (void)mouseDragged:(NSEvent *)event
++{
++    NSPoint point;
++
++    point = [self convertPoint:[event locationInWindow] fromView:nil];
++    SDL_PrivateMouseMotion(SDL_BUTTON_LMASK, 0, (Sint16)point.x,
++                           (Sint16)point.y);
++}
++
++- (void)rightMouseDragged:(NSEvent *)event
++{
++    NSPoint point;
++
++    point = [self convertPoint:[event locationInWindow] fromView:nil];
++    SDL_PrivateMouseMotion(SDL_BUTTON_RMASK, 0, (Sint16)point.x,
++                           (Sint16)point.y);
++}
++
++- (void)windowWillClose:(NSNotification *)notification
++{
++    /* NSWindow releases itself and its content view when a user closes a
++       default OPENSTEP window.  SDL_Quit() follows this notification, so
++       leave it only the bitmap/framebuffer resources; the AppKit objects
++       must not be messaged or released a second time. */
++    if (_device != NULL) {
++        _device->hidden->window = NULL;
++        _device->hidden->view = NULL;
++    }
++    SDL_PrivateQuit();
++}
++
++- (void)windowDidResize:(NSNotification *)notification
++{
++    NSRect frame;
++    int width;
++    int height;
++
++    /* The OPENSTEP Window reference says this delegate method is delivered
++       once the user finishes resizing.  SDL 1.2 then requires the client to
++       answer SDL_VIDEORESIZE by calling SDL_SetVideoMode() again.  Ignore a
++       newly-created replacement view until SetVideoMode has installed it as
++       the device's current view. */
++    if ((_device == NULL) || !_device->hidden->resizable ||
++        (_device->hidden->view != (void *)self)) return;
++    frame = [self frame];
++    width = (int)frame.size.width;
++    height = (int)frame.size.height;
++    if ((width > 0) && (height > 0) &&
++        ((width != _device->hidden->width) ||
++         (height != _device->hidden->height))) {
++        SDL_PrivateResize(width, height);
++    }
++}
++
++@end
++
++static int OPENSTEP_Available(void)
++{
++    const char *requested;
++
++    requested = SDL_getenv("SDL_VIDEODRIVER");
++    if ((requested != NULL) &&
++        (SDL_strcasecmp(requested, OPENSTEPVID_DRIVER_NAME) != 0)) {
++        return 0;
++    }
++    return 1;
++}
++
++static void OPENSTEP_DeleteDevice(_THIS)
++{
++    SDL_free(this->hidden);
++    SDL_free(this);
++}
++
++static SDL_VideoDevice *OPENSTEP_CreateDevice(int devindex)
++{
++    SDL_VideoDevice *device;
++
++    device = (SDL_VideoDevice *)SDL_malloc(sizeof(SDL_VideoDevice));
++    if (device == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    SDL_memset(device, 0, sizeof(SDL_VideoDevice));
++    device->hidden = (struct SDL_PrivateVideoData *)SDL_malloc(
++        sizeof(struct SDL_PrivateVideoData));
++    if (device->hidden == NULL) {
++        SDL_free(device);
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    SDL_memset(device->hidden, 0, sizeof(struct SDL_PrivateVideoData));
++
++    device->VideoInit = OPENSTEP_VideoInit;
++    device->ListModes = OPENSTEP_ListModes;
++    device->SetVideoMode = OPENSTEP_SetVideoMode;
++    device->SetColors = OPENSTEP_SetColors;
++    device->UpdateRects = OPENSTEP_UpdateRects;
++    device->VideoQuit = OPENSTEP_VideoQuit;
++    device->AllocHWSurface = OPENSTEP_AllocHWSurface;
++    device->LockHWSurface = OPENSTEP_LockHWSurface;
++    device->UnlockHWSurface = OPENSTEP_UnlockHWSurface;
++    device->FreeHWSurface = OPENSTEP_FreeHWSurface;
++    device->SetCaption = OPENSTEP_SetCaption;
++    device->IconifyWindow = OPENSTEP_IconifyWindow;
++    device->GrabInput = OPENSTEP_GrabInput;
++    device->CreateWMCursor = OPENSTEP_CreateWMCursor;
++    device->FreeWMCursor = OPENSTEP_FreeWMCursor;
++    device->ShowWMCursor = OPENSTEP_ShowWMCursor;
++    device->WarpWMCursor = OPENSTEP_WarpWMCursor;
++    device->InitOSKeymap = OPENSTEP_InitOSKeymap;
++    device->PumpEvents = OPENSTEP_PumpEvents;
++    device->free = OPENSTEP_DeleteDevice;
++    return device;
++}
++
++VideoBootStrap OPENSTEP_bootstrap = {
++    OPENSTEPVID_DRIVER_NAME, "OPENSTEP AppKit video driver",
++    OPENSTEP_Available, OPENSTEP_CreateDevice
++};
++
++static int OPENSTEP_VideoInit(_THIS, SDL_PixelFormat *vformat)
++{
++    NSAutoreleasePool *pool;
++
++    pool = [[NSAutoreleasePool alloc] init];
++    this->hidden->pool = (void *)pool;
++    [NSApplication sharedApplication];
++    vformat->BitsPerPixel = 24;
++    vformat->BytesPerPixel = 3;
++    return 0;
++}
++
++static SDL_Rect **OPENSTEP_ListModes(_THIS, SDL_PixelFormat *format,
++                                     Uint32 flags)
++{
++    return (SDL_Rect **)-1;
++}
++
++static void OPENSTEP_DestroyWindow(_THIS)
++{
++    id window;
++    id bitmap;
++    unsigned char *pixels;
++    unsigned char *present_pixels;
++
++    /* Detach every pointer first.  Closing an NSWindow can deliver AppKit
++       notifications synchronously, and the close delegate calls
++       SDL_PrivateQuit() for a user-initiated close.  A shutdown-initiated
++       close must therefore neither invoke that delegate nor allow a nested
++       VideoQuit to release the same objects. */
++    window = (id)this->hidden->window;
++    bitmap = (id)this->hidden->bitmap;
++    pixels = this->hidden->pixels;
++    present_pixels = this->hidden->present_pixels;
++    this->hidden->window = NULL;
++    this->hidden->view = NULL;
++    this->hidden->bitmap = NULL;
++    this->hidden->pixels = NULL;
++    this->hidden->present_pixels = NULL;
++
++    if (window != nil) {
++        [window setDelegate:nil];
++        /* Default OPENSTEP NSWindows release themselves on close, together
++           with their content view.  Do not release either object again. */
++        [window close];
++    }
++    if (bitmap != nil) [bitmap release];
++    if (pixels != NULL) SDL_free(pixels);
++    if (present_pixels != NULL) SDL_free(present_pixels);
++}
++
++static WMcursor *OPENSTEP_CreateWMCursor(_THIS, Uint8 *data, Uint8 *mask,
++                                         int w, int h, int hot_x, int hot_y)
++{
++    WMcursor *cursor;
++    NSBitmapImageRep *representation;
++    NSImage *image;
++    unsigned char *planes[5];
++    unsigned char *pixels;
++    int source_bytes_per_row;
++    int source_index;
++    int target_index;
++    int x;
++    int y;
++    int data_bit;
++    int mask_bit;
++
++    if ((data == NULL) || (mask == NULL) || (w <= 0) || (h <= 0)) {
++        return NULL;
++    }
++    /* The OPENSTEP NXCursor reference requires at least a 16x16 image and
++       displays only a 16x16 portion of larger images.  We pad smaller SDL
++       cursors into a 16x16 native image, but reject larger cursors here so
++       SDL core deliberately selects its size-preserving software fallback. */
++    if ((w > 16) || (h > 16) || (hot_x >= 16) || (hot_y >= 16)) {
++        return NULL;
++    }
++    cursor = (WMcursor *)SDL_malloc(sizeof(WMcursor));
++    if (cursor == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    cursor->cursor = nil;
++    representation = [[NSBitmapImageRep alloc]
++        initWithBitmapDataPlanes:NULL pixelsWide:16 pixelsHigh:16
++        bitsPerSample:8 samplesPerPixel:4 hasAlpha:YES isPlanar:NO
++        colorSpaceName:NSCalibratedRGBColorSpace bytesPerRow:64
++        bitsPerPixel:32];
++    if (representation == nil) goto failed;
++    [representation getBitmapDataPlanes:planes];
++    pixels = planes[0];
++    SDL_memset(pixels, 0, 16 * 16 * 4);
++    source_bytes_per_row = (w + 7) / 8;
++    for (y = 0; (y < h) && (y < 16); ++y) {
++        for (x = 0; (x < w) && (x < 16); ++x) {
++            source_index = y * source_bytes_per_row + x / 8;
++            /* NSCursor consumes its NSImage in the documented flipped
++               upper-left cursor coordinate system.  Unlike the display
++               bitmap backing plane, its image rows must retain SDL's
++               top-to-bottom order. */
++            target_index = (y * 16 + x) * 4;
++            data_bit = data[source_index] & (0x80 >> (x & 7));
++            mask_bit = mask[source_index] & (0x80 >> (x & 7));
++            if (!mask_bit && !data_bit) continue;
++            if (data_bit) {
++                pixels[target_index] = 0;
++                pixels[target_index + 1] = 0;
++                pixels[target_index + 2] = 0;
++            } else {
++                pixels[target_index] = 255;
++                pixels[target_index + 1] = 255;
++                pixels[target_index + 2] = 255;
++            }
++            pixels[target_index + 3] = 255;
++        }
++    }
++    image = [[NSImage alloc] initWithSize:NSMakeSize(16.0, 16.0)];
++    if (image == nil) goto failed;
++    [image addRepresentation:representation];
++    [representation release];
++    representation = nil;
++    if (hot_x < 0) hot_x = 0;
++    if (hot_y < 0) hot_y = 0;
++    if (hot_x > 15) hot_x = 15;
++    if (hot_y > 15) hot_y = 15;
++    cursor->cursor = [[NSCursor alloc]
++        initWithImage:image hotSpot:NSMakePoint((float)hot_x, (float)hot_y)];
++    [image release];
++    if (cursor->cursor == nil) goto failed;
++    return cursor;
++
++failed:
++    if (representation != nil) [representation release];
++    if (cursor->cursor != nil) [cursor->cursor release];
++    SDL_free(cursor);
++    SDL_OutOfMemory();
++    return NULL;
++}
++
++static void OPENSTEP_FreeWMCursor(_THIS, WMcursor *cursor)
++{
++    if (cursor != NULL) {
++        if (cursor->cursor != nil) [cursor->cursor release];
++        SDL_free(cursor);
++    }
++}
++
++static WMcursor *OPENSTEP_CreateInvisibleCursor(_THIS)
++{
++    Uint8 transparent_data[32];
++    Uint8 transparent_mask[32];
++
++    SDL_memset(transparent_data, 0, sizeof(transparent_data));
++    SDL_memset(transparent_mask, 0, sizeof(transparent_mask));
++    return OPENSTEP_CreateWMCursor(this, transparent_data, transparent_mask,
++                                   16, 16, 0, 0);
++}
++
++static void OPENSTEP_ResetCursorRects(SDL_VideoDevice *device, NSView *view)
++{
++    SDL_Cursor *cursor;
++    WMcursor *native_cursor;
++
++    if ((device == NULL) || (view == nil)) return;
++    native_cursor = NULL;
++    if ((SDL_cursorstate & CURSOR_VISIBLE) != 0) {
++        cursor = SDL_GetCursor();
++        if (cursor != NULL) native_cursor = cursor->wm_cursor;
++    } else {
++        native_cursor = (WMcursor *)device->hidden->invisible_cursor;
++    }
++    if ((native_cursor != NULL) && (native_cursor->cursor != nil)) {
++        [view addCursorRect:[view bounds] cursor:native_cursor->cursor];
++    }
++}
++
++static int OPENSTEP_ShowWMCursor(_THIS, WMcursor *cursor)
++{
++    WMcursor *native_cursor;
++    id window;
++    id view;
++
++    native_cursor = cursor;
++    if (native_cursor == NULL) {
++        native_cursor = (WMcursor *)this->hidden->invisible_cursor;
++        if (native_cursor == NULL) {
++            native_cursor = OPENSTEP_CreateInvisibleCursor(this);
++            if (native_cursor == NULL) return 0;
++            this->hidden->invisible_cursor = (void *)native_cursor;
++        }
++    }
++    if ((native_cursor != NULL) && (native_cursor->cursor != nil)) {
++        [native_cursor->cursor set];
++    }
++    window = (id)this->hidden->window;
++    view = (id)this->hidden->view;
++    if ((window != nil) && (view != nil)) {
++        [window invalidateCursorRectsForView:view];
++    }
++    return 1;
++}
++
++static void OPENSTEP_WarpWMCursor(_THIS, Uint16 x, Uint16 y)
++{
++    id view;
++
++    view = (id)this->hidden->view;
++    if (view == nil) return;
++    if (this->hidden->width > 0) {
++        if (x >= this->hidden->width) x = this->hidden->width - 1;
++    }
++    if (this->hidden->height > 0) {
++        if (y >= this->hidden->height) y = this->hidden->height - 1;
++    }
++    /* Display PostScript's documented setmouse operator moves both mouse
++       location and cursor in the current coordinate system.  lockFocus makes
++       that system the flipped SDL view's coordinates, so no Quartz/global
++       screen conversion is involved. */
++    [view lockFocus];
++    PSsetmouse((float)x, (float)y);
++    [view unlockFocus];
++    SDL_PrivateMouseMotion(0, 0, (Sint16)x, (Sint16)y);
++}
++
++static SDL_Surface *OPENSTEP_SetVideoMode(_THIS, SDL_Surface *current,
++                                          int width, int height, int bpp,
++                                          Uint32 flags)
++{
++    SDL12OpenStepWindow *window;
++    SDL12OpenStepView *view;
++    NSBitmapImageRep *bitmap;
++    NSRect frame;
++    unsigned char *planes[1];
++    unsigned char *pixels;
++    unsigned char *present_pixels;
++    int bytes_per_pixel;
++    int pitch;
++    int present_pitch;
++
++    if ((flags & SDL_FULLSCREEN) != 0) {
++        SDL_SetError("OPENSTEP AppKit driver has no fullscreen mode yet");
++        return NULL;
++    }
++    if ((width <= 0) || (height <= 0) ||
++        ((bpp != 8) && (bpp != 16) && (bpp != 24) && (bpp != 32))) {
++        SDL_SetError("OPENSTEP AppKit driver supports 8/16/24/32bpp software surfaces");
++        return NULL;
++    }
++    bytes_per_pixel = bpp / 8;
++    pitch = width * bytes_per_pixel;
++    present_pitch = width * 3;
++    pixels = (unsigned char *)SDL_malloc((size_t)pitch * (size_t)height);
++    if (pixels == NULL) {
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    SDL_memset(pixels, 0, (size_t)pitch * (size_t)height);
++    present_pixels = (unsigned char *)SDL_malloc((size_t)present_pitch *
++                                                  (size_t)height);
++    if (present_pixels == NULL) {
++        SDL_free(pixels);
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    SDL_memset(present_pixels, 0, (size_t)present_pitch * (size_t)height);
++    planes[0] = present_pixels;
++    bitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes:planes
++                                                       pixelsWide:width
++                                                       pixelsHigh:height
++                                                    bitsPerSample:8
++                                                  samplesPerPixel:3
++                                                         hasAlpha:NO
++                                                          isPlanar:NO
++                                                colorSpaceName:NSCalibratedRGBColorSpace
++                                                   bytesPerRow:present_pitch
++                                                  bitsPerPixel:24];
++    if (bitmap == nil) {
++        SDL_free(pixels);
++        SDL_free(present_pixels);
++        SDL_SetError("OPENSTEP could not create NSBitmapImageRep");
++        return NULL;
++    }
++    frame = NSMakeRect(80.0, 80.0, (float)width, (float)height);
++    window = [[SDL12OpenStepWindow alloc]
++                initWithContentRect:frame
++                styleMask:(NSTitledWindowMask | NSClosableWindowMask |
++                           NSMiniaturizableWindowMask |
++                           (((flags & SDL_RESIZABLE) != 0) ?
++                            NSResizableWindowMask : 0))
++                backing:NSBackingStoreBuffered defer:NO device:this];
++    if (window == nil) {
++        [bitmap release];
++        SDL_free(pixels);
++        SDL_free(present_pixels);
++        SDL_SetError("OPENSTEP could not create SDL window");
++        return NULL;
++    }
++    view = [[SDL12OpenStepView alloc]
++              initWithFrame:NSMakeRect(0.0, 0.0, (float)width, (float)height)
++              device:this bitmap:bitmap];
++    if (view == nil) {
++        [window release];
++        [bitmap release];
++        SDL_free(pixels);
++        SDL_free(present_pixels);
++        SDL_OutOfMemory();
++        return NULL;
++    }
++    [window setTitle:@"SDL 1.2 OPENSTEP"];
++    [window setDelegate:view];
++    [window setContentView:view];
++    [window makeFirstResponder:view];
++    [window makeKeyAndOrderFront:nil];
++    [window setAcceptsMouseMovedEvents:YES];
++    [[NSApplication sharedApplication] activateIgnoringOtherApps:YES];
++
++    OPENSTEP_DestroyWindow(this);
++    this->hidden->window = (void *)window;
++    this->hidden->view = (void *)view;
++    this->hidden->bitmap = (void *)bitmap;
++    this->hidden->pixels = pixels;
++    this->hidden->present_pixels = present_pixels;
++    this->hidden->width = width;
++    this->hidden->height = height;
++    this->hidden->pitch = pitch;
++    this->hidden->bits_per_pixel = bpp;
++    this->hidden->resizable = ((flags & SDL_RESIZABLE) != 0);
++    /* SDL_WM_SetCaption() is valid before the first SDL_SetVideoMode().
++       SDL core retained wm_title then called SetCaption while no AppKit
++       window existed, so apply that retained value once the window does. */
++    OPENSTEP_SetCaption(this, this->wm_title, this->wm_icon);
++    [window invalidateCursorRectsForView:view];
++    if (!SDL_ReallocFormat(current, bpp,
++                           (bpp == 8) ? 0 : ((bpp == 16) ? 0x0000f800 : 0x000000ff),
++                           (bpp == 8) ? 0 : ((bpp == 16) ? 0x000007e0 : 0x0000ff00),
++                           (bpp == 8) ? 0 : ((bpp == 16) ? 0x0000001f : 0x00ff0000),
++                           0)) {
++        OPENSTEP_DestroyWindow(this);
++        SDL_SetError("OPENSTEP could not allocate SDL pixel format");
++        return NULL;
++    }
++    current->flags = SDL_SWSURFACE | (flags & SDL_RESIZABLE);
++    current->w = width;
++    current->h = height;
++    current->pitch = pitch;
++    current->pixels = pixels;
++    SDL_SetMouseRange(width, height);
++    return current;
++}
++
++static int OPENSTEP_SetColors(_THIS, int firstcolor, int ncolors,
++                              SDL_Color *colors)
++{
++    int index;
++
++    if ((firstcolor < 0) || (ncolors < 0) ||
++        ((firstcolor + ncolors) > 256) || (colors == NULL)) return 0;
++    for (index = 0; index < ncolors; ++index) {
++        this->hidden->palette[firstcolor + index] = colors[index];
++    }
++    return 1;
++}
++
++static void OPENSTEP_UpdateRects(_THIS, int numrects, SDL_Rect *rects)
++{
++    id view;
++    int index;
++    int left;
++    int top;
++    int right;
++    int bottom;
++
++    view = (id)this->hidden->view;
++    if (view == nil) return;
++    OPENSTEP_ConvertSurface(this, numrects, rects);
++    this->hidden->presenting = 1;
++    if ((numrects <= 0) || (rects == NULL)) {
++        [view display];
++    } else {
++        /* OPENSTEP NSView documents displayRect: as an immediate redraw
++           clipped to a rectangle in the receiving view's coordinate system.
++           The view is flipped, so SDL's top-left rectangles can be passed
++           directly; only the NSBitmapImageRep backing rows are reversed. */
++        for (index = 0; index < numrects; ++index) {
++            left = rects[index].x;
++            top = rects[index].y;
++            right = left + rects[index].w;
++            bottom = top + rects[index].h;
++            if (left < 0) left = 0;
++            if (top < 0) top = 0;
++            if (right > this->hidden->width) right = this->hidden->width;
++            if (bottom > this->hidden->height) bottom = this->hidden->height;
++            if ((right > left) && (bottom > top)) {
++                [view displayRect:NSMakeRect((float)left, (float)top,
++                                             (float)(right - left),
++                                             (float)(bottom - top))];
++            }
++        }
++    }
++    this->hidden->presenting = 0;
++}
++
++static void OPENSTEP_ConvertSurface(_THIS, int numrects, SDL_Rect *rects)
++{
++    int index;
++    int left;
++    int top;
++    int right;
++    int bottom;
++
++    if ((numrects <= 0) || (rects == NULL)) {
++        OPENSTEP_ConvertRect(this, 0, 0, this->hidden->width,
++                             this->hidden->height);
++        return;
++    }
++    for (index = 0; index < numrects; ++index) {
++        left = rects[index].x;
++        top = rects[index].y;
++        right = left + rects[index].w;
++        bottom = top + rects[index].h;
++        if (left < 0) left = 0;
++        if (top < 0) top = 0;
++        if (right > this->hidden->width) right = this->hidden->width;
++        if (bottom > this->hidden->height) bottom = this->hidden->height;
++        if ((right > left) && (bottom > top)) {
++            OPENSTEP_ConvertRect(this, left, top, right, bottom);
++        }
++    }
++}
++
++static void OPENSTEP_ConvertRect(_THIS, int left, int top, int right,
++                                 int bottom)
++{
++    unsigned char *source;
++    unsigned char *target;
++    Uint32 pixel;
++    Uint16 pixel16;
++    int x;
++    int y;
++    int present_y;
++    int source_offset;
++    int target_offset;
++
++    source = this->hidden->pixels;
++    target = this->hidden->present_pixels;
++    if ((source == NULL) || (target == NULL)) return;
++    for (y = top; y < bottom; ++y) {
++        /* NSBitmapImageRep stores its first data row at the lower edge.
++           SDL surface row 0 is the upper edge, so reverse only the backing
++           bitmap row here; event coordinates are already top-left. */
++        present_y = this->hidden->height - 1 - y;
++        for (x = left; x < right; ++x) {
++            source_offset = y * this->hidden->pitch;
++            target_offset = (present_y * this->hidden->width + x) * 3;
++            switch (this->hidden->bits_per_pixel) {
++            case 8:
++                pixel = source[source_offset + x];
++                target[target_offset] = this->hidden->palette[pixel].r;
++                target[target_offset + 1] = this->hidden->palette[pixel].g;
++                target[target_offset + 2] = this->hidden->palette[pixel].b;
++                break;
++            case 16:
++                pixel16 = *((Uint16 *)(source + source_offset + x * 2));
++                target[target_offset] = (Uint8)((pixel16 >> 8) & 0xf8);
++                target[target_offset + 1] = (Uint8)((pixel16 >> 3) & 0xfc);
++                target[target_offset + 2] = (Uint8)((pixel16 << 3) & 0xf8);
++                break;
++            case 24:
++                source_offset += x * 3;
++                target[target_offset] = source[source_offset];
++                target[target_offset + 1] = source[source_offset + 1];
++                target[target_offset + 2] = source[source_offset + 2];
++                break;
++            default:
++                pixel = *((Uint32 *)(source + source_offset + x * 4));
++                target[target_offset] = (Uint8)(pixel & 0xff);
++                target[target_offset + 1] = (Uint8)((pixel >> 8) & 0xff);
++                target[target_offset + 2] = (Uint8)((pixel >> 16) & 0xff);
++                break;
++            }
++        }
++    }
++}
++
++static void OPENSTEP_VideoQuit(_THIS)
++{
++    OPENSTEP_DestroyWindow(this);
++    if (this->hidden->invisible_cursor != NULL) {
++        OPENSTEP_FreeWMCursor(this,
++            (WMcursor *)this->hidden->invisible_cursor);
++        this->hidden->invisible_cursor = NULL;
++    }
++    if (this->hidden->pool != NULL) {
++        [(id)this->hidden->pool release];
++        this->hidden->pool = NULL;
++    }
++}
++
++static int OPENSTEP_AllocHWSurface(_THIS, SDL_Surface *surface)
++{
++    return -1;
++}
++
++static void OPENSTEP_FreeHWSurface(_THIS, SDL_Surface *surface)
++{
++}
++
++static int OPENSTEP_LockHWSurface(_THIS, SDL_Surface *surface)
++{
++    return 0;
++}
++
++static void OPENSTEP_UnlockHWSurface(_THIS, SDL_Surface *surface)
++{
++}
++
++static void OPENSTEP_SetCaption(_THIS, const char *title, const char *icon)
++{
++    NSString *string;
++
++    if ((this->hidden->window == NULL) || (title == NULL)) return;
++    string = [NSString stringWithCString:title];
++    if (string != nil) [(id)this->hidden->window setTitle:string];
++}
++
++static int OPENSTEP_IconifyWindow(_THIS)
++{
++    if (this->hidden->window == NULL) return 0;
++    [(id)this->hidden->window miniaturize:nil];
++    return 1;
++}
++
++static SDL_GrabMode OPENSTEP_GrabInput(_THIS, SDL_GrabMode mode)
++{
++    if (mode == SDL_GRAB_QUERY) return SDL_GRAB_OFF;
++    if (mode == SDL_GRAB_ON) {
++        SDL_SetError("OPENSTEP AppKit mouse grab is not implemented");
++    }
++    return SDL_GRAB_OFF;
++}
++
++static void OPENSTEP_InitOSKeymap(_THIS)
++{
++}
++
++static void OPENSTEP_PumpEvents(_THIS)
++{
++    NSEvent *event;
++
++    for (;;) {
++        event = [NSApp nextEventMatchingMask:NSAnyEventMask
++                                    untilDate:[NSDate distantPast]
++                                       inMode:NSDefaultRunLoopMode
++                                      dequeue:YES];
++        if (event == nil) break;
++        [NSApp sendEvent:event];
++    }
++    [NSApp updateWindows];
++}
++
++static void OPENSTEP_SendKey(SDL_VideoDevice *device, NSEvent *event,
++                             Uint8 state)
++{
++    SDL_keysym key;
++    NSString *characters;
++    unsigned short character;
++
++    SDL_memset(&key, 0, sizeof(key));
++    characters = [event characters];
++    if ([characters length] == 0) {
++        key.sym = SDLK_UNKNOWN;
++    } else {
++        character = (unsigned short)[characters characterAtIndex:0];
++        key.sym = OPENSTEP_KeyForCharacter(character);
++        key.unicode = (Uint16)character;
++    }
++    key.mod = OPENSTEP_Modifiers(device, event);
++    SDL_PrivateKeyboard(state, &key);
++}
++
++static SDLKey OPENSTEP_KeyForCharacter(unsigned short character)
++{
++    /* AppKit represents these editing/control keys as ASCII control
++       characters, while SDLKey reserves the same numeric values. */
++    switch (character) {
++    case 8: return SDLK_BACKSPACE;
++    case 9: return SDLK_TAB;
++    case 13: return SDLK_RETURN;
++    case 27: return SDLK_ESCAPE;
++    case 127: return SDLK_DELETE;
++    default: break;
++    }
++    if ((character >= 32) && (character <= 127)) return (SDLKey)character;
++    switch (character) {
++    case NSUpArrowFunctionKey: return SDLK_UP;
++    case NSDownArrowFunctionKey: return SDLK_DOWN;
++    case NSLeftArrowFunctionKey: return SDLK_LEFT;
++    case NSRightArrowFunctionKey: return SDLK_RIGHT;
++    case NSInsertFunctionKey: return SDLK_INSERT;
++    case NSDeleteFunctionKey: return SDLK_DELETE;
++    case NSHomeFunctionKey: return SDLK_HOME;
++    case NSEndFunctionKey: return SDLK_END;
++    case NSPageUpFunctionKey: return SDLK_PAGEUP;
++    case NSPageDownFunctionKey: return SDLK_PAGEDOWN;
++    case NSHelpFunctionKey: return SDLK_HELP;
++    case NSPauseFunctionKey: return SDLK_PAUSE;
++    case NSPrintFunctionKey: return SDLK_PRINT;
++    case NSClearDisplayFunctionKey: return SDLK_CLEAR;
++    case NSF1FunctionKey: return SDLK_F1;
++    case NSF2FunctionKey: return SDLK_F2;
++    case NSF3FunctionKey: return SDLK_F3;
++    case NSF4FunctionKey: return SDLK_F4;
++    case NSF5FunctionKey: return SDLK_F5;
++    case NSF6FunctionKey: return SDLK_F6;
++    case NSF7FunctionKey: return SDLK_F7;
++    case NSF8FunctionKey: return SDLK_F8;
++    case NSF9FunctionKey: return SDLK_F9;
++    case NSF10FunctionKey: return SDLK_F10;
++    case NSF11FunctionKey: return SDLK_F11;
++    case NSF12FunctionKey: return SDLK_F12;
++    case NSF13FunctionKey: return SDLK_F13;
++    case NSF14FunctionKey: return SDLK_F14;
++    case NSF15FunctionKey: return SDLK_F15;
++    default: return SDLK_UNKNOWN;
++    }
++}
++
++static SDLMod OPENSTEP_Modifiers(SDL_VideoDevice *device, NSEvent *event)
++{
++    unsigned int flags;
++    SDLMod mod;
++
++    flags = [event modifierFlags];
++    if (flags == 0) flags = device->hidden->modifier_flags;
++    mod = KMOD_NONE;
++    if (flags & NSShiftKeyMask) mod = (SDLMod)(mod | KMOD_LSHIFT);
++    if (flags & NSControlKeyMask) mod = (SDLMod)(mod | KMOD_LCTRL);
++    if (flags & NSAlternateKeyMask) mod = (SDLMod)(mod | KMOD_LALT);
++    if (flags & NSCommandKeyMask) mod = (SDLMod)(mod | KMOD_LMETA);
++    if (flags & NSAlphaShiftKeyMask) mod = (SDLMod)(mod | KMOD_CAPS);
++    if (flags & NSNumericPadKeyMask) mod = (SDLMod)(mod | KMOD_NUM);
++    if (flags & NSFunctionKeyMask) mod = (SDLMod)(mod | KMOD_MODE);
++    return mod;
++}
++
++static void OPENSTEP_SendMouse(SDL_VideoDevice *device, NSEvent *event,
++                               Uint8 state, Uint8 button)
++{
++    NSPoint point;
++    NSView *view;
++    int x;
++    int y;
++
++    view = (NSView *)device->hidden->view;
++    if (view == nil) return;
++    point = [view convertPoint:[event locationInWindow] fromView:nil];
++    x = (int)point.x;
++    y = (int)point.y;
++    SDL_PrivateMouseButton(state, button, (Sint16)x, (Sint16)y);
++}

@@ -1,63 +1,64 @@
 #!/bin/sh
 set -e
-PREFIX="$LOCAL_ROOT"
-GTAR="$PREFIX/bin/gtar"
-PATH="$PREFIX/bin:/usr/ucb:/bin:/usr/bin"
+TAR="$ROOT_DIR/usr/local/bin/gnutar"
+PATH=/usr/ucb:/bin:/usr/bin
 export PATH
 WORK=/tmp/pkg-tar.$$
 mkdir "$WORK"
-trap 'rm -rf "$WORK"' 0 1 2 3 15
+status=1
+trap 'rm -rf "$WORK"; exit "$status"' 0
+trap 'exit 1' 1 2 3 15
 cd "$WORK"
-
-[ -x "$GTAR" ]
-"$GTAR" --version | grep 'GNU tar' > /dev/null
-
-mkdir src src/sub src/emptydir
-i=0
-: > src/text.txt
-while [ $i -lt 100 ]; do
-    printf 'OPENSTEP gtar test line %d\n' "$i" >> src/text.txt
-    i=`expr $i + 1`
+"$TAR" --version
+"$TAR" --help > help
+# Fill the entire 100-byte USTAR name field (no terminating NUL).
+name=0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+echo 'complete filename' > "$name"
+"$TAR" --format=ustar -cf exact.tar "$name"
+mkdir exact
+"$TAR" -xf exact.tar -C exact
+cmp "$name" "exact/$name"
+# Archive owners may exceed OPENSTEP's 16-bit uid_t/gid_t even when ignored.
+cat > owners.c <<'EOF'
+#include <stdio.h>
+#include <string.h>
+int main(void)
+{
+    unsigned char header[512];
+    unsigned int sum = 0;
+    int i;
+    FILE *f = fopen("owners.tar", "r+b");
+    if (!f || fread(header, 1, sizeof header, f) != sizeof header) return 1;
+    sprintf((char *)header + 108, "%07o", 197609);
+    sprintf((char *)header + 116, "%07o", 197609);
+    memset(header + 148, ' ', 8);
+    for (i = 0; i < sizeof header; i++) sum += header[i];
+    sprintf((char *)header + 148, "%06o", sum);
+    if (fseek(f, 0L, SEEK_SET) != 0) return 1;
+    if (fwrite(header, 1, sizeof header, f) != sizeof header) return 1;
+    return fclose(f) != 0;
+}
+EOF
+/bin/cc -o owners owners.c
+for format in v7 ustar gnu; do
+    "$TAR" --format="$format" -cf owners.tar help
+    ./owners
+    "$TAR" --numeric-owner -tvf owners.tar > owners.list
+    grep '197609/197609' owners.list
+    "$TAR" --numeric-owner --no-same-owner -xf owners.tar -C exact
+    cmp help exact/help
 done
-printf 'second\n' > src/sub/second.txt
-printf 'name with spaces\n' > "src/sub/a file.txt"
-cp /bin/ls src/binary
-ln -s sub/second.txt src/link
-
-# Create, list and extract; directory contents must survive a round trip.
-"$GTAR" -cf archive.tar src
-"$GTAR" -tf archive.tar | grep 'src/sub/second.txt' > /dev/null
-test "`"$GTAR" -tf archive.tar | wc -l | tr -d ' '`" -ge 6
-mkdir out
-"$GTAR" -xf archive.tar -C out
-cmp src/text.txt out/src/text.txt
-cmp src/sub/second.txt out/src/sub/second.txt
-cmp "src/sub/a file.txt" "out/src/sub/a file.txt"
-cmp src/binary out/src/binary
-[ -d out/src/emptydir ]
-[ -h out/src/link ]
-test "`ls -l out/src/link | sed 's/.* -> //'`" = sub/second.txt
-
-# Reading directory entries correctly: names must come out intact.
-"$GTAR" -tf archive.tar | sort > listing
-grep '^src/$' listing > /dev/null
-grep '^src/binary$' listing > /dev/null
-grep '^src/sub/a file.txt$' listing > /dev/null
-
-# gzip filter, --exclude, append and --directory.
-"$GTAR" -czf archive.tgz src
-"$GTAR" -tzf archive.tgz | grep 'src/text.txt' > /dev/null
-mkdir out2
-"$GTAR" -xzf archive.tgz -C out2
-cmp src/text.txt out2/src/text.txt
-"$GTAR" -cf noexcl.tar --exclude='*.txt' src
-"$GTAR" -tf noexcl.tar | grep 'text.txt' > /dev/null && exit 1
-"$GTAR" -tf noexcl.tar | grep 'src/binary' > /dev/null
-printf 'later\n' > later.txt
-"$GTAR" -rf archive.tar later.txt
-"$GTAR" -tf archive.tar | grep '^later.txt$' > /dev/null
-"$GTAR" -cf viadir.tar -C src sub
-"$GTAR" -tf viadir.tar | grep '^sub/second.txt$' > /dev/null
-
-# Archives from stdin/stdout.
-"$GTAR" -cf - src | "$GTAR" -tf - | grep 'src/text.txt' > /dev/null
+# Exercise GNU long-name extensions, PAX headers, gzip, and link copying.
+mkdir "$name.dir"
+cp "$name" "$name.dir/$name"
+ln -s "$name" "$name.dir/link"
+for format in gnu posix; do
+    "$TAR" --format="$format" -czf "$format.tar.gz" "$name.dir"
+    mkdir "$format"
+    "$TAR" -xzf "$format.tar.gz" -C "$format"
+    cmp "$name" "$format/$name.dir/$name"
+    cmp "$name" "$format/$name.dir/link"
+done
+cp help bad.tar
+if "$TAR" -tf bad.tar > /dev/null 2>&1; then exit 1; fi
+status=0

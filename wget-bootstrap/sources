@@ -1,0 +1,3 @@
+# https://mirrors.kernel.org/gnu/wget/wget-1.19.5.tar.gz
+wget-1.19.5.tar.gz
+wget-1.19.5-openstep.patch wget-1.19.5

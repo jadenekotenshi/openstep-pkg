@@ -1,0 +1,90 @@
+--- a/lib/system.h
++++ b/lib/system.h
+@@ -497,6 +497,9 @@
+ #include <savedir.h>
+ #include <unlocked-io.h>
+ #include <xalloc.h>
++#ifdef NeXT
++# define strdup xstrdup
++#endif
+ 
+ #include <gettext.h>
+ #define _(msgid) gettext (msgid)
+--- a/lib/argp-fmtstream.c
++++ b/lib/argp-fmtstream.c
+@@ -47,6 +47,38 @@
+ 
+ #define INIT_BUF_SIZE 200
+ #define PRINTF_SIZE_GUESS 150
++
++#ifdef NeXT
++/* OPENSTEP has no vsnprintf; its vfprintf returns zero on success. */
++static int
++next_vsnprintf (char *buf, size_t size, const char *fmt, va_list args)
++{
++  FILE *stream = tmpfile ();
++  long length;
++  size_t count;
++  if (!stream)
++    return -1;
++  if (vfprintf (stream, fmt, args) < 0 || fflush (stream) != 0
++      || (length = ftell (stream)) < 0
++      || fseek (stream, 0L, SEEK_SET) != 0)
++    {
++      fclose (stream);
++      return -1;
++    }
++  count = size ? (length < size ? length : size - 1) : 0;
++  if (fread (buf, 1, count, stream) != count)
++    {
++      fclose (stream);
++      return -1;
++    }
++  if (size)
++    buf[count] = '\0';
++  fclose (stream);
++  return length;
++}
++# undef __vsnprintf
++# define __vsnprintf next_vsnprintf
++#endif
+ 
+ /* Return an argp_fmtstream that outputs to STREAM, and which prefixes lines
+    written on it with LMARGIN spaces and limits them to RMARGIN columns
+@@ -421,6 +453,8 @@
+       avail = fs->end - fs->p;
+       out = __vsnprintf (fs->p, avail, fmt, args);
+       va_end (args);
++      if (out < 0)
++	return -1;
+       if ((size_t) out >= avail)
+ 	size_guess = out + 1;
+     }
+--- a/src/extract.c
++++ b/src/extract.c
+@@ -619,7 +619,8 @@
+   char *file_name;
+ 
+   set_next_block_after (current_header);
+-  decode_header (current_header, &current_stat_info, &current_format, 1);
++  decode_header (current_header, &current_stat_info, &current_format,
++                 0 < same_owner_option);
+ 
+   if (interactive_option && !confirm ("extract", current_stat_info.file_name))
+     {
+--- a/src/list.c
++++ b/src/list.c
+@@ -562,8 +562,11 @@
+ 
+   if (format == V7_FORMAT)
+     {
+-      stat_info->stat.st_uid = UID_FROM_HEADER (header->header.uid);
+-      stat_info->stat.st_gid = GID_FROM_HEADER (header->header.gid);
++      if (do_user_group)
++        {
++          stat_info->stat.st_uid = UID_FROM_HEADER (header->header.uid);
++          stat_info->stat.st_gid = GID_FROM_HEADER (header->header.gid);
++        }
+       stat_info->stat.st_rdev = 0;
+     }
+   else

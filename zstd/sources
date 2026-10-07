@@ -1,2 +1,2 @@
-zstd-1.5.7.tar.gz
+https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz
 zstd-1.5.7-openstep.patch zstd-1.5.7
