@@ -31,6 +31,10 @@ export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED
 #include <sys/types.h>
 #include <sys/dir.h>
 #define dirent direct
+/* BSD <sys/dir.h> defines rewinddir() as a macro; gnulib declares a function. */
+#ifdef rewinddir
+# undef rewinddir
+#endif
 #endif
 SEOF
 
