@@ -53,7 +53,7 @@ has not been attempted.
 | libpng | validated | validated |
 | libsvgtiny | validated | — |
 | libwapcaplet | validated | — |
-| libxml2 | 2.15.4 untested (2.9.14 was validated on x86) | — |
+| libxml2 | validated on x86 (2.15.4: build, install, test) | — |
 | lua | validated | — |
 | lz4 | validated | — |
 | m4 | validated | validated |
