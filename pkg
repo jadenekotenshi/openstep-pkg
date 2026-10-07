@@ -233,16 +233,21 @@ EOF
 
 # Record the optional options this build saw, so a later change to pkg.conf can
 # be noticed ("built without HAVE_X11; reinstall to enable").
-write_features() {
+write_features_to() {
+    wf_file=$1
     rq_list=`read_requires "$PKG_DIR" "$PKG_NAME"` || exit 1
-    rm -f "$INST_DIR/features"
+    rm -f "$wf_file"
     while read rq_kind rq_opt; do
         [ "x$rq_kind" = xoptional ] || continue
         rq_val=`option_value "$rq_opt"`
-        echo "$rq_opt=$rq_val" >> "$INST_DIR/features"
+        echo "$rq_opt=$rq_val" >> "$wf_file"
     done <<EOF
 $rq_list
 EOF
+}
+
+write_features() {
+    write_features_to "$INST_DIR/features"
 }
 
 # Print the optional options whose value now differs from the recorded build.
@@ -265,11 +270,29 @@ usage:
   pkg download <package-dir>
   pkg build <package-dir>
   pkg install <package-dir>...
+  pkg reinstall <package-dir>...    (alias: forceinstall)
+  pkg binpkg <package-dir>...
+  pkg installpkg <file>...
   pkg list
   pkg remove <name>
   pkg test <name>...
   pkg arch
   pkg config
+
+install actions:
+  install      builds and installs a package and what it depends on; a package
+               already installed at the same version is skipped
+  reinstall    rebuilds and installs the named package even when it is already
+               installed at that version (its dependencies are only installed
+               when missing)
+  binpkg       builds a package like install does, but instead of installing it
+               writes <name>-<version>-<arch>.binpkg.tar.gz (into PKG_BINPKG_DIR,
+               default the current directory); dependencies are installed first,
+               as the build needs them
+  installpkg   installs such a file: it replaces any installed version, copies
+               the files in, records the package database and runs post-install,
+               as install does.  It refuses a package built for another PKG_ARCH,
+               and one whose dependencies are not installed
 
 configuration:
   pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
@@ -523,6 +546,11 @@ load_pkg() {
     [ -n "$PKG_VERSION" ] || die "version file did not contain a version"
     [ -z "$PKG_VERSION_EXTRA" ] || die "version file must contain exactly one field"
 
+    set_paths
+}
+
+# Work out the install, cache and database locations for PKG_NAME.
+set_paths() {
     ROOT_DIR=`default_value "$PKG_ROOT" "/"`
     ROOT_DIR=`trim_slash "$ROOT_DIR"`
     LOCAL_ROOT=$ROOT_DIR/usr/local
@@ -1092,11 +1120,18 @@ write_manifest() {
     ) > "$INST_DIR/manifest"
 
     echo "$PKG_VERSION" > "$INST_DIR/version"
-    write_features
+    if [ -n "$FEATURES_FILE" ]; then
+        rm -f "$INST_DIR/features"
+        if [ -f "$FEATURES_FILE" ]; then
+            cp "$FEATURES_FILE" "$INST_DIR/features"
+        fi
+    else
+        write_features
+    fi
 
     for hook in pre-remove post-install test; do
-        if [ -f "$PKG_DIR/$hook" ]; then
-            cp "$PKG_DIR/$hook" "$INST_DIR/$hook"
+        if [ -f "$HOOK_DIR/$hook" ]; then
+            cp "$HOOK_DIR/$hook" "$INST_DIR/$hook"
             chmod +x "$INST_DIR/$hook" 2>/dev/null || :
         else
             rm -f "$INST_DIR/$hook"
@@ -1158,6 +1193,9 @@ restore_install_context() {
 
 install_pkg() {
     pkg_arg=$1
+    # Only the package named on the command line is forced, not its dependencies.
+    install_force=$PKG_FORCE
+    PKG_FORCE=0
     saved_install_stack=$PKG_INSTALL_STACK
     saved_pkg_dir=$PKG_DIR
     saved_pkg_name=$PKG_NAME
@@ -1191,7 +1229,7 @@ install_pkg() {
     install_depends
     check_depends
 
-    if installed_same_version; then
+    if [ "x$install_force" != x1 ] && installed_same_version; then
         log "already installed: $PKG_NAME $PKG_VERSION"
         stale=`stale_features "$INST_DIR"`
         if [ -n "$stale" ]; then
@@ -1204,16 +1242,39 @@ install_pkg() {
 
     check_build_shell
 
+    if [ "x$install_force" = x1 ]; then
+        log "reinstalling $PKG_NAME $PKG_VERSION: rebuilding it"
+        clean_image_cache
+    fi
+
+    build_or_reuse_image
+
+    HOOK_DIR=$PKG_DIR
+    FEATURES_FILE=
+    commit_install
+
+    restore_install_context
+}
+
+# Build the package into its staged image unless one is already there.
+build_or_reuse_image() {
     if [ ! -d "$IMAGE_DIR" ] || [ -z "`find "$IMAGE_DIR" -print 2>/dev/null | sed 1d`" ]; then
         run_build
     else
         log "using existing staged image $IMAGE_DIR"
     fi
+}
 
+# Install the staged image of PKG_NAME into ROOT_DIR, replacing any installed
+# version, record it in the package database and run its post-install hook.
+# HOOK_DIR holds the package's hooks; FEATURES_FILE, when set, is the recorded
+# feature list to keep (otherwise it is worked out from PKG_DIR).  Shared by
+# install, reinstall and installpkg.
+commit_install() {
     if [ -d "$INST_DIR" ]; then
         log "replacing installed package $PKG_NAME"
         remove_name "$PKG_NAME"
-        load_pkg "$pkg_arg"
+        set_paths
     fi
 
     log_install_contents
@@ -1231,16 +1292,223 @@ install_pkg() {
 
     clean_image_cache
     log "installed $PKG_NAME $PKG_VERSION"
-
-    restore_install_context
 }
 
 install_pkgs() {
-    [ $# -ge 1 ] || die "install requires at least one <package-dir>"
+    [ $# -ge 1 ] || die "$ACTION requires at least one <package-dir>"
 
     for pkg_arg
     do
+        PKG_FORCE=$FORCE_INSTALL
         install_pkg "$pkg_arg"
+    done
+}
+
+# --- binary packages -------------------------------------------------------
+#
+# A binary package is a gzipped tar of a built package's staged image, plus a
+# .pkg/ directory at its top with what installpkg needs:
+#   format  name  version  arch  target   identification
+#   depends     the resolved depends entries (!name = conflicts)
+#   requires    pkg.conf options the package needs
+#   features    optional options it was built with
+#   post-install, pre-remove, test   the package's hooks, when it has them
+# installpkg then does what install does after the build: it replaces any
+# installed version, copies the files in, records the package database and
+# runs post-install.
+
+write_resolved_depends() {
+    [ -f "$PKG_DIR/depends" ] || return 0
+
+    while read rd_dep rd_extra || [ -n "$rd_dep" ]; do
+        rd_dep=`dep_resolve "$rd_dep"` || exit 1
+        case $rd_dep in
+            ''|\#*)
+                continue
+            ;;
+        esac
+        echo "$rd_dep"
+    done < "$PKG_DIR/depends"
+}
+
+binpkg_pkg() {
+    pkg_arg=$1
+
+    load_pkg "$pkg_arg"
+    check_requires_tree "$PKG_DIR"
+
+    PKG_INSTALL_STACK=$PKG_INSTALL_STACK:$PKG_NAME
+    export PKG_INSTALL_STACK
+
+    log "starting binary package build for $PKG_NAME"
+    install_depends
+    check_depends
+    check_build_shell
+    build_or_reuse_image
+
+    bp_dir=`default_value "$PKG_BINPKG_DIR" "."`
+    ensure_dir "$bp_dir"
+    bp_dir=`cd "$bp_dir" && pwd`
+    bp_file=$bp_dir/$PKG_NAME-$PKG_VERSION-$PKG_ARCH.binpkg.tar.gz
+
+    bp_meta=$IMAGE_DIR/.pkg
+    [ ! -e "$bp_meta" ] || die "$PKG_NAME's image already contains a .pkg: $bp_meta"
+    mkdir "$bp_meta"
+
+    echo 1 > "$bp_meta/format"
+    echo "$PKG_NAME" > "$bp_meta/name"
+    echo "$PKG_VERSION" > "$bp_meta/version"
+    echo "$PKG_ARCH" > "$bp_meta/arch"
+    echo "$PKG_TARGET" > "$bp_meta/target"
+    write_resolved_depends > "$bp_meta/depends"
+    write_features_to "$bp_meta/features"
+    if [ -f "$PKG_DIR/requires" ]; then
+        cp "$PKG_DIR/requires" "$bp_meta/requires"
+    fi
+    for hook in pre-remove post-install test; do
+        if [ -f "$PKG_DIR/$hook" ]; then
+            cp "$PKG_DIR/$hook" "$bp_meta/$hook"
+        fi
+    done
+
+    log "writing $bp_file"
+    rm -f "$bp_file"
+    (
+        cd "$IMAGE_DIR"
+        pkg_tar -czf "$bp_file" .
+    ) || { rm -rf "$bp_meta"; rm -f "$bp_file"; die "could not write $bp_file"; }
+    rm -rf "$bp_meta"
+
+    clean_image_cache
+    log "wrote binary package $bp_file"
+}
+
+binpkg_pkgs() {
+    [ $# -ge 1 ] || die "binpkg requires at least one <package-dir>"
+
+    for pkg_arg
+    do
+        ( binpkg_pkg "$pkg_arg" ) < /dev/null || exit 1
+    done
+}
+
+# Print the first line of one of a binary package's .pkg/ metadata files.
+binpkg_field() {
+    bf_line=`pkg_tar -xzOf "$1" "./.pkg/$2" 2>/dev/null | sed 1q` || :
+    echo "$bf_line"
+}
+
+binpkg_check_requires() {
+    bc_meta=$1
+    [ -f "$bc_meta/requires" ] || return 0
+
+    bc_list=`read_requires "$bc_meta" "$PKG_NAME"` || exit 1
+    bc_bad=
+    while read bc_kind bc_opt; do
+        [ "x$bc_kind" = xrequired ] || continue
+        bc_val=`option_value "$bc_opt"`
+        if [ "x$bc_val" != x1 ]; then
+            bc_bad="$bc_bad $bc_opt"
+        fi
+    done <<EOF
+$bc_list
+EOF
+    if [ -n "$bc_bad" ]; then
+        clean_image_cache
+        die "$PKG_NAME needs these pkg.conf options set to 1:$bc_bad"
+    fi
+}
+
+binpkg_check_depends() {
+    bd_meta=$1
+    [ -f "$bd_meta/depends" ] || return 0
+
+    bd_missing=
+    bd_conflicts=
+    while read bd_dep bd_extra || [ -n "$bd_dep" ]; do
+        case $bd_dep in
+            ''|\#*)
+                continue
+            ;;
+        esac
+        bd_pkg=`dep_name "$bd_dep"`
+        if dep_is_negative "$bd_dep"; then
+            if [ -d "$DB_ROOT/installed/$bd_pkg" ]; then
+                bd_conflicts="$bd_conflicts $bd_pkg"
+            fi
+        elif [ ! -d "$DB_ROOT/installed/$bd_pkg" ]; then
+            bd_missing="$bd_missing $bd_pkg"
+        fi
+    done < "$bd_meta/depends"
+
+    if [ -n "$bd_missing" ]; then
+        clean_image_cache
+        die "missing dependencies for $PKG_NAME (install them first):$bd_missing"
+    fi
+    if [ -n "$bd_conflicts" ]; then
+        clean_image_cache
+        die "conflicting installed packages for $PKG_NAME:$bd_conflicts"
+    fi
+}
+
+installpkg_file() {
+    ip_file=$1
+    [ -f "$ip_file" ] || die "binary package not found: $ip_file"
+    case $ip_file in
+        /*)
+        ;;
+        *)
+            ip_file=`pwd`/$ip_file
+        ;;
+    esac
+
+    ip_format=`binpkg_field "$ip_file" format`
+    [ "x$ip_format" = x1 ] ||
+        die "not a binary package made by this pkg (format '$ip_format'): $ip_file"
+
+    PKG_NAME=`binpkg_field "$ip_file" name`
+    PKG_VERSION=`binpkg_field "$ip_file" version`
+    ip_arch=`binpkg_field "$ip_file" arch`
+    case $PKG_NAME in
+        ''|*/*|.*)
+            die "invalid package name in $ip_file: '$PKG_NAME'"
+        ;;
+    esac
+    [ -n "$PKG_VERSION" ] || die "no version in $ip_file"
+    [ "x$ip_arch" = "x$PKG_ARCH" ] ||
+        die "$PKG_NAME was built for $ip_arch, this machine is $PKG_ARCH"
+
+    PKG_DIR=
+    set_paths
+    log "starting install of binary package $PKG_NAME $PKG_VERSION from $ip_file"
+
+    clean_image_cache
+    ensure_dir "$IMAGE_DIR"
+    pkg_tar -xzpf "$ip_file" -C "$IMAGE_DIR" ||
+        { clean_image_cache; die "could not unpack $ip_file"; }
+
+    ip_meta=$CACHE_ROOT/binpkg-meta/$PKG_NAME
+    rm -rf "$ip_meta"
+    ensure_dir "$CACHE_ROOT/binpkg-meta"
+    [ -d "$IMAGE_DIR/.pkg" ] ||
+        { clean_image_cache; die "$ip_file has no .pkg metadata"; }
+    mv "$IMAGE_DIR/.pkg" "$ip_meta"
+
+    binpkg_check_requires "$ip_meta"
+    binpkg_check_depends "$ip_meta"
+
+    HOOK_DIR=$ip_meta
+    FEATURES_FILE=$ip_meta/features
+    commit_install
+    rm -rf "$ip_meta"
+}
+
+installpkg_files() {
+    [ $# -ge 1 ] || die "installpkg requires at least one <file>"
+
+    for ip_arg
+    do
+        ( installpkg_file "$ip_arg" ) < /dev/null || exit 1
     done
 }
 
@@ -1359,6 +1627,10 @@ remove_name() {
 # function call, so take what we need from them before calling anything.
 ACTION=$1
 ARGC=$#
+FORCE_INSTALL=0
+PKG_FORCE=0
+HOOK_DIR=
+FEATURES_FILE=
 ARG2=$2
 if [ $# -gt 1 ]; then
     shift
@@ -1401,7 +1673,21 @@ case $ACTION in
     ;;
 
     install)
+        FORCE_INSTALL=0
         install_pkgs $PKG_ARGS
+    ;;
+
+    reinstall|forceinstall)
+        FORCE_INSTALL=1
+        install_pkgs $PKG_ARGS
+    ;;
+
+    binpkg)
+        binpkg_pkgs $PKG_ARGS
+    ;;
+
+    installpkg)
+        installpkg_files $PKG_ARGS
     ;;
 
     list)
