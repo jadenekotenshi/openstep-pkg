@@ -168,3 +168,85 @@ ostep_strncmp(const char *a, const char *b, size_t n)
 CSEOF
     echo "-include $cs_dir/ostep-cmp.h"
 }
+
+# pkg_cmp_obj DIR
+# The same fix as pkg_cmp_shim, for packages whose gnulib wrappers cannot be
+# preceded by a forced -include (they insist on config.h coming first): writes
+# DIR/ostep-cmp.c with unsigned memcmp(), strcmp() and strncmp() definitions,
+# compiles it with $CC, and prints the object's path.  Add that to LDFLAGS at
+# make time: the program's own definitions win over libc's.  Prints nothing on
+# machines whose libc is fine, or with PKG_UNSIGNED_CMP=0 (=1 forces it on).
+pkg_cmp_obj() {
+    co_dir=$1
+
+    case ${PKG_UNSIGNED_CMP-} in
+        0)
+            return 0
+        ;;
+        1)
+            :
+        ;;
+        *)
+            [ "${PKG_ARCH-}" = sparc ] || return 0
+        ;;
+    esac
+
+    [ -d "$co_dir" ] || mkdir "$co_dir" || return 1
+    /bin/cat > "$co_dir/ostep-cmp.c" <<'COEOF'
+#include <stddef.h>
+
+int
+memcmp(a, b, n)
+    const void *a;
+    const void *b;
+    size_t n;
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (n-- > 0) {
+        if (*p != *q)
+            return *p < *q ? -1 : 1;
+        p++;
+        q++;
+    }
+    return 0;
+}
+
+int
+strcmp(a, b)
+    const char *a;
+    const char *b;
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (*p != 0 && *p == *q) {
+        p++;
+        q++;
+    }
+    return *p == *q ? 0 : (*p < *q ? -1 : 1);
+}
+
+int
+strncmp(a, b, n)
+    const char *a;
+    const char *b;
+    size_t n;
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (n > 0 && *p != 0 && *p == *q) {
+        p++;
+        q++;
+        n--;
+    }
+    if (n == 0)
+        return 0;
+    return *p == *q ? 0 : (*p < *q ? -1 : 1);
+}
+COEOF
+    $CC -fno-builtin -O -c "$co_dir/ostep-cmp.c" -o "$co_dir/ostep-cmp.o" || return 1
+    echo "$co_dir/ostep-cmp.o"
+}
