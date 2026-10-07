@@ -81,7 +81,7 @@ has not been attempted.
 | python311 | validated | — |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | — |
 | quickjs | validated | — |
-| roboclient | validated | — |
+| roboclient | 1.0 validated; 1.1 adds `rc.dhcp` (tested on Linux, not yet on OPENSTEP) | — |
 | rsync | validated | — |
 | sdl12 | validated | — |
 | sed | validated | validated (with pkg_cmp_shim) |
