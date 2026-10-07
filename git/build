@@ -29,6 +29,7 @@ export PATH CC CFLAGS LDFLAGS CONFIG_SHELL SHELL_PATH GREP AWK
 # may not provide, and tigerbrew carries the same fix for big-endian PowerPC.
 /bin/cat > endian-probe.c <<'EPEOF'
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <netinet/in.h>
 int main(void)
@@ -46,6 +47,14 @@ int main(void)
 #ifdef __sparc
     printf("__sparc defined\n");
 #endif
+    {
+        unsigned char hi[2], lo[2];
+        hi[0] = 0xff; hi[1] = 0;
+        lo[0] = 0x01; lo[1] = 0;
+        printf("libc: memcmp(0xff, 0x01) %s, strcmp %s\n",
+            memcmp(hi, lo, 1) > 0 ? "unsigned (correct)" : "SIGNED (wrong)",
+            strcmp((char *) hi, (char *) lo) > 0 ? "unsigned (correct)" : "SIGNED (wrong)");
+    }
     return p[0] == 1 ? 3 : 0;
 }
 EPEOF
