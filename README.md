@@ -71,6 +71,11 @@ records the package database and runs `post-install`, exactly as `install` does 
 build.  It needs `gnutar` and `gzip` (the `tar` and `gzip` packages), and checks the
 package's required `pkg.conf` options against the machine's.
 
+Binary packages are checked before anything is read from them: `binpkg` writes
+`<file>.sha256` next to the archive, and `installpkg` refuses a package whose SHA-256 does not
+match it, or that has no checksum.  Give the expected hash with `PKG_SHA256=<hex>` when the
+`.sha256` file does not travel with the package, or skip the check with `PKG_NO_VERIFY=1`.
+
 ## Configuration
 
 Site options live outside the package tree in `/usr/local/etc/pkg.conf` (under `PKG_ROOT`

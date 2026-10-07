@@ -291,8 +291,11 @@ install actions:
                as the build needs them
   installpkg   installs such a file: it replaces any installed version, copies
                the files in, records the package database and runs post-install,
-               as install does.  It refuses a package built for another PKG_ARCH,
-               and one whose dependencies are not installed
+               as install does.  It first checks the file's SHA-256 against
+               <file>.sha256 (written by binpkg) or PKG_SHA256, and refuses a
+               package that fails, or has no checksum, unless PKG_NO_VERIFY=1.
+               It also refuses a package built for another PKG_ARCH, and one
+               whose dependencies are not installed
 
 configuration:
   pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
@@ -1403,8 +1406,13 @@ binpkg_pkg() {
     ) || { rm -rf "$bp_meta"; rm -f "$bp_file"; die "could not write $bp_file"; }
     rm -rf "$bp_meta"
 
+    # The checksum travels with the package; installpkg refuses a package
+    # whose SHA-256 it cannot check.
+    bp_hash=`hash_file "$bp_file"` || die "could not checksum $bp_file"
+    echo "$bp_hash  `path_leaf "$bp_file"`" > "$bp_file.sha256"
+
     clean_image_cache
-    log "wrote binary package $bp_file"
+    log "wrote binary package $bp_file (sha256 $bp_hash)"
 }
 
 binpkg_pkgs() {
@@ -1485,6 +1493,24 @@ installpkg_file() {
             ip_file=`pwd`/$ip_file
         ;;
     esac
+
+    # Check the package before reading anything out of it.  The expected hash
+    # is PKG_SHA256, or the one in <file>.sha256 that binpkg wrote.
+    # PKG_NO_VERIFY=1 skips the check.
+    if [ "x$PKG_NO_VERIFY" != x1 ]; then
+        ip_want=$PKG_SHA256
+        if [ -z "$ip_want" ] && [ -f "$ip_file.sha256" ]; then
+            read ip_want ip_want_rest < "$ip_file.sha256"
+        fi
+        [ -n "$ip_want" ] ||
+            die "no checksum for $ip_file: put its SHA-256 in $ip_file.sha256 (binpkg writes one), set PKG_SHA256, or set PKG_NO_VERIFY=1 to install it unchecked"
+        ip_got=`hash_file "$ip_file"` || die "could not checksum $ip_file"
+        [ "x$ip_got" = "x$ip_want" ] ||
+            die "SHA-256 mismatch for $ip_file (expected $ip_want, got $ip_got); not installing it"
+        log "verified $ip_file"
+    else
+        log "warning: installing $ip_file without verifying it (PKG_NO_VERIFY=1)"
+    fi
 
     ip_format=`binpkg_field "$ip_file" format`
     [ "x$ip_format" = x1 ] ||
