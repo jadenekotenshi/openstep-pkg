@@ -9,7 +9,12 @@ GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
 export PATH CC CFLAGS AWK GREP EGREP
 . "$PKG_BUILD_HELPERS"
+
+# OPENSTEP's SPARC libc compares bytes as signed in memcmp() and strcmp(); see
+# pkg_cmp_shim in build-helpers.sh.  Empty on x86.  It is forced in at make
+# time only: configure's own tests do not cope with it.
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/openstep-cmp"`
 run_configure --build=$PKG_TARGET --prefix=/usr/local \
     --disable-nls --disable-dependency-tracking
-/bin/gnumake SHELL="$CONFIG_SHELL"
-/bin/gnumake SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"
+/bin/gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS" SHELL="$CONFIG_SHELL"
+/bin/gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS" SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"

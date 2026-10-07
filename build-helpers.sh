@@ -88,3 +88,83 @@ pkg_apply_patch() {
     patch -p$pkg_patch_strip < "$pkg_patch_file"
     /bin/cp "$pkg_patch_file" "$pkg_patch_copy"
 }
+
+# pkg_cmp_shim DIR
+# OPENSTEP's SPARC libc compares bytes as signed in memcmp() (for 20 bytes, and
+# so for any word-sized and larger input) and strcmp(), so data with bytes of
+# 0x80 or more sorts wrongly: git's pack indexes came out corrupt.  This writes
+# DIR/ostep-cmp.h, which defines correct unsigned versions as static inline
+# functions and renames memcmp, strcmp and strncmp to them, and prints the
+# "-include DIR/ostep-cmp.h" flag for the package to add to its CFLAGS.  It
+# prints nothing, and writes nothing, on machines whose libc is fine (x86) or
+# when PKG_UNSIGNED_CMP=0; PKG_UNSIGNED_CMP=1 forces it on.  Example:
+#   CFLAGS="$CFLAGS `pkg_cmp_shim \`pwd\`/openstep`"
+pkg_cmp_shim() {
+    cs_dir=$1
+
+    case ${PKG_UNSIGNED_CMP-} in
+        0)
+            return 0
+        ;;
+        1)
+            :
+        ;;
+        *)
+            [ "${PKG_ARCH-}" = sparc ] || return 0
+        ;;
+    esac
+
+    [ -d "$cs_dir" ] || mkdir "$cs_dir" || return 1
+    /bin/cat > "$cs_dir/ostep-cmp.h" <<'CSEOF'
+#ifndef OSTEP_CMP_H
+#define OSTEP_CMP_H
+#include <stddef.h>
+#include <string.h>
+static __inline int
+ostep_memcmp(const void *a, const void *b, size_t n)
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (n-- > 0) {
+        if (*p != *q)
+            return *p < *q ? -1 : 1;
+        p++;
+        q++;
+    }
+    return 0;
+}
+static __inline int
+ostep_strcmp(const char *a, const char *b)
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (*p != 0 && *p == *q) {
+        p++;
+        q++;
+    }
+    return *p == *q ? 0 : (*p < *q ? -1 : 1);
+}
+static __inline int
+ostep_strncmp(const char *a, const char *b, size_t n)
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (n > 0 && *p != 0 && *p == *q) {
+        p++;
+        q++;
+        n--;
+    }
+    if (n == 0)
+        return 0;
+    return *p == *q ? 0 : (*p < *q ? -1 : 1);
+}
+#define memcmp ostep_memcmp
+#define strcmp ostep_strcmp
+#define strncmp ostep_strncmp
+#endif
+CSEOF
+    echo "-include $cs_dir/ostep-cmp.h"
+}

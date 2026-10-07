@@ -105,6 +105,26 @@ The SPARC back end is not in Apple's GCC tree, so it comes from FSF GCC 4.2.1
 Python 3.11 builds at `-O3`, except its generated `deepfreeze.c` unit, which uses
 `-O0 -g0` to avoid GCC42 allocation failures and optimizer crashes on OPENSTEP.
 
+## Signed `memcmp()` and `strcmp()` on SPARC
+
+OPENSTEP's SPARC libc compares bytes as *signed* in `memcmp()` (inputs of a word or more)
+and in `strcmp()`, so data with bytes of 0x80 or more sorts wrongly: git's pack indexes were
+written corrupt because of it.  `build-helpers.sh` provides `pkg_cmp_shim DIR`, which writes
+`DIR/ostep-cmp.h` (correct unsigned versions as static inline functions, with `memcmp`,
+`strcmp` and `strncmp` renamed to them) and prints the flag to force it into a build.  It
+prints nothing on x86, or when `PKG_UNSIGNED_CMP=0`; `PKG_UNSIGNED_CMP=1` forces it on.
+Add the flag at *make* time, not configure time, since configure's own tests do not cope
+with a forced include:
+
+```sh
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/openstep-cmp"`
+...
+gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS"
+```
+
+`git`, `python311`, `sed`, `grep`, `gawk`, `coreutils`, `diffutils`, `findutils` and `vim`
+use it; other packages that sort or compare binary data on SPARC should too.
+
 ## Package layout
 
 Each package is a directory named after the package:

@@ -42,6 +42,11 @@ export DEEPFREEZE_CFLAGS
 export GREP EGREP AWK SED ac_cv_prog_cc_c99 ac_cv_sizeof_wchar_t
 . "$PKG_BUILD_HELPERS"
 
+# OPENSTEP's SPARC libc compares bytes as signed in memcmp() and strcmp(); see
+# pkg_cmp_shim in build-helpers.sh.  Empty on x86.  It is forced in at make
+# time only: configure's own tests do not cope with it.
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/openstep-cmp"`
+
 if [ -d "Python-$VERSION" ]; then
     cd "Python-$VERSION"
     PATCHFILE="../$PATCHFILE"
@@ -108,5 +113,5 @@ run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
   --prefix="$PREFIX" --disable-shared --without-ensurepip \
   --disable-test-modules
 
-gnumake SHELL=/usr/local/bin/ksh
-gnumake SHELL=/usr/local/bin/ksh install DESTDIR="$DESTDIR"
+gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS" SHELL=/usr/local/bin/ksh
+gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS" SHELL=/usr/local/bin/ksh install DESTDIR="$DESTDIR"
