@@ -46,10 +46,28 @@ sh ./pkg download bash
 sh ./pkg build bash
 sh ./pkg install bash
 sh ./pkg install bash grep
+sh ./pkg reinstall bash
+sh ./pkg binpkg bash
+sh ./pkg installpkg bash-5.3-i386.binpkg.tar.gz
 sh ./pkg test bash
 sh ./pkg list
 sh ./pkg remove bash
 ```
+
+`install` skips a package that is already installed at the same version.  `reinstall` (also
+spelled `forceinstall`) rebuilds and installs the named packages anyway, replacing the
+installed copy; their dependencies are only installed when missing.
+
+`binpkg` builds a package the way `install` does (installing its dependencies first, since
+the build needs them) but writes `<name>-<version>-<arch>.binpkg.tar.gz` instead of
+installing it.  The file goes in `PKG_BINPKG_DIR`, or the current directory.  It holds the
+package's files and, in a `.pkg/` directory, its name, version, architecture, resolved
+dependencies, `requires`, recorded features and its `post-install`, `pre-remove` and `test`
+hooks.  `installpkg <file>` then installs it on any machine of the same `PKG_ARCH` that
+has the dependencies installed: it replaces any installed version, copies the files in,
+records the package database and runs `post-install`, exactly as `install` does after the
+build.  It needs `gnutar` and `gzip` (the `tar` and `gzip` packages), and checks the
+package's required `pkg.conf` options against the machine's.
 
 ## Configuration
 
