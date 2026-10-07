@@ -16,7 +16,19 @@ export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED
 . "$PKG_BUILD_HELPERS"
 
 # Private headers, first on the include path (configure and make both see them).
-/usr/local/bin/mkdir -p openstep/openssl
+/usr/local/bin/mkdir -p openstep/openssl openstep/sys
+
+# BSD names the open-files limit RLIMIT_OFILE; gnulib's getdtablesize() wants
+# RLIMIT_NOFILE.
+/bin/cat > openstep/sys/resource.h <<'SEOF'
+#ifndef OPENSTEP_SYS_RESOURCE_H
+#define OPENSTEP_SYS_RESOURCE_H
+#include_next <sys/resource.h>
+#if !defined(RLIMIT_NOFILE) && defined(RLIMIT_OFILE)
+# define RLIMIT_NOFILE RLIMIT_OFILE
+#endif
+#endif
+SEOF
 
 # OPENSTEP's <dirent.h> does not give POSIX programs DIR and struct dirent; the
 # BSD <sys/dir.h> does (as struct direct).  gnulib's <dirent.h> wrapper reaches
