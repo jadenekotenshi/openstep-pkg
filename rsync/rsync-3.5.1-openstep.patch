@@ -52,6 +52,16 @@
  #endif
  
  struct pid_status {
+@@ -1741,7 +1743,8 @@
+ 		}
+ 	}
+ #endif
+-#ifndef HAVE_SIGACTION
++#if !defined(HAVE_SIGACTION) && !defined(NeXT)
++	/* NeXT handlers persist; signal() here can re-enter dyld. */
+ 	signal(SIGCHLD, remember_children);
+ #endif
+ }
 --- a/openstep/compat.c
 +++ b/openstep/compat.c
 @@ -0,0 +1,120 @@
@@ -460,6 +470,18 @@
  
  /* The default RSYNC_RSH is always set in config.h. */
  
+--- a/socket.c
++++ b/socket.c
+@@ -686,7 +686,8 @@
+ #ifdef WNOHANG
+ 	while (waitpid(-1, NULL, WNOHANG) > 0) {}
+ #endif
+-#ifndef HAVE_SIGACTION
++#if !defined(HAVE_SIGACTION) && !defined(NeXT)
++	/* NeXT handlers persist; signal() here can re-enter dyld. */
+ 	signal(SIGCHLD, sigchld_handler);
+ #endif
+ }
 --- a/util1.c
 +++ b/util1.c
 @@ -711,6 +711,11 @@

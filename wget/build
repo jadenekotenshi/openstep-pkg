@@ -13,7 +13,8 @@ PATCHFILE="wget-$VERSION-openstep.patch"
 
 patch -p1 < "$PATCHFILE"
 run_configure --disable-nls --without-ssl --prefix=/usr/local
-gnumake
+# OPENSTEP has no /usr/bin/env for texi2pod.pl's shebang.
+gnumake 'TEXI2POD=/usr/local/bin/perl ./texi2pod.pl'
 
 test -d "$DESTDIR/usr" || mkdir "$DESTDIR/usr"
 test -d "$DESTDIR/usr/local" || mkdir "$DESTDIR/usr/local"
