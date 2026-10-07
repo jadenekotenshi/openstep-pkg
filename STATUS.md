@@ -67,7 +67,7 @@ has not been attempted.
 | neXtaw | validated | — |
 | nsgenbind | validated | — |
 | ntp | validated (build, install, test; ntpdate and ntpd run against a server) | — |
-| openssh | 10.6p1 untested (7.9p1 was validated) | 10.6p1 untested (7.9p1 was validated) |
+| openssh | 10.6p1 build, install, test; sshd and login not yet exercised (7.9p1 was validated) | 10.6p1 untested (7.9p1 was validated) |
 | openssl | validated | validated |
 | p7zip | validated | — |
 | patch | validated | validated |
