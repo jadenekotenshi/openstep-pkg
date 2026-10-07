@@ -18,7 +18,7 @@ ax_cv_check_cflags___std_c99=no
 export PATH CC CFLAGS CPPFLAGS LDFLAGS GREP EGREP AWK SED ax_cv_check_cflags___std_c99
 . "$PKG_BUILD_HELPERS"
 
-# OPENSTEP has no <stdint.h>, <inttypes.h> or POSIX <dirent.h> (it has
+# OPENSTEP has no <stdint.h>, <inttypes.h>, <libgen.h>, <langinfo.h> or POSIX <dirent.h> (it has
 # <sys/dir.h> and struct direct), and no snprintf()/vsnprintf().  Private
 # headers and a forced-include shim supply them at make time only: configure's
 # own tests do not cope with the shim.
@@ -90,6 +90,24 @@ SEOF
 #include <sys/types.h>
 #include <sys/dir.h>
 #define dirent direct
+#endif
+SEOF
+# <libgen.h> is included but pkgconf has its own basename/dirname code.
+/bin/cat > openstep/libgen.h <<'SEOF'
+#ifndef OPENSTEP_LIBGEN_H
+#define OPENSTEP_LIBGEN_H
+#endif
+SEOF
+# <langinfo.h>: only used to ask whether the locale is UTF-8; say it is not.
+/bin/cat > openstep/langinfo.h <<'SEOF'
+#ifndef OPENSTEP_LANGINFO_H
+#define OPENSTEP_LANGINFO_H
+#define CODESET 14
+static const char *
+nl_langinfo(int item)
+{
+    return "ANSI_X3.4-1968";
+}
 #endif
 SEOF
 /bin/cat > openstep/ostep-compat.h <<'SEOF'
