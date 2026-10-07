@@ -22,6 +22,243 @@ trace_enabled() {
     return 1
 }
 
+# Work out which OPENSTEP architecture we are running on and export it, along
+# with the default compiler flags for it.  arch(1) prints i386, sparc, m68k or
+# hppa; when it is missing, assume i386 as pkg always has.  An architecture
+# pkg does not know is passed through with no default flags.
+detect_arch() {
+    arch_raw=${PKG_ARCH:-`/usr/bin/arch 2>/dev/null`}
+
+    case $arch_raw in
+        ""|i[3-9]86|i386*)  PKG_ARCH=i386 ;;
+        sparc*)             PKG_ARCH=sparc ;;
+        m68*)               PKG_ARCH=m68k ;;
+        hppa*)              PKG_ARCH=hppa ;;
+        *)                  PKG_ARCH=$arch_raw ;;
+    esac
+
+    PKG_TARGET=$PKG_ARCH-next-openstep4
+
+    case $PKG_ARCH in
+        i386)
+            arch_syscc=-m486
+            arch_gcc42=-march=i486
+        ;;
+        sparc)
+            # gcc-4.2 is configured for V8 (sun4m), so it needs no flag.
+            arch_syscc=-mv8
+            arch_gcc42=
+        ;;
+        *)
+            arch_syscc=
+            arch_gcc42=
+        ;;
+    esac
+
+    PKG_SYSCC_ARCH_FLAGS=${PKG_SYSCC_ARCH_FLAGS-$arch_syscc}
+    PKG_GCC42_ARCH_FLAGS=${PKG_GCC42_ARCH_FLAGS-$arch_gcc42}
+
+    export PKG_ARCH PKG_TARGET PKG_SYSCC_ARCH_FLAGS PKG_GCC42_ARCH_FLAGS
+}
+
+# Site configuration lives outside the package tree, in a plain sh file of
+# VAR=value lines: $PKG_CONF, else $PKG_ROOT/usr/local/etc/pkg.conf.  Every
+# option has a default, so the file is optional.  The options are exported to
+# build, test, post-install and pre-remove.
+load_config() {
+    conf_file=$PKG_CONF
+    if [ "x$conf_file" = x ]; then
+        conf_file=$PKG_ROOT/usr/local/etc/pkg.conf
+    fi
+    PKG_CONF_FILE=$conf_file
+
+    # HAVE_X11: 1 when an X11 server (CubXWindow or similar) and its
+    # development headers and libraries are installed, else 0.
+    HAVE_X11=${HAVE_X11-0}
+
+    # X11_PREFIX: directory holding the X11 include/ and lib/ (CubXWindow
+    # installs under /usr/X11R6).
+    X11_PREFIX=${X11_PREFIX-/usr/X11R6}
+
+    # WITH_PYTHON: 1 to build packages' optional Python support (git-p4 in git)
+    # against the python311 package, 0 to leave it out.
+    WITH_PYTHON=${WITH_PYTHON-1}
+
+    if [ -f "$conf_file" ]; then
+        . "$conf_file"
+    fi
+
+    case $HAVE_X11 in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: HAVE_X11 must be 0 or 1, not '$HAVE_X11'"
+        ;;
+    esac
+
+    case $WITH_PYTHON in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: WITH_PYTHON must be 0 or 1, not '$WITH_PYTHON'"
+        ;;
+    esac
+
+    export PKG_CONF_FILE HAVE_X11 X11_PREFIX WITH_PYTHON
+}
+
+# A package's optional `requires` file names the pkg.conf options it needs:
+#   HAVE_X11     required; build and install are refused when it is not 1
+#   ?HAVE_X11    optional; the build script enables extra features when it is 1
+# Comments (#) and blank lines are allowed.
+option_value() {
+    case $1 in
+        HAVE_X11)
+            echo "$HAVE_X11"
+        ;;
+        WITH_PYTHON)
+            echo "$WITH_PYTHON"
+        ;;
+        *)
+            return 1
+        ;;
+    esac
+}
+
+# Print "required" or "optional" lines for each entry in DIR/requires, as
+# "<kind> <option>"; dies on an unknown option.
+read_requires() {
+    rr_file=$1/requires
+    rr_pkg=$2
+
+    [ -f "$rr_file" ] || return 0
+
+    while read rr_entry rr_extra || [ -n "$rr_entry" ]; do
+        case $rr_entry in
+            ''|\#*)
+                continue
+            ;;
+            \?*)
+                rr_kind=optional
+                rr_opt=`echo "$rr_entry" | sed 's/^?//'`
+            ;;
+            *)
+                rr_kind=required
+                rr_opt=$rr_entry
+            ;;
+        esac
+
+        option_value "$rr_opt" > /dev/null ||
+            die "unknown option in $rr_pkg requires: $rr_entry"
+        echo "$rr_kind $rr_opt"
+    done < "$rr_file"
+}
+
+# Check the requires files of a package and everything it would pull in via
+# depends, before anything is built.  Dependencies that are already installed
+# are skipped.
+check_requires_tree() {
+    rq_top=$1
+    rq_root=`path_parent "$rq_top"`
+    rq_todo=$rq_top
+    rq_seen=:
+    rq_bad=
+
+    while [ -n "$rq_todo" ]; do
+        set -- $rq_todo
+        rq_cur=$1
+        shift
+        rq_todo="$*"
+
+        rq_name=`path_leaf "$rq_cur"`
+        case $rq_seen in
+            *:$rq_name:*)
+                continue
+            ;;
+        esac
+        rq_seen=$rq_seen$rq_name:
+
+        rq_list=`read_requires "$rq_cur" "$rq_name"` || exit 1
+        while read rq_kind rq_opt; do
+            [ "x$rq_kind" = xrequired ] || continue
+            rq_val=`option_value "$rq_opt"`
+            if [ "x$rq_val" != x1 ]; then
+                rq_bad="$rq_bad
+  $rq_name needs $rq_opt=1"
+            fi
+        done <<EOF
+$rq_list
+EOF
+
+        [ -f "$rq_cur/depends" ] || continue
+
+        while read rq_dep rq_extra || [ -n "$rq_dep" ]; do
+            rq_dep=`dep_resolve "$rq_dep"` || exit 1
+            case $rq_dep in
+                ''|\#*|!*)
+                    continue
+                ;;
+            esac
+            [ -d "$DB_ROOT/installed/$rq_dep" ] && continue
+            for rq_cand in "$rq_root/$rq_dep" "$rq_dep"
+            do
+                if [ -d "$rq_cand" ]; then
+                    rq_todo="$rq_todo $rq_cand"
+                    break
+                fi
+            done
+        done < "$rq_cur/depends"
+    done
+
+    if [ -n "$rq_bad" ]; then
+        die "cannot build $PKG_NAME with the current configuration ($PKG_CONF_FILE):$rq_bad"
+    fi
+}
+
+# Tell the person which optional features this build will use.
+log_optional_features() {
+    rq_list=`read_requires "$PKG_DIR" "$PKG_NAME"` || exit 1
+    while read rq_kind rq_opt; do
+        [ "x$rq_kind" = xoptional ] || continue
+        rq_val=`option_value "$rq_opt"`
+        if [ "x$rq_val" = x1 ]; then
+            log "optional feature $rq_opt: enabled"
+        else
+            log "optional feature $rq_opt: disabled"
+        fi
+    done <<EOF
+$rq_list
+EOF
+}
+
+# Record the optional options this build saw, so a later change to pkg.conf can
+# be noticed ("built without HAVE_X11; reinstall to enable").
+write_features() {
+    rq_list=`read_requires "$PKG_DIR" "$PKG_NAME"` || exit 1
+    rm -f "$INST_DIR/features"
+    while read rq_kind rq_opt; do
+        [ "x$rq_kind" = xoptional ] || continue
+        rq_val=`option_value "$rq_opt"`
+        echo "$rq_opt=$rq_val" >> "$INST_DIR/features"
+    done <<EOF
+$rq_list
+EOF
+}
+
+# Print the optional options whose value now differs from the recorded build.
+stale_features() {
+    sf_dir=$1
+    [ -f "$sf_dir/features" ] || return 0
+    while read sf_line; do
+        sf_opt=`echo "$sf_line" | sed 's/=.*//'`
+        sf_old=`echo "$sf_line" | sed 's/.*=//'`
+        sf_now=`option_value "$sf_opt"` || continue
+        if [ "x$sf_now" != "x$sf_old" ]; then
+            echo "$sf_opt (built with $sf_old, now $sf_now)"
+        fi
+    done < "$sf_dir/features"
+}
+
 usage() {
     cat <<'EOF'
 usage:
@@ -31,17 +268,64 @@ usage:
   pkg list
   pkg remove <name>
   pkg test <name>...
+  pkg arch
+  pkg config
+
+configuration:
+  pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
+  PKG_ROOT when that is set).  The file is optional, plain sh VAR=value lines.
+  See pkg.conf.example.  Options are exported to build, test, post-install and
+  pre-remove.
+    HAVE_X11   1 if an X11 server (CubXWindow or similar) and its development
+               headers are installed; default 0
+    X11_PREFIX directory holding the X11 include/ and lib/; default /usr/X11R6
+               (where CubXWindow installs)
+    WITH_PYTHON 1 (default) builds optional Python support (git-p4 in git) and
+               depends on python311; 0 leaves it out
+
+architecture:
+  pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)
+  and exports these to build, test, post-install and pre-remove:
+    PKG_ARCH               i386, sparc, m68k or hppa
+    PKG_TARGET             <arch>-next-openstep4, for configure --build/--host
+    PKG_SYSCC_ARCH_FLAGS   default flags for the system /bin/cc (i386 -m486, sparc -mv8)
+    PKG_GCC42_ARCH_FLAGS   default flags for gcc-4.2 (i386 -march=i486, sparc none:
+                           V8 is its default)
+  Set either *_FLAGS variable (even to empty) to override it.
 
 package layout:
   build         required build script
   version       required, contains version
-  depends       optional, one package name per line
+  depends       optional, one package name per line (?OPTION:name = only when OPTION is 1)
+  requires      optional, pkg.conf options: HAVE_X11 (needed) or ?HAVE_X11 (extra features)
   sources       optional, one source per line
   checksums     SHA-256 and filename for each remote source
   post-install  optional shell hook
   pre-remove    optional shell hook
   test          optional installed-package test hook
 EOF
+}
+
+# A depends entry may be conditional on a pkg.conf option: "?HAVE_X11:neXtaw"
+# is a dependency on neXtaw only when HAVE_X11 is 1 (and is ignored otherwise).
+# Print the entry to act on: the plain entry, or nothing when it is inactive.
+dep_resolve() {
+    dr_entry=$1
+
+    case $dr_entry in
+        \?*:*)
+            dr_opt=`echo "$dr_entry" | sed 's/^?//; s/:.*//'`
+            dr_rest=`echo "$dr_entry" | sed 's/^[^:]*://'`
+            dr_val=`option_value "$dr_opt"` ||
+                die "unknown option in depends entry: $dr_entry"
+            if [ "x$dr_val" = x1 ]; then
+                echo "$dr_rest"
+            fi
+        ;;
+        *)
+            echo "$dr_entry"
+        ;;
+    esac
 }
 
 dep_name() {
@@ -182,7 +466,11 @@ requires_pdksh_sh() {
 }
 
 build_shell_path() {
-    if requires_pdksh_sh "$1"; then
+    # PKG_BUILD_SHELL overrides the shell for every build and test script, for
+    # when pdksh trips over a package (e.g. PKG_BUILD_SHELL=/usr/local/bin/bash).
+    if [ -n "${PKG_BUILD_SHELL-}" ]; then
+        echo "$PKG_BUILD_SHELL"
+    elif requires_pdksh_sh "$1"; then
         echo /usr/local/bin/ksh
     else
         echo /bin/sh
@@ -436,7 +724,7 @@ copy_local_source() {
         copy_tree "$path" "$target_dir"
     else
         case $path in
-            *.tar.gz|*.tgz|*.tar|*.tar.bz2|*.tbz2|*.tar.xz|*.txz)
+            *.tar.gz|*.tgz|*.tar|*.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
                 extract_archive "$path" "$dest"
             ;;
             *)
@@ -466,10 +754,11 @@ extract_archive() {
         *.tar)
             pkg_tar -xf "$archive" -C "$target_dir"
         ;;
-        *.tar.bz2|*.tbz2|*.tar.xz|*.txz)
+        *.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
             (
                 case $archive in
                     *.tar.bz2|*.tbz2) unpacker=bzip2 ;;
+                    *.tar.zst|*.tzst) unpacker=zstd ;;
                     *) unpacker=xz ;;
                 esac
                 unpack_path=`find_tool "$unpacker" 2>/dev/null || :`
@@ -510,12 +799,26 @@ stage_source() {
 }
 
 prepare_build_root() {
-    log "preparing build root $BUILD_ROOT"
-    rm -rf "$BUILD_ROOT" "$IMAGE_DIR"
-    ensure_dir "$BUILD_ROOT"
+    # PKG_RESUME=1 keeps the build tree of an earlier, failed run (sources
+    # already extracted, patched and configured, objects already built) instead
+    # of starting over; the package's build script skips the steps it has
+    # already completed (see pkg_step and pkg_apply_patch in build-helpers.sh).
+    resume_build=
+    if [ -n "${PKG_RESUME-}" ] && [ -d "$BUILD_ROOT" ]; then
+        resume_build=1
+    fi
+
+    if [ -n "$resume_build" ]; then
+        log "resuming build in $BUILD_ROOT"
+        rm -rf "$IMAGE_DIR"
+    else
+        log "preparing build root $BUILD_ROOT"
+        rm -rf "$BUILD_ROOT" "$IMAGE_DIR"
+        ensure_dir "$BUILD_ROOT"
+    fi
     ensure_dir "$IMAGE_DIR"
 
-    if [ -f "$PKG_DIR/sources" ]; then
+    if [ -z "$resume_build" ] && [ -f "$PKG_DIR/sources" ]; then
         while read src dest || [ -n "$src" ]; do
             case $src in
                 ''|\#*)
@@ -547,6 +850,7 @@ run_build() {
     prepare_build_root
 
     log "building $PKG_NAME $PKG_VERSION"
+    log_optional_features
     log "build directory $BUILD_CWD"
     log "image directory $IMAGE_DIR"
     log "build shell $build_shell"
@@ -634,6 +938,7 @@ check_depends() {
     conflicts=
 
     while read dep extra || [ -n "$dep" ]; do
+        dep=`dep_resolve "$dep"` || exit 1
         case $dep in
             ''|\#*)
                 continue
@@ -702,6 +1007,7 @@ install_depends() {
     parent_pkg_name=$PKG_NAME
 
     while read dep extra || [ -n "$dep" ]; do
+        dep=`dep_resolve "$dep"` || exit 1
         case $dep in
             ''|\#*)
                 continue
@@ -786,6 +1092,7 @@ write_manifest() {
     ) > "$INST_DIR/manifest"
 
     echo "$PKG_VERSION" > "$INST_DIR/version"
+    write_features
 
     for hook in pre-remove post-install test; do
         if [ -f "$PKG_DIR/$hook" ]; then
@@ -873,6 +1180,10 @@ install_pkg() {
         ;;
     esac
 
+    if [ -z "$PKG_INSTALL_STACK" ]; then
+        check_requires_tree "$PKG_DIR"
+    fi
+
     PKG_INSTALL_STACK=$PKG_INSTALL_STACK:$PKG_NAME
     export PKG_INSTALL_STACK
 
@@ -882,6 +1193,11 @@ install_pkg() {
 
     if installed_same_version; then
         log "already installed: $PKG_NAME $PKG_VERSION"
+        stale=`stale_features "$INST_DIR"`
+        if [ -n "$stale" ]; then
+            log "note: $PKG_NAME was built with different options: $stale"
+            log "      remove and reinstall it to pick up the current configuration"
+        fi
         restore_install_context
         return 0
     fi
@@ -996,7 +1312,12 @@ list_pkgs() {
         [ -d "$dir" ] || continue
         name=`path_leaf "$dir"`
         read version extra < "$dir/version" || version=unknown
-        echo "$name $version"
+        stale=`stale_features "$dir"`
+        if [ -n "$stale" ]; then
+            echo "$name $version  [rebuild to apply: $stale]"
+        else
+            echo "$name $version"
+        fi
     done
 }
 
@@ -1034,39 +1355,67 @@ remove_name() {
     rm -rf "$INST_DIR"
 }
 
+# Some old Bourne shells do not restore the positional parameters after a
+# function call, so take what we need from them before calling anything.
 ACTION=$1
+ARGC=$#
+ARG2=$2
+if [ $# -gt 1 ]; then
+    shift
+    PKG_ARGS="$*"
+else
+    PKG_ARGS=
+fi
+
+detect_arch
+load_config
 
 case $ACTION in
+    arch)
+        [ "$ARGC" -eq 1 ] || die "arch takes no arguments"
+        echo "PKG_ARCH=$PKG_ARCH"
+        echo "PKG_TARGET=$PKG_TARGET"
+        echo "PKG_SYSCC_ARCH_FLAGS=$PKG_SYSCC_ARCH_FLAGS"
+        echo "PKG_GCC42_ARCH_FLAGS=$PKG_GCC42_ARCH_FLAGS"
+    ;;
+
+    config)
+        [ "$ARGC" -eq 1 ] || die "config takes no arguments"
+        echo "PKG_CONF_FILE=$PKG_CONF_FILE"
+        echo "HAVE_X11=$HAVE_X11"
+        echo "X11_PREFIX=$X11_PREFIX"
+        echo "WITH_PYTHON=$WITH_PYTHON"
+    ;;
+
     download)
-        [ $# -eq 2 ] || die "download requires <package-dir>"
-        load_pkg "$2"
+        [ "$ARGC" -eq 2 ] || die "download requires <package-dir>"
+        load_pkg "$ARG2"
         download_pkg
     ;;
 
     build)
-        [ $# -eq 2 ] || die "build requires <package-dir>"
-        load_pkg "$2"
+        [ "$ARGC" -eq 2 ] || die "build requires <package-dir>"
+        load_pkg "$ARG2"
+        check_requires_tree "$PKG_DIR"
         run_build
     ;;
 
     install)
-        shift
-        install_pkgs "$@"
+        install_pkgs $PKG_ARGS
     ;;
 
     list)
-        [ $# -eq 1 ] || die "list takes no arguments"
+        [ "$ARGC" -eq 1 ] || die "list takes no arguments"
         list_pkgs
     ;;
 
     remove)
-        [ $# -eq 2 ] || die "remove requires <name>"
-        remove_name "$2"
+        [ "$ARGC" -eq 2 ] || die "remove requires <name>"
+        remove_name "$ARG2"
     ;;
 
     test)
-        shift
-        test_pkgs "$@"
+        test_pkgs $PKG_ARGS
     ;;
 
     ""|-h|--help|help)
