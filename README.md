@@ -54,6 +54,8 @@ sh ./pkg list
 sh ./pkg remove bash
 ```
 
+`sh ./pkg-missing` lists the packages in the tree that are not installed (`-v` also shows version mismatches and installed packages the tree lacks), which is handy while working down the tree on a fresh machine: `for p in \`sh ./pkg-missing\`; do sh ./pkg install $p; done`.
+
 `install` skips a package that is already installed at the same version.  `reinstall` (also
 spelled `forceinstall`) rebuilds and installs the named packages anyway, replacing the
 installed copy; their dependencies are only installed when missing.
