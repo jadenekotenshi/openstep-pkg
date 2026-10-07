@@ -123,7 +123,7 @@ run_configure --prefix=/usr/local \
   --disable-shared --enable-static --disable-dependency-tracking
 
 # Keep make from re-running configure or automake over the extracted tree.
-/bin/sleep 1
+sleep 1
 /usr/local/bin/touch aclocal.m4 configure Makefile.in libpkgconf/config.h.in config.h.in
 /usr/local/bin/touch config.status Makefile libpkgconf/config.h config.h
 /bin/gnumake pkgconf CFLAGS="$CFLAGS $SHIMFLAGS"
