@@ -657,10 +657,19 @@ fetch_source() (
                 features=`"$wget_path" --version 2>/dev/null || :`
                 case $features in *+https*) : ;; *) continue ;; esac
             fi
-            # --continue resumes the partial file from an earlier attempt (or
-            # from an earlier try within this run) instead of starting over.
-            "$wget_path" --continue --timeout=30 --tries=3 -O "$output" "$url"
-            exit $?
+            # --continue resumes the partial file from an earlier attempt
+            # instead of starting over.  The retries are done here, one wget
+            # process per attempt, because wget's own retry (which sleeps in
+            # xsleep() first) hangs on some OPENSTEP builds.
+            wget_try=1
+            while :; do
+                "$wget_path" --continue --timeout=30 --tries=1 -O "$output" "$url" &&
+                    exit 0
+                [ "$wget_try" -lt 5 ] || exit 1
+                wget_try=`expr $wget_try + 1`
+                log "download interrupted; retrying (attempt $wget_try of 5)" >&2
+                sleep 2
+            done
         done
     done
     die "wget-bootstrap did not provide a downloader supporting $scheme"
