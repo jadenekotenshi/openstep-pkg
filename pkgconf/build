@@ -114,9 +114,44 @@ SEOF
 #ifndef OPENSTEP_OSTEP_COMPAT_H
 #define OPENSTEP_OSTEP_COMPAT_H
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <string.h>
 #ifdef OSTEP_NEED_SSIZE_T
 typedef int ssize_t;
 #endif
+/* Missing from OPENSTEP's libc and headers.  The functions are static and
+ * renamed by macros after the system headers, so they cannot clash. */
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef S_ISSOCK
+# define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#endif
+#ifndef S_ISFIFO
+# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#endif
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != NULL)
+        memcpy(p, s, n);
+    return p;
+}
+static size_t
+ostep_strnlen(const char *s, size_t max)
+{
+    size_t i = 0;
+
+    while (i < max && s[i] != 0)
+        i++;
+    return i;
+}
+#define strdup ostep_strdup
+#define strnlen ostep_strnlen
 #include "snprintf-shim.h"
 #endif
 SEOF
