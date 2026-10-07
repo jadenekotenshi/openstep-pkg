@@ -162,6 +162,11 @@ gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS"
 `git`, `python311`, `sed`, `grep`, `gawk`, `coreutils`, `diffutils`, `findutils` and `vim`
 use it; other packages that sort or compare binary data on SPARC should too.
 
+Newer gnulib trees (such as `wget-bootstrap`'s) refuse a header that is included before
+`config.h`, so a forced `-include` cannot work there.  `pkg_cmp_obj DIR` does the same job
+by compiling unsigned `memcmp`, `strcmp` and `strncmp` into `DIR/ostep-cmp.o` and printing
+its path; add that to `LDFLAGS` at make time.
+
 ## Package layout
 
 Each package is a directory named after the package:
