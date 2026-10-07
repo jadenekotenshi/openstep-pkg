@@ -284,7 +284,10 @@ download, including its compression format; do not repack it first. Every remote
 source needs exactly one entry. Missing, malformed, or duplicate entries fail.
 
 `pkg` verifies with `sha256sum` or the bootstrap's `openssl dgst -sha256`.
-Verified downloads are renamed into the cache only after transfer and hash
+A download that fails or is interrupted keeps its partial file (`<name>.part` in the
+source cache), and the next attempt, or the next try within the same run, continues it
+(`wget --continue`, `curl -C -`) instead of starting over; a finished file that fails its
+hash is discarded.  Verified downloads are renamed into the cache only after transfer and hash
 verification succeed. Existing cache files are rechecked before reuse; corrupt
 ones are discarded and fetched again. Local sources remain usable offline.
 

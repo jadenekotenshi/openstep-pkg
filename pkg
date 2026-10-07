@@ -644,7 +644,8 @@ fetch_source() (
             protocols=`"$curl_path" -V 2>/dev/null | sed -n 's/^Protocols: *//p'`
             case " $protocols " in
                 *" $scheme "*)
-                    "$curl_path" -fL --connect-timeout 30 -o "$output" "$url"
+                    # -C - continues a partial file left by an earlier attempt.
+                    "$curl_path" -fL -C - --retry 3 --connect-timeout 30 -o "$output" "$url"
                     exit $?
                 ;;
             esac
@@ -656,7 +657,9 @@ fetch_source() (
                 features=`"$wget_path" --version 2>/dev/null || :`
                 case $features in *+https*) : ;; *) continue ;; esac
             fi
-            "$wget_path" --timeout=30 --tries=2 -O "$output" "$url"
+            # --continue resumes the partial file from an earlier attempt (or
+            # from an earlier try within this run) instead of starting over.
+            "$wget_path" --continue --timeout=30 --tries=3 -O "$output" "$url"
             exit $?
         done
     done
@@ -690,15 +693,27 @@ download_one() (
                 rm -f "$out"
             fi
 
-            log "downloading $src"
-            partial=$out.part-$$
+            # A download that fails or is interrupted leaves its partial file in
+            # the cache; the next attempt continues it.  It is dropped when the
+            # finished file does not match its checksum.
+            partial=$out.part
+            if [ -f "$partial" ]; then
+                partial_size=`wc -c < "$partial" | sed 's/ //g'`
+                log "resuming download of $src ($partial_size bytes already fetched)"
+            else
+                log "downloading $src"
+            fi
             # Stock sh can report zero in an EXIT trap after an error.
             cleanup_status=1
-            trap 'rm -f "$partial"; exit "$cleanup_status"' 0
+            trap 'exit "$cleanup_status"' 0
             trap 'exit 1' 1 2 3 15
-            fetch_source "$src" "$partial" || die "download failed: $src"
+            fetch_source "$src" "$partial" ||
+                die "download failed: $src (the partial file $partial is kept; run again to resume, or delete it to start over)"
             actual=`hash_file "$partial"` || exit 1
-            [ "$actual" = "$expected" ] || die "SHA-256 mismatch: $src"
+            if [ "$actual" != "$expected" ]; then
+                rm -f "$partial"
+                die "SHA-256 mismatch: $src (partial file discarded; run again to fetch it afresh)"
+            fi
             mv "$partial" "$out" || die "cannot cache $src_name"
             cleanup_status=0
         ;;
