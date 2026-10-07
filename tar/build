@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+. "$PKG_BUILD_HELPERS"
+PATH=/usr/ucb:/bin:/usr/bin:/usr/local/bin
+CC='/bin/cc -traditional-cpp'
+CFLAGS=-O0
+# NeXT's POSIX headers otherwise define __STRICT_ANSI__ without a value.
+CPPFLAGS='-D_POSIX_SOURCE -D__STRICT_ANSI__=1 -D_NEXT_SOURCE'
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+# OPENSTEP readdir returns BSD struct direct, not its POSIX struct dirent.
+ac_cv_header_dirent_dirent_h=no
+export PATH CC CFLAGS CPPFLAGS GREP EGREP AWK ac_cv_header_dirent_dirent_h
+/usr/local/bin/patch -p1 < "tar-$VERSION-openstep.patch"
+run_configure --prefix=/usr/local --program-prefix=gnu \
+    --disable-nls --disable-dependency-tracking
+/bin/gnumake
+/bin/gnumake install DESTDIR="$DESTDIR"

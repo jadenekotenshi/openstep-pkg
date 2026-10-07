@@ -13,7 +13,7 @@ sh ./pkg install zlib
 You can also run `sh ./pkg install wget-bootstrap` explicitly. It builds with
 stock `/bin/cc`, using only inputs kept in this repository.
 Its offline dependency set is `pdksh`, `patch`,
-`texinfo`, `grep`, `gawk`, `openssl`, and `ca-certificates`. Keep these package
+`texinfo`, `grep`, `gawk`, `gzip`, `tar`, `openssl`, and `ca-certificates`. Keep these package
 directories beside `wget-bootstrap`, `pkg`, and `build-helpers.sh` when transferring
 the bootstrap to a machine without an HTTP client.
 
@@ -25,6 +25,14 @@ ordinary wget. The existing HTTP-only wget package remains usable for HTTP.
 Unlike the dependency-free shell bootstrap, `wget-bootstrap` installs its
 declared dependencies normally and builds under pdksh. Local-only packages
 do not trigger downloader installation.
+
+The offline `tar` package builds GNU tar 1.15.1 with stock `/bin/cc` and installs
+`/usr/local/bin/gnutar`. `pkg` prefers it for archive extraction and installation
+copies: OPENSTEP's GNU tar 1.12 truncates names that fill the 100-byte archive
+name field, and its BSD tar cannot copy longer paths. Existing installations can
+upgrade with `sh ./pkg install tar`; `gcc42` also declares it as a dependency.
+The gzip bootstrap uses its portable copy loop because OPENSTEP's `memcpy`
+corrupts some overlapping decompression-window copies.
 
 Other package archives are fetched on demand from their upstream releases or
 source repositories, with SHA-256 hashes pinned in each package's `checksums`.

@@ -1,2 +1,3 @@
-https://mirrors.kernel.org/gnu/gzip/gzip-1.3.12.tar.gz
+# Offline bootstrap: https://mirrors.kernel.org/gnu/gzip/gzip-1.3.12.tar.gz
+gzip-1.3.12.tar.gz
 gzip-1.3.12-openstep.patch gzip-1.3.12

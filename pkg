@@ -402,6 +402,16 @@ download_pkg() {
     done < "$PKG_DIR/sources"
 }
 
+pkg_tar() (
+    PATH=${LOCAL_ROOT:-/usr/local}/bin:$PATH
+    export PATH
+    if [ -x "${LOCAL_ROOT:-/usr/local}/bin/gnutar" ]; then
+        "${LOCAL_ROOT:-/usr/local}/bin/gnutar" "$@"
+    else
+        gnutar "$@"
+    fi
+)
+
 copy_local_source() {
     src=$1
     dest=$2
@@ -423,13 +433,7 @@ copy_local_source() {
     ensure_dir "$target_dir"
 
     if [ -d "$path" ]; then
-        (
-            cd "$path"
-            tar cf - .
-        ) | (
-            cd "$target_dir"
-            tar xpf -
-        )
+        copy_tree "$path" "$target_dir"
     else
         case $path in
             *.tar.gz|*.tgz|*.tar|*.tar.bz2|*.tbz2|*.tar.xz|*.txz)
@@ -457,10 +461,10 @@ extract_archive() {
 
     case $archive in
         *.tar.gz|*.tgz)
-            gnutar -xzf "$archive" -C "$target_dir"
+            pkg_tar -xzf "$archive" -C "$target_dir"
         ;;
         *.tar)
-            gnutar -xf "$archive" -C "$target_dir"
+            pkg_tar -xf "$archive" -C "$target_dir"
         ;;
         *.tar.bz2|*.tbz2|*.tar.xz|*.txz)
             (
@@ -477,7 +481,7 @@ extract_archive() {
                 trap 'exit 1' 1 2 3 15
                 "$unpack_path" -dc "$archive" > "$unpack_tmp" ||
                     die "decompression failed: $archive"
-                gnutar -xf "$unpack_tmp" -C "$target_dir" || exit 1
+                pkg_tar -xf "$unpack_tmp" -C "$target_dir" || exit 1
                 cleanup_status=0
             )
         ;;
@@ -567,13 +571,20 @@ copy_tree() {
     dst=$2
 
     ensure_dir "$dst"
+    copy_tar=tar
+    copy_tar_flags=
+    if [ -x "${LOCAL_ROOT:-/usr/local}/bin/gnutar" ]; then
+        copy_tar=${LOCAL_ROOT:-/usr/local}/bin/gnutar
+        # Shared ancestors such as /usr belong to the system, not the package.
+        copy_tar_flags=--no-overwrite-dir
+    fi
 
     (
         cd "$src"
-        tar cf - .
+        "$copy_tar" cf - .
     ) | (
         cd "$dst"
-        tar xpf -
+        "$copy_tar" xpf - $copy_tar_flags
     )
 }
 

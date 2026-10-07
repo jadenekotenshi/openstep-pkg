@@ -1,0 +1,64 @@
+#!/bin/sh
+set -e
+TAR="$ROOT_DIR/usr/local/bin/gnutar"
+PATH=/usr/ucb:/bin:/usr/bin
+export PATH
+WORK=/tmp/pkg-tar.$$
+mkdir "$WORK"
+status=1
+trap 'rm -rf "$WORK"; exit "$status"' 0
+trap 'exit 1' 1 2 3 15
+cd "$WORK"
+"$TAR" --version
+"$TAR" --help > help
+# Fill the entire 100-byte USTAR name field (no terminating NUL).
+name=0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
+echo 'complete filename' > "$name"
+"$TAR" --format=ustar -cf exact.tar "$name"
+mkdir exact
+"$TAR" -xf exact.tar -C exact
+cmp "$name" "exact/$name"
+# Archive owners may exceed OPENSTEP's 16-bit uid_t/gid_t even when ignored.
+cat > owners.c <<'EOF'
+#include <stdio.h>
+#include <string.h>
+int main(void)
+{
+    unsigned char header[512];
+    unsigned int sum = 0;
+    int i;
+    FILE *f = fopen("owners.tar", "r+b");
+    if (!f || fread(header, 1, sizeof header, f) != sizeof header) return 1;
+    sprintf((char *)header + 108, "%07o", 197609);
+    sprintf((char *)header + 116, "%07o", 197609);
+    memset(header + 148, ' ', 8);
+    for (i = 0; i < sizeof header; i++) sum += header[i];
+    sprintf((char *)header + 148, "%06o", sum);
+    if (fseek(f, 0L, SEEK_SET) != 0) return 1;
+    if (fwrite(header, 1, sizeof header, f) != sizeof header) return 1;
+    return fclose(f) != 0;
+}
+EOF
+/bin/cc -o owners owners.c
+for format in v7 ustar gnu; do
+    "$TAR" --format="$format" -cf owners.tar help
+    ./owners
+    "$TAR" --numeric-owner -tvf owners.tar > owners.list
+    grep '197609/197609' owners.list
+    "$TAR" --numeric-owner --no-same-owner -xf owners.tar -C exact
+    cmp help exact/help
+done
+# Exercise GNU long-name extensions, PAX headers, gzip, and link copying.
+mkdir "$name.dir"
+cp "$name" "$name.dir/$name"
+ln -s "$name" "$name.dir/link"
+for format in gnu posix; do
+    "$TAR" --format="$format" -czf "$format.tar.gz" "$name.dir"
+    mkdir "$format"
+    "$TAR" -xzf "$format.tar.gz" -C "$format"
+    cmp "$name" "$format/$name.dir/$name"
+    cmp "$name" "$format/$name.dir/link"
+done
+cp help bad.tar
+if "$TAR" -tf bad.tar > /dev/null 2>&1; then exit 1; fi
+status=0

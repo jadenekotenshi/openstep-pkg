@@ -7,10 +7,42 @@ TMPDIR=/tmp/gzip-test-$$
 
 test -x "$GZIP"
 mkdir "$TMPDIR"
-trap 'rm -rf "$TMPDIR"' 0 1 2 3 15
+status=1
+trap 'rm -rf "$TMPDIR"; exit "$status"' 0
+trap 'exit 1' 1 2 3 15
 
 "$GZIP" --version >/dev/null
 echo 'openstep gzip package test' > "$TMPDIR/plain.txt"
 "$GZIP" -c "$TMPDIR/plain.txt" > "$TMPDIR/plain.txt.gz"
 "$GZIP" -cd "$TMPDIR/plain.txt.gz" > "$TMPDIR/out.txt"
 cmp "$TMPDIR/plain.txt" "$TMPDIR/out.txt"
+
+# A stored 32 KiB block followed by a 258-byte match at distance 32767.
+# Ordinary gzip round trips do not generate this overlapping window copy.
+cd "$TMPDIR"
+cat > fixture.c <<'EOF'
+#include <stdio.h>
+int main(void) {
+    unsigned char header[] = {31,139,8,0,0,0,0,0,0,3,0,0,128,255,127};
+    unsigned char trailer[] = {27,189,254,31,0,73,230,209,156,2,129,0,0};
+    FILE *packed = fopen("overlap.gz", "wb");
+    FILE *plain = fopen("expected", "wb");
+    int i, a, b;
+    if (!packed || !plain) return 1;
+    fwrite(header, 1, sizeof header, packed);
+    for (i = 0; i < 32768; i++) {
+        fputc('A' + i % 26, packed);
+        fputc('A' + i % 26, plain);
+    }
+    for (i = 1; i < 259; i++) fputc('A' + i % 26, plain);
+    fwrite(trailer, 1, sizeof trailer, packed);
+    a = ferror(packed) || ferror(plain);
+    b = fclose(packed);
+    return fclose(plain) || a || b;
+}
+EOF
+/bin/cc fixture.c -o fixture
+./fixture
+"$GZIP" -cd overlap.gz > actual
+cmp expected actual
+status=0

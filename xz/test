@@ -59,3 +59,8 @@ int main(void) {
 EOF
 "$PREFIX/bin/gcc-4.2" -I"$PREFIX/include" api.c -L"$PREFIX/lib" -llzma -o api
 ./api
+# Autoconf consumers may provide integer types as macros (for example libxml2).
+"$PREFIX/bin/gcc-4.2" -I"$PREFIX/include" -Duint8_t='unsigned char' \
+    -Duint32_t='unsigned int' -Duint64_t='unsigned long long' \
+    api.c -L"$PREFIX/lib" -llzma -o api
+./api

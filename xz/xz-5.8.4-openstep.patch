@@ -1045,17 +1045,23 @@ index b10ffa7..2d007ca 100644
  // MSVC v19.00 (VS 2015 version 14.0) and later should work.
  //
 diff --git a/src/liblzma/api/lzma.h b/src/liblzma/api/lzma.h
-index 6ca6e50..d92dcfc 100644
+index 6ca6e50..d00a74d 100644
 --- a/src/liblzma/api/lzma.h
 +++ b/src/liblzma/api/lzma.h
-@@ -68,6 +68,16 @@
+@@ -68,6 +68,22 @@
   * necessarily the same as sizeof(bool) in C++.
   */
  
 +#if defined(NeXT) && !defined(LZMA_MANUAL_HEADERS) && !defined(UINT32_MAX)
++#ifndef uint8_t
 +typedef unsigned char uint8_t;
++#endif
++#ifndef uint32_t
 +typedef unsigned int uint32_t;
++#endif
++#ifndef uint64_t
 +typedef unsigned long long uint64_t;
++#endif
 +#define UINT32_C(n) n ## U
 +#define UINT64_C(n) n ## ULL
 +#define UINT32_MAX UINT32_C(4294967295)
