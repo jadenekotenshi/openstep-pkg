@@ -124,7 +124,8 @@ stamp() {
 installed_set() {
     is_out=
     if [ -d "$installed_dir" ]; then
-        for is_d in "$installed_dir"/*; do
+        # Unquoted, as pkg itself does: the stock /bin/sh does not expand "$dir"/*.
+        for is_d in $installed_dir/*; do
             if [ -d "$is_d" ]; then
                 is_n=`echo "$is_d" | sed 's#.*/##'`
                 is_out="$is_out $is_n"
@@ -136,7 +137,7 @@ installed_set() {
 
 tree_set() {
     ts_out=
-    for ts_d in "$tree"/*; do
+    for ts_d in $tree/*; do
         if [ -d "$ts_d" ]; then
             if [ -f "$ts_d/build" ]; then
                 if [ -f "$ts_d/version" ]; then
@@ -348,6 +349,16 @@ say "host:   `hostname 2>/dev/null`"
 say "logs:   $logdir"
 say "tests after builds: `if [ $run_tests = 1 ]; then echo yes; else echo no; fi`"
 say ""
+
+tree_pkgs=`tree_set`
+if [ -z "$tree_pkgs" ]; then
+    say "ERROR: no packages found in the tree $tree (a package directory holds build and version files)"
+    exit 2
+fi
+if [ -z "$installed" ] && [ $mode != remake ]; then
+    say "ERROR: no installed packages found in $installed_dir (PKG_ROOT=${PKG_ROOT:-unset}, PKG_DB=${PKG_DB:-unset}); nothing to do"
+    exit 2
+fi
 
 case $mode in
     test)
