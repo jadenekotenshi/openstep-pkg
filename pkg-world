@@ -105,7 +105,13 @@ case "$*" in
     ;;
 esac
 
-here=`dirname "$0"`
+# No dirname here: the stock system lacks it (it comes with coreutils, which
+# "remake entire-world" removes).
+case $0 in
+    */*) here=`echo "$0" | sed 's#/[^/]*$##'` ;;
+    *) here=. ;;
+esac
+[ -n "$here" ] || here=/
 tree=`cd "$here" && pwd`
 PKG="$tree/pkg"
 [ -f "$PKG" ] || { echo "pkg-world: no pkg in $tree" >&2; exit 2; }
@@ -382,7 +388,33 @@ finish() {
 if [ -z "$logdir" ]; then
     logdir=${PKG_WORLD_LOGS:-$tree/world-logs}/$mode-`date '+%Y%m%d-%H%M%S'`
 fi
-mkdir -p "$logdir" || { echo "pkg-world: cannot create $logdir" >&2; exit 2; }
+# mkdir -p is coreutils' too: make the directory one component at a time.
+mkdirs() {
+    md_path=
+    case $1 in
+        /*) md_path= ;;
+        *) md_path=`pwd` ;;
+    esac
+    md_save_ifs=$IFS
+    IFS=/
+    set -- $1
+    IFS=$md_save_ifs
+    for md_c
+    do
+        if [ -n "$md_c" ]; then
+            md_path=$md_path/$md_c
+            if [ ! -d "$md_path" ]; then
+                mkdir "$md_path" || return 1
+            fi
+        fi
+    done
+    return 0
+}
+mkdirs "$logdir" || { echo "pkg-world: cannot create $logdir" >&2; exit 2; }
+case $logdir in
+    /*) : ;;
+    *) logdir=`pwd`/$logdir ;;
+esac
 summary=$logdir/summary.log
 : > "$summary"
 
