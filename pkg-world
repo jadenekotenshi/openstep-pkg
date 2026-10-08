@@ -343,13 +343,10 @@ verify_step() {
     return 0
 }
 
-# step ACTION PACKAGE ARG runs "pkg ACTION ARG" with its output in
-# <package>.<action>.log and records PASS or FAIL.  (No shift or "$@": the
-# stock sh is not trusted with them.)
+# step runs "pkg $st_action $st_arg" for package $st_pkg (all three set by the
+# caller; no function arguments, no shift, no "$@": the stock sh has mangled
+# them) with its output in <package>.<action>.log, and records PASS or FAIL.
 step() {
-    st_action=$1
-    st_pkg=$2
-    st_arg=$3
     st_log=$logdir/$st_pkg.$st_action.log
     {
         echo "### $st_action $st_pkg  `stamp`"
@@ -374,32 +371,37 @@ step() {
 
 # ---- the work ---------------------------------------------------------------
 
+# run_test: test package $rt_name
 run_test() {
-    if [ -f "$installed_dir/$1/test" ]; then
-        step test "$1" "$1"
+    if [ -f "$installed_dir/$rt_name/test" ]; then
+        st_action=test
+        st_pkg=$rt_name
+        st_arg=$rt_name
+        step
     else
-        record SKIP test "$1" "no test hook"
+        record SKIP test "$rt_name" "no test hook"
     fi
 }
 
-in_tree() {
-    [ -d "$tree/$1" ] && [ -f "$tree/$1/build" ] && [ -f "$tree/$1/version" ]
-}
-
-# build ACTION NAME (ACTION is install or reinstall), then test it
+# build_and_test: build package $bt_name with pkg action $bt_action (install or
+# reinstall), then test it
 build_and_test() {
-    if in_tree "$2"; then
-        if step "$1" "$2" "$tree/$2"; then
+    if [ -d "$tree/$bt_name" ] && [ -f "$tree/$bt_name/build" ] && [ -f "$tree/$bt_name/version" ]; then
+        st_action=$bt_action
+        st_pkg=$bt_name
+        st_arg=$tree/$bt_name
+        if step; then
             if [ $run_tests = 1 ]; then
-                run_test "$2"
+                rt_name=$bt_name
+                run_test
             fi
         else
             if [ $run_tests = 1 ]; then
-                record SKIP test "$2" "the build failed"
+                record SKIP test "$bt_name" "the build failed"
             fi
         fi
     else
-        record SKIP "$1" "$2" "not in this package tree"
+        record SKIP "$bt_action" "$bt_name" "not in this package tree"
     fi
 }
 
@@ -479,7 +481,8 @@ case $mode in
         for name in $set_to_do; do
             if [ $stop_now = 0 ]; then
                 if in_set "$name" "$installed"; then
-                    run_test "$name"
+                    rt_name=$name
+                    run_test
                 else
                     record SKIP test "$name" "not installed"
                 fi
@@ -496,7 +499,9 @@ case $mode in
         for name in `order_set "$set_to_do"`; do
             if [ $stop_now = 0 ]; then
                 if in_set "$name" "$installed"; then
-                    build_and_test reinstall "$name"
+                    bt_action=reinstall
+                    bt_name=$name
+                    build_and_test
                 else
                     record SKIP reinstall "$name" "not installed"
                 fi
@@ -535,7 +540,10 @@ case $mode in
         remove_order=`reverse_set "$remove_order"`
         for name in $remove_order; do
             if [ $stop_now = 0 ]; then
-                step remove "$name" "$name"
+                st_action=remove
+                st_pkg=$name
+                st_arg=$name
+                step
             fi
         done
         left=`installed_set`
@@ -547,7 +555,9 @@ case $mode in
         say ""
         for name in `order_set "$target"`; do
             if [ $stop_now = 0 ]; then
-                build_and_test install "$name"
+                bt_action=install
+                bt_name=$name
+                build_and_test
             fi
         done
     ;;
