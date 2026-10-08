@@ -1425,8 +1425,10 @@ install_pkg() {
 build_or_reuse_image() {
     if [ ! -d "$IMAGE_DIR" ] || [ -z "`find "$IMAGE_DIR" -print 2>/dev/null | sed 1d`" ]; then
         run_build
+        log "built $PKG_NAME $PKG_VERSION"
     else
         log "using existing staged image $IMAGE_DIR"
+        log "built $PKG_NAME $PKG_VERSION (existing staged image)"
     fi
 }
 
