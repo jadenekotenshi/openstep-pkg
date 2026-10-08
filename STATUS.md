@@ -10,8 +10,8 @@ has not been attempted.
 
 **Needs re-test after the October 2026 CVE fixes** (results above predate them;
 nothing below has been built on OPENSTEP yet): bzip2, freetype, libmad, wget
-(patches); gzip, zip, patch, tar (interim), openssl, emacs, mpg123 (patches);
-expat 2.9.0, python311 3.11.17, libpng 1.6.59, vim 9.2.1091, ca-certificates
+(patches); gzip, zip, patch, tar (interim), openssl, emacs (patches);
+expat 2.9.0, mpg123 1.33.7 (with private stdint.h/inttypes.h shims), python311 3.11.17, libpng 1.6.59, vim 9.2.1091, ca-certificates
 2026.09.25 (version bumps).  pkg itself gained a retry through `tarfix` for
 tarballs whose uid/gid exceed OPENSTEP's 16-bit uid_t.
 
