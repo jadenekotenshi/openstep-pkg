@@ -79,7 +79,17 @@ if [ -d "$installed_dir" ]; then
     done | sort > "$work/installed"
 fi
 
-comm -23 "$work/tree" "$work/installed" > "$work/missing"
+if [ ! -s "$work/tree" ]; then
+    echo "pkg-missing: no packages found in $tree (a package directory holds build and version files)" >&2
+    exit 2
+fi
+
+# Missing: the same test pkg itself makes, a directory in the installed database.
+# (A plain loop, not comm, which varies between systems.)
+: > "$work/missing"
+while read name; do
+    [ -d "$installed_dir/$name" ] || echo "$name" >> "$work/missing"
+done < "$work/tree"
 
 if [ $verbose -eq 0 ]; then
     cat "$work/missing"
@@ -90,6 +100,9 @@ n_tree=`wc -l < "$work/tree" | sed 's/ //g'`
 n_inst=`wc -l < "$work/installed" | sed 's/ //g'`
 n_miss=`wc -l < "$work/missing" | sed 's/ //g'`
 
+echo "Package tree: $tree"
+echo "Database:     $installed_dir"
+echo
 echo "Not installed ($n_miss):"
 sed 's/^/  /' "$work/missing"
 
