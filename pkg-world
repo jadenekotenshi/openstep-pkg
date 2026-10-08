@@ -343,18 +343,19 @@ verify_step() {
     return 0
 }
 
-# step ACTION PACKAGE COMMAND... runs one pkg command with its output in
-# <package>.<action>.log and records PASS or FAIL.
+# step ACTION PACKAGE ARG runs "pkg ACTION ARG" with its output in
+# <package>.<action>.log and records PASS or FAIL.  (No shift or "$@": the
+# stock sh is not trusted with them.)
 step() {
     st_action=$1
     st_pkg=$2
-    shift 2
+    st_arg=$3
     st_log=$logdir/$st_pkg.$st_action.log
     {
         echo "### $st_action $st_pkg  `stamp`"
-        echo "### $*"
+        echo "### /bin/sh $PKG $st_action $st_arg"
     } > "$st_log"
-    "$@" >> "$st_log" 2>&1
+    /bin/sh "$PKG" "$st_action" "$st_arg" >> "$st_log" 2>&1
     st_rc=$?
     echo "### exit status $st_rc  `stamp`" >> "$st_log"
     st_why=`verify_step "$st_action" "$st_pkg" "$st_log"`
@@ -375,7 +376,7 @@ step() {
 
 run_test() {
     if [ -f "$installed_dir/$1/test" ]; then
-        step test "$1" /bin/sh "$PKG" test "$1"
+        step test "$1" "$1"
     else
         record SKIP test "$1" "no test hook"
     fi
@@ -388,7 +389,7 @@ in_tree() {
 # build ACTION NAME (ACTION is install or reinstall), then test it
 build_and_test() {
     if in_tree "$2"; then
-        if step "$1" "$2" /bin/sh "$PKG" "$1" "$tree/$2"; then
+        if step "$1" "$2" "$tree/$2"; then
             if [ $run_tests = 1 ]; then
                 run_test "$2"
             fi
@@ -534,7 +535,7 @@ case $mode in
         remove_order=`reverse_set "$remove_order"`
         for name in $remove_order; do
             if [ $stop_now = 0 ]; then
-                step remove "$name" /bin/sh "$PKG" remove "$name"
+                step remove "$name" "$name"
             fi
         done
         left=`installed_set`
