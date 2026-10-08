@@ -814,6 +814,19 @@ pkg_tar() (
     fi
 )
 
+# TAR_NOOWNER is --no-same-owner when the gnutar has it (the stock one does
+# not; without it, extraction just keeps the archive's owners).
+TAR_NOOWNER_PROBED=0
+TAR_NOOWNER=
+tar_owner_opt() {
+    if [ $TAR_NOOWNER_PROBED = 0 ]; then
+        TAR_NOOWNER_PROBED=1
+        if pkg_tar --help 2>&1 | grep 'no-same-owner' > /dev/null 2>&1; then
+            TAR_NOOWNER=--no-same-owner
+        fi
+    fi
+}
+
 copy_local_source() {
     src=$1
     dest=$2
@@ -852,17 +865,23 @@ copy_local_source() {
 # 16-bit uid_t ("Archive value 197609 is out of uid_t range").  Retry through
 # tarfix, which zeroes the owner fields; $3... is the command that writes the
 # archive as a plain tar stream on stdout when given the file name.
+#
+# NB: the stock sh does not restore a caller's $1... after a call to a function
+# with arguments, so $@ is flattened into a variable before anything (log!) is
+# called.
 untar_retry() {
     ur_archive=$1
     ur_dir=$2
     shift 2
+    ur_cmd="$*"
     ur_src=$PKG_DIR/../tarfix.c
     [ -f "$ur_src" ] || return 1
     ur_bin=$BUILD_ROOT/.tarfix-$$
     log "extraction failed; retrying with owner ids cleared"
     ( ${PKG_TARFIX_CC:-cc} -o "$ur_bin" "$ur_src" ) || return 1
-    "$@" "$ur_archive" | "$ur_bin" |
-        pkg_tar -xf - --no-same-owner -C "$ur_dir"
+    tar_owner_opt
+    $ur_cmd "$ur_archive" | "$ur_bin" |
+        pkg_tar -xf - $TAR_NOOWNER -C "$ur_dir"
     ur_status=$?
     rm -f "$ur_bin"
     return $ur_status
@@ -880,14 +899,15 @@ extract_archive() {
     fi
 
     ensure_dir "$target_dir"
+    tar_owner_opt
 
     case $archive in
         *.tar.gz|*.tgz)
-            pkg_tar -xzf "$archive" --no-same-owner -C "$target_dir" ||
+            pkg_tar -xzf "$archive" $TAR_NOOWNER -C "$target_dir" ||
                 untar_retry "$archive" "$target_dir" gzip -dc
         ;;
         *.tar)
-            pkg_tar -xf "$archive" --no-same-owner -C "$target_dir" ||
+            pkg_tar -xf "$archive" $TAR_NOOWNER -C "$target_dir" ||
                 untar_retry "$archive" "$target_dir" cat
         ;;
         *.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
@@ -906,7 +926,7 @@ extract_archive() {
                 trap 'exit 1' 1 2 3 15
                 "$unpack_path" -dc "$archive" > "$unpack_tmp" ||
                     die "decompression failed: $archive"
-                pkg_tar -xf "$unpack_tmp" --no-same-owner -C "$target_dir" ||
+                pkg_tar -xf "$unpack_tmp" $TAR_NOOWNER -C "$target_dir" ||
                     untar_retry "$unpack_tmp" "$target_dir" cat || exit 1
                 cleanup_status=0
             )
