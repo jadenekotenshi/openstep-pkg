@@ -26,6 +26,8 @@ export PKG_CONFIG SDL_CFLAGS SDL_LIBS
 if test -d "mpg123-$VERSION"; then
     cd "mpg123-$VERSION"
 fi
+# Upstream fix for CVE-2024-10573 (mpg123 1.32.8), backported to 1.31.4.
+patch -p1 < "mpg123-$VERSION-CVE-2024-10573.patch"
 patch -p1 < "mpg123-$VERSION-openstep.patch"
 
 # Keep our -O2 flags: upstream's fast-math bundle produces instructions
