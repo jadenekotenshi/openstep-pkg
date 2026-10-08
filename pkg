@@ -8,6 +8,52 @@ die() {
     exit 1
 }
 
+# One build per package at a time.  Two builds in the same tree overwrite each
+# other's files (configure's conftest.c, objects, the staged image) and fail in
+# confusing ways.  The lock is a directory beside the build tree holding the
+# pid of the pkg that owns it.  A lock whose pid is gone (a build that was
+# interrupted, failed or died) is stale and is removed automatically; PKG_RESUME does
+# not override a live one.  PKG_BREAK_LOCK=1 removes the lock regardless.
+BUILD_LOCK_DIR=
+
+acquire_build_lock() {
+    ab_dir=$CACHE_ROOT/build/$PKG_NAME.lock
+    ensure_dir "$CACHE_ROOT/build"
+    ab_tries=0
+    while :; do
+        if mkdir "$ab_dir" 2>/dev/null; then
+            echo $$ > "$ab_dir/pid"
+            BUILD_LOCK_DIR=$ab_dir
+            return 0
+        fi
+        ab_pid=`cat "$ab_dir/pid" 2>/dev/null || :`
+        if [ -z "$ab_pid" ] && [ $ab_tries -lt 3 ]; then
+            # The owner may be between mkdir and writing its pid.
+            ab_tries=`expr $ab_tries + 1`
+            sleep 1
+            continue
+        fi
+        if [ -n "$ab_pid" ] && [ "$ab_pid" != "$$" ] && kill -0 "$ab_pid" 2>/dev/null; then
+            if [ "${PKG_BREAK_LOCK-}" = 1 ]; then
+                log "removing the build lock of $PKG_NAME held by pid $ab_pid (PKG_BREAK_LOCK=1)"
+            else
+                die "another pkg (pid $ab_pid) is already building $PKG_NAME; wait for it to finish, or stop it. If you are sure none is running, PKG_BREAK_LOCK=1 removes the lock ($ab_dir)"
+            fi
+        else
+            log "removing a stale build lock for $PKG_NAME (${ab_pid:-no pid})"
+        fi
+        rm -rf "$ab_dir"
+        ab_tries=0
+    done
+}
+
+release_build_lock() {
+    if [ -n "$BUILD_LOCK_DIR" ]; then
+        rm -rf "$BUILD_LOCK_DIR"
+        BUILD_LOCK_DIR=
+    fi
+}
+
 log() {
     echo "==> $*"
 }
@@ -924,6 +970,7 @@ run_build() {
     build_trace_flag=
     check_build_shell
     check_depends
+    acquire_build_lock
     download_pkg
     prepare_build_root
 
@@ -945,6 +992,7 @@ run_build() {
         "$build_shell" $build_trace_flag "$PKG_DIR/build" "$IMAGE_DIR" "$PKG_VERSION"
     )
 
+    release_build_lock
     clean_work_cache
 }
 

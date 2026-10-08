@@ -248,6 +248,16 @@ Plain `make` steps are already incremental, so they need no wrapping.  Without
 Packages that do not use the helpers simply run all their steps again in the
 kept tree.  `sudo` is the first to use them.
 
+**One build per package.**  Two builds in the same tree overwrite each other's files
+(configure's `conftest.c`, objects, the staged image) and fail in confusing ways, so
+`pkg` takes a lock, `<cache>/build/<package>.lock`, while it builds, and a second
+`pkg` for the same package stops with "another pkg (pid N) is already building ...".
+The lock holds the owner's pid.  If that process is gone (a build that was
+interrupted or died) the lock is stale and the next build removes it and carries on,
+so `PKG_RESUME` needs no special step.  `PKG_BREAK_LOCK=1` removes a lock whose owner
+is still alive, if you are sure it is not building.  Different packages still build
+side by side.
+
 ## `version`
 
 Contains the package version as a single field.
