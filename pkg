@@ -1916,3 +1916,9 @@ case $ACTION in
         die "unknown action: $ACTION"
     ;;
 esac
+
+# Stop here.  The shell reads a script as it runs, so a long run (a package that
+# takes hours to build) that reaches the end of the file after the file was
+# replaced by an update would carry on reading from the old offset into the
+# middle of the new file and try to run pieces of it ("Stock: not found").
+exit 0
