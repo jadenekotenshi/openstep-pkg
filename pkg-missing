@@ -19,28 +19,23 @@
 # listed like any other; pkg itself refuses them with a clear message.
 #
 # The script runs under pdksh (the stock OPENSTEP /bin/sh is too limited for it).
-# If pdksh is not installed, pkg-missing installs it first with this tree's pkg.
-# Set KSH to use another shell.
+# If pdksh is not installed, it prints "pdksh" alone (nearly every other package
+# depends on it) and a note on stderr.  Set KSH to use another shell.
 
 usage() {
     sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
 }
 
-# Re-run under pdksh, installing it first when needed.
-if [ -z "$PKG_MISSING_REEXEC" ]; then
-    here=`dirname "$0"`
+# Re-run under pdksh.  Without it almost nothing in the tree is installed (nearly
+# every package depends on pdksh, directly or not), so the answer is just pdksh.
+if [ -z "$PKG_MISSING_REEXEC" ] && [ "x$1" != x-h ] && [ "x$1" != x--help ]; then
     root=`echo "$PKG_ROOT" | sed 's#/*$##'`
     ksh=${KSH:-$root/usr/local/bin/ksh}
     if [ ! -x "$ksh" ]; then
-        if [ -n "$KSH" ]; then
-            echo "pkg-missing: $KSH is not executable" >&2
-            exit 2
-        fi
-        echo "pkg-missing: pdksh is not installed; installing it first" >&2
-        sh "$here/pkg" install pdksh || {
-            echo "pkg-missing: could not install pdksh" >&2
-            exit 2
-        }
+        echo "pkg-missing: pdksh ($ksh) is not installed; nearly every other package needs it." >&2
+        echo "pkg-missing: install it first (pkg install pdksh), then run pkg-missing again." >&2
+        echo pdksh
+        exit 0
     fi
     PKG_MISSING_REEXEC=1
     export PKG_MISSING_REEXEC
