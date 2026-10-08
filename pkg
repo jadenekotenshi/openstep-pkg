@@ -1835,8 +1835,8 @@ remove_name() {
 # Options for what to keep (they come before the action, and also work as
 # environment variables set to 1):
 #   --preserve-download      keep the downloaded sources after the build
-#   --preserve-build-tree    keep the build tree after the build
-#   --preserve-install-tree  keep the staged image after the install
+#   --preserve-build-tree    keep the build tree after the build (or --preserve-build)
+#   --preserve-install-tree  keep the staged image after the install (or --preserve-install)
 PKG_PRESERVE_DOWNLOAD=${PKG_PRESERVE_DOWNLOAD-0}
 PKG_PRESERVE_BUILD_TREE=${PKG_PRESERVE_BUILD_TREE-0}
 PKG_PRESERVE_INSTALL_TREE=${PKG_PRESERVE_INSTALL_TREE-0}
@@ -1846,11 +1846,11 @@ while [ $# -gt 0 ]; do
             PKG_PRESERVE_DOWNLOAD=1
             shift
         ;;
-        --preserve-build-tree)
+        --preserve-build-tree|--preserve-build)
             PKG_PRESERVE_BUILD_TREE=1
             shift
         ;;
-        --preserve-install-tree)
+        --preserve-install-tree|--preserve-install)
             PKG_PRESERVE_INSTALL_TREE=1
             shift
         ;;
