@@ -15,6 +15,10 @@ expat 2.9.0, python311 3.11.17, libpng 1.6.59, vim 9.2.1091, ca-certificates
 2026.09.25 (version bumps).  pkg itself gained a retry through `tarfix` for
 tarballs whose uid/gid exceed OPENSTEP's 16-bit uid_t.
 
+lha is only partly hardened: upstream's 2016 header and symlink fixes are ported
+to 1.14i-ac20050924p1, but two header-read gaps upstream also left are not
+fixed.  Use it for old, known-safe archives only.
+
 | Package | x86 | SPARC |
 |---|---|---|
 | bash | validated | — |
