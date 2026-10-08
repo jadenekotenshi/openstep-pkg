@@ -347,6 +347,13 @@ verify_step() {
 # caller; no function arguments, no shift, no "$@": the stock sh has mangled
 # them) with its output in <package>.<action>.log, and records PASS or FAIL.
 step() {
+    case $st_action in
+        install) st_verb=building ;;
+        reinstall) st_verb=rebuilding ;;
+        remove) st_verb=removing ;;
+        *) st_verb=testing ;;
+    esac
+    say "`stamp`  ...   $st_verb $st_pkg"
     st_log=$logdir/$st_pkg.$st_action.log
     {
         echo "### $st_action $st_pkg  `stamp`"
