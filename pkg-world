@@ -364,6 +364,22 @@ step() {
     echo "### exit status $st_rc  `stamp`" >> "$st_log"
     st_why=`verify_step "$st_action" "$st_pkg" "$st_log"`
     st_ok=$?
+    # An install is a build then an install: report the build on its own, so a
+    # package that compiles but fails to install says so.
+    case $st_action in
+        install|reinstall)
+            if grep "^==> built $st_pkg " "$st_log" > /dev/null 2>&1; then
+                record PASS build "$st_pkg"
+            elif [ $st_rc -ne 0 ] || [ $st_ok -ne 0 ]; then
+                if [ $st_rc -ne 0 ]; then
+                    record FAIL build "$st_pkg" "exit $st_rc, see $st_pkg.$st_action.log"
+                else
+                    record FAIL build "$st_pkg" "exit 0 but $st_why, see $st_pkg.$st_action.log"
+                fi
+                return 1
+            fi
+        ;;
+    esac
     if [ $st_rc -eq 0 ] && [ $st_ok -eq 0 ]; then
         record PASS "$st_action" "$st_pkg"
         return 0
