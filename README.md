@@ -56,6 +56,16 @@ sh ./pkg remove bash
 
 `sh ./pkg-missing` lists the packages in the tree that are not installed (`-v` also shows version mismatches and installed packages the tree lacks), which is handy while working down the tree on a fresh machine: `for p in \`sh ./pkg-missing\`; do sh ./pkg install $p; done`.
 
+`sh ./pkg-world` runs the whole tree through its paces and writes a log of every step:
+
+```
+sh ./pkg-world test world               # pkg test for every installed package
+sh ./pkg-world reinstall world          # rebuild and reinstall each installed package, dependencies first, then test it
+sh ./pkg-world remake entire-world      # remove every package, then rebuild the whole tree from an empty system
+```
+
+Each step is a plain `pkg test`, `pkg reinstall`, `pkg install` or `pkg remove`, so a failure can be repeated by hand. The logs go to `world-logs/<mode>-<date>-<time>/` (or `-l DIR`): `summary.log` has one line per step marked `PASS`, `FAIL` or `SKIP` (no test hook, not in the tree, a failed build) with the time, `<package>.<action>.log` has that step's complete output, and the run ends with the totals and the list of failures; the exit status is 1 if anything failed. Options: `-n` skips the tests after builds, `-s` stops at the first failure, `-y` skips the confirmation that `remake` asks for, `-i` makes `remake` put back only the packages that were installed instead of the whole tree, and `-o "a b"` limits the run to those packages. `remake entire-world` is destructive by design: it removes everything `pkg` installed and rebuilds from the sources, so use it on a machine where that is what you want. It runs under the stock `/bin/sh`, so it works on an empty system.
+
 `install` skips a package that is already installed at the same version.  `reinstall` (also
 spelled `forceinstall`) rebuilds and installs the named packages anyway, replacing the
 installed copy; their dependencies are only installed when missing.
