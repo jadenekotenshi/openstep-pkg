@@ -17,10 +17,35 @@
 #   for p in `sh ./pkg-missing`; do sh ./pkg install $p; done
 # Packages that need a pkg.conf option you have not set (see "requires") are
 # listed like any other; pkg itself refuses them with a clear message.
+#
+# The script runs under pdksh (the stock OPENSTEP /bin/sh is too limited for it).
+# If pdksh is not installed, pkg-missing installs it first with this tree's pkg.
+# Set KSH to use another shell.
 
 usage() {
-    sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'
 }
+
+# Re-run under pdksh, installing it first when needed.
+if [ -z "$PKG_MISSING_REEXEC" ]; then
+    here=`dirname "$0"`
+    root=`echo "$PKG_ROOT" | sed 's#/*$##'`
+    ksh=${KSH:-$root/usr/local/bin/ksh}
+    if [ ! -x "$ksh" ]; then
+        if [ -n "$KSH" ]; then
+            echo "pkg-missing: $KSH is not executable" >&2
+            exit 2
+        fi
+        echo "pkg-missing: pdksh is not installed; installing it first" >&2
+        sh "$here/pkg" install pdksh || {
+            echo "pkg-missing: could not install pdksh" >&2
+            exit 2
+        }
+    fi
+    PKG_MISSING_REEXEC=1
+    export PKG_MISSING_REEXEC
+    exec "$ksh" "$0" ${1+"$@"}
+fi
 
 verbose=0
 tree=
