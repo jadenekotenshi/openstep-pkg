@@ -258,6 +258,22 @@ Plain `make` steps are already incremental, so they need no wrapping.  Without
 Packages that do not use the helpers simply run all their steps again in the
 kept tree.  `sudo` is the first to use them.
 
+**Keeping what `pkg` normally deletes.**  After a package builds and installs, `pkg` removes
+its downloaded sources, its build tree and its staged image.  For debugging, three options
+(given before the action, or as environment variables set to 1) keep them:
+
+```
+pkg --preserve-download reinstall sudo        # <cache>/sources/sudo stays
+pkg --preserve-build-tree reinstall sudo      # <cache>/build/sudo stays (the next build of sudo replaces it, unless PKG_RESUME is set)
+pkg --preserve-install-tree reinstall sudo    # the staged image stays as <cache>/pkg/sudo.installed
+```
+
+(`PKG_PRESERVE_DOWNLOAD`, `PKG_PRESERVE_BUILD_TREE`, `PKG_PRESERVE_INSTALL_TREE`.)  They apply
+to every package that run builds, dependencies included, so set the variables to run
+`pkg-world` with them.  The staged image is kept under another name so that a later install
+never mistakes it for a finished build and reuses it.  A build that fails keeps its tree
+anyway.
+
 **One build per package.**  Two builds in the same tree overwrite each other's files
 (configure's `conftest.c`, objects, the staged image) and fail in confusing ways, so
 `pkg` takes a lock, `<cache>/build/<package>.lock`, while it builds, and a second
