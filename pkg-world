@@ -23,6 +23,11 @@
 #   -o "A B" work on only these packages (a quick way to try the script)
 #   -h       this text
 #
+#   sh ./pkg-world check dependencies
+#            looks for dependency loops among all the packages in the tree and
+#            prints one if it finds it (exit 2).  "reinstall world" and
+#            "remake entire-world" run this first, before they change anything.
+#
 # Logs: summary.log lists every step as one line, "PASS" or "FAIL" (or "SKIP"),
 # the action, the package and the time; <package>.<action>.log holds the whole
 # output of that step.  The script ends with the totals and the failures, and
@@ -35,7 +40,7 @@
 # pkg settings in the environment.
 
 usage() {
-    sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 logdir=
@@ -98,6 +103,9 @@ case "$*" in
     ;;
     "remake entire-world")
         mode=remake
+    ;;
+    "check dependencies")
+        mode=check
     ;;
     *)
         usage >&2
@@ -262,6 +270,87 @@ order_words() {
         ow_out="$ow_out $ow_n"
     done
     echo $ow_out
+}
+
+# Look for a dependency loop among the packages of a set (all of the tree by
+# default).  Every package other than pdksh also depends on pdksh, the build
+# shell that pkg installs first.  Optional dependencies count (a loop through
+# one is real whenever its option is on).  Prints the loop and returns 1, or
+# returns 0.
+check_cycles() {
+    cc_set=" $1 "
+    cc_done=" "
+    cc_left=$1
+    while [ -n "$cc_left" ]; do
+        cc_next=
+        cc_progress=0
+        for cc_n in $cc_left; do
+            cc_ready=1
+            for cc_d in `cc_deps "$cc_n"`; do
+                case $cc_set in
+                    *" $cc_d "*)
+                        case $cc_done in
+                            *" $cc_d "*) : ;;
+                            *) cc_ready=0 ;;
+                        esac
+                    ;;
+                esac
+            done
+            if [ $cc_ready = 1 ]; then
+                cc_done="$cc_done$cc_n "
+                cc_progress=1
+            else
+                cc_next="$cc_next $cc_n"
+            fi
+        done
+        if [ $cc_progress = 0 ]; then
+            # Everything left either is in a loop or needs one.  Every left-over
+            # package has a dependency that is left over too, so follow those
+            # until a package comes round again: that is a loop.
+            cc_stuck=" $cc_next "
+            for cc_n in $cc_next; do break; done
+            cc_path=" "
+            while :; do
+                case $cc_path in
+                    *" $cc_n "*) break ;;
+                esac
+                cc_path="$cc_path$cc_n "
+                cc_pick=
+                for cc_d in `cc_deps "$cc_n"`; do
+                    case $cc_stuck in
+                        *" $cc_d "*)
+                            if [ -z "$cc_pick" ]; then
+                                cc_pick=$cc_d
+                            fi
+                        ;;
+                    esac
+                done
+                cc_n=$cc_pick
+            done
+            cc_loop=$cc_n
+            cc_started=0
+            for cc_p in $cc_path; do
+                if [ "$cc_p" = "$cc_n" ]; then
+                    cc_started=1
+                fi
+                if [ $cc_started = 1 ] && [ "$cc_p" != "$cc_n" ]; then
+                    cc_loop="$cc_loop -> $cc_p"
+                fi
+            done
+            echo "pkg-world: dependency loop: $cc_loop -> $cc_n" >&2
+            return 1
+        fi
+        cc_left=$cc_next
+    done
+    return 0
+}
+
+# A package's dependencies for the loop check: its depends file, plus pdksh.
+cc_deps() {
+    deps_of "$1"
+    if [ "$1" != pdksh ] && [ -d "$tree/pdksh" ]; then
+        echo pdksh
+    fi
 }
 
 # ---- logging ----------------------------------------------------------------
@@ -440,6 +529,17 @@ finish() {
     say "No failures.  Logs: $logdir"
     exit 0
 }
+
+if [ $mode = check ]; then
+    if check_cycles "`tree_set`"; then
+        echo "pkg-world: no dependency loops among `tree_set | wc -w | sed 's/ //g'` packages"
+        exit 0
+    fi
+    exit 2
+fi
+if [ $mode != test ]; then
+    check_cycles "`tree_set`" || { echo "pkg-world: not starting; fix the loop first" >&2; exit 2; }
+fi
 
 if [ -z "$logdir" ]; then
     logdir=${PKG_WORLD_LOGS:-$tree/world-logs}/$mode-`stamp_name`
