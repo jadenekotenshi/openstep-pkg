@@ -266,6 +266,47 @@ record() {
     esac
 }
 
+# Did the step really succeed?  The exit status of pkg is not trusted on its
+# own: the stock sh has been seen to lose a failing status, so a step only
+# passes if pkg also printed its success line (and no "error:" line) and, for a
+# removal, the package is gone.  Prints why it did not, if it did not.
+verify_step() {
+    vs_action=$1
+    vs_pkg=$2
+    vs_log=$3
+    if grep '^error:' "$vs_log" > /dev/null 2>&1; then
+        echo "pkg printed an error"
+        return 1
+    fi
+    case $vs_action in
+        test)
+            if grep "test passed for $vs_pkg " "$vs_log" > /dev/null 2>&1; then
+                return 0
+            fi
+            echo "no 'test passed' line"
+            return 1
+        ;;
+        install|reinstall)
+            if grep "==> installed $vs_pkg " "$vs_log" > /dev/null 2>&1; then
+                return 0
+            fi
+            if grep "==> already installed: $vs_pkg " "$vs_log" > /dev/null 2>&1; then
+                return 0
+            fi
+            echo "no 'installed' line"
+            return 1
+        ;;
+        remove)
+            if [ -d "$installed_dir/$vs_pkg" ]; then
+                echo "still installed"
+                return 1
+            fi
+            return 0
+        ;;
+    esac
+    return 0
+}
+
 # step ACTION PACKAGE COMMAND... runs one pkg command with its output in
 # <package>.<action>.log and records PASS or FAIL.
 step() {
@@ -280,12 +321,18 @@ step() {
     "$@" >> "$st_log" 2>&1
     st_rc=$?
     echo "### exit status $st_rc  `stamp`" >> "$st_log"
-    if [ $st_rc -eq 0 ]; then
+    st_why=`verify_step "$st_action" "$st_pkg" "$st_log"`
+    st_ok=$?
+    if [ $st_rc -eq 0 ] && [ $st_ok -eq 0 ]; then
         record PASS "$st_action" "$st_pkg"
-    else
-        record FAIL "$st_action" "$st_pkg" "exit $st_rc, see $st_pkg.$st_action.log"
+        return 0
     fi
-    return $st_rc
+    if [ $st_rc -ne 0 ]; then
+        record FAIL "$st_action" "$st_pkg" "exit $st_rc, see $st_pkg.$st_action.log"
+        return $st_rc
+    fi
+    record FAIL "$st_action" "$st_pkg" "exit 0 but $st_why, see $st_pkg.$st_action.log"
+    return 1
 }
 
 # ---- the work ---------------------------------------------------------------
