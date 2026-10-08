@@ -67,7 +67,11 @@ while [ $# -gt 0 ]; do
 done
 
 if [ -z "$tree" ]; then
-    tree=`dirname "$0"`
+    case $0 in
+        */*) tree=`echo "$0" | sed 's#/[^/]*$##'` ;;
+        *) tree=. ;;
+    esac
+    [ -n "$tree" ] || tree=/
 fi
 [ -d "$tree" ] || { echo "pkg-missing: no such directory: $tree" >&2; exit 2; }
 tree=`cd "$tree" && pwd`
