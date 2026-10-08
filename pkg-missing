@@ -64,23 +64,40 @@ trap 'rm -rf "$work"' 0
 trap 'exit 1' 1 2 3 15
 
 # The tree: a directory is a package when it has build and version files.
+# (Plain if tests, no "continue" or pipelines around the loop: the stock
+# OPENSTEP /bin/sh is picky about both.)
+: > "$work/tree.raw"
 for d in "$tree"/*; do
-    [ -d "$d" ] || continue
-    [ -f "$d/build" ] && [ -f "$d/version" ] || continue
-    basename "$d"
-done | sort > "$work/tree"
+    if [ -d "$d" ]; then
+        if [ -f "$d/build" ]; then
+            if [ -f "$d/version" ]; then
+                echo "$d" | sed 's#.*/##' >> "$work/tree.raw"
+            fi
+        fi
+    fi
+done
+sort "$work/tree.raw" > "$work/tree"
 
 # The database: one directory per installed package, holding its version file.
-: > "$work/installed"
+: > "$work/installed.raw"
 if [ -d "$installed_dir" ]; then
     for d in "$installed_dir"/*; do
-        [ -d "$d" ] || continue
-        basename "$d"
-    done | sort > "$work/installed"
+        if [ -d "$d" ]; then
+            echo "$d" | sed 's#.*/##' >> "$work/installed.raw"
+        fi
+    done
 fi
+sort "$work/installed.raw" > "$work/installed"
 
 if [ ! -s "$work/tree" ]; then
     echo "pkg-missing: no packages found in $tree (a package directory holds build and version files)" >&2
+    for d in "$tree"/gzip "$tree"/make; do
+        if [ -d "$d" ]; then
+            echo "pkg-missing: $d: build `[ -f "$d/build" ] && echo yes || echo no`, version `[ -f "$d/version" ] && echo yes || echo no`" >&2
+            ls -l "$d" >&2
+            break
+        fi
+    done
     exit 2
 fi
 
