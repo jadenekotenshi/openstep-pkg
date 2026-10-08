@@ -8,6 +8,13 @@ Last updated 2026-10-06.  Results come from test runs on the x86 and SPARC
 OPENSTEP 4.2 machines; most packages have only been tried on x86 so far.  M68k
 has not been attempted.
 
+**Needs re-test after the October 2026 CVE fixes** (results above predate them;
+nothing below has been built on OPENSTEP yet): bzip2, freetype, libmad, wget
+(patches); gzip, zip, patch, tar (interim), openssl, emacs, mpg123 (patches);
+expat 2.9.0, python311 3.11.17, libpng 1.6.59, vim 9.2.1091, ca-certificates
+2026.09.25 (version bumps).  pkg itself gained a retry through `tarfix` for
+tarballs whose uid/gid exceed OPENSTEP's 16-bit uid_t.
+
 | Package | x86 | SPARC |
 |---|---|---|
 | bash | validated | — |
