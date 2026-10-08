@@ -89,6 +89,10 @@ pkg_apply_patch() {
     /bin/cp "$pkg_patch_file" "$pkg_patch_copy"
 }
 
+# NB: the stock /bin/cc silently IGNORES "-include FILE", so pkg_cmp_shim does
+# nothing for it; use it only with gcc-4.2.  For the system cc use pkg_cmp_obj
+# (a program) or pkg_cmp_named (a library).
+#
 # pkg_cmp_shim DIR
 # OPENSTEP's SPARC libc compares bytes as signed in memcmp() (for 20 bytes, and
 # so for any word-sized and larger input) and strcmp(), so data with bytes of
@@ -249,4 +253,90 @@ strncmp(a, b, n)
 COEOF
     $CC -fno-builtin -O -c "$co_dir/ostep-cmp.c" -o "$co_dir/ostep-cmp.o" || return 1
     echo "$co_dir/ostep-cmp.o"
+}
+
+# pkg_cmp_named DIR
+# For a library that other programs link (so they cannot all be given an
+# object, and the stock cc cannot take pkg_cmp_shim's -include): writes
+# DIR/ostep-cmp-named.c with unsigned ostep_memcmp(), ostep_strcmp() and
+# ostep_strncmp(), compiles it with $CC to DIR/ostep-cmp-named.o, and prints
+# the compiler flags that rename memcmp, strcmp and strncmp to them.  Compile
+# the package with those flags and add the object to the library (ar r), so
+# that whatever links the library gets the definitions; a program that does not
+# fails to link instead of quietly using the signed libc routines.  Prints
+# nothing on machines whose libc is fine, or with PKG_UNSIGNED_CMP=0 (=1
+# forces it on).
+pkg_cmp_named() {
+    cn_dir=$1
+
+    case ${PKG_UNSIGNED_CMP-} in
+        0)
+            return 0
+        ;;
+        1)
+            :
+        ;;
+        *)
+            [ "${PKG_ARCH-}" = sparc ] || return 0
+        ;;
+    esac
+
+    [ -d "$cn_dir" ] || mkdir "$cn_dir" || return 1
+    /bin/cat > "$cn_dir/ostep-cmp-named.c" <<'CNEOF'
+#include <stddef.h>
+
+int
+ostep_memcmp(a, b, n)
+    const void *a;
+    const void *b;
+    size_t n;
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (n-- > 0) {
+        if (*p != *q)
+            return *p < *q ? -1 : 1;
+        p++;
+        q++;
+    }
+    return 0;
+}
+
+int
+ostep_strcmp(a, b)
+    const char *a;
+    const char *b;
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (*p != 0 && *p == *q) {
+        p++;
+        q++;
+    }
+    return *p == *q ? 0 : (*p < *q ? -1 : 1);
+}
+
+int
+ostep_strncmp(a, b, n)
+    const char *a;
+    const char *b;
+    size_t n;
+{
+    const unsigned char *p = (const unsigned char *) a;
+    const unsigned char *q = (const unsigned char *) b;
+
+    while (n > 0 && *p != 0 && *p == *q) {
+        p++;
+        q++;
+        n--;
+    }
+    if (n == 0)
+        return 0;
+    return *p == *q ? 0 : (*p < *q ? -1 : 1);
+}
+CNEOF
+    $CC -fno-builtin -O -c "$cn_dir/ostep-cmp-named.c" -o "$cn_dir/ostep-cmp-named.o" || return 1
+    echo "-Dmemcmp=ostep_memcmp -Dstrcmp=ostep_strcmp -Dstrncmp=ostep_strncmp"
 }
