@@ -313,7 +313,7 @@ stale_features() {
 usage() {
     cat <<'EOF'
 usage:
-  pkg download <package-dir>
+  pkg [options] download <package-dir>
   pkg build <package-dir>
   pkg install <package-dir>...
   pkg reinstall <package-dir>...    (alias: forceinstall)
@@ -324,6 +324,19 @@ usage:
   pkg test <name>...
   pkg arch
   pkg config
+
+options (before the action; each also works as an environment variable set to 1):
+  --preserve-download      keep the downloaded sources (PKG_PRESERVE_DOWNLOAD)
+                           in <cache>/sources/<package> instead of deleting
+                           them after a successful build
+  --preserve-build-tree    keep the build tree (PKG_PRESERVE_BUILD_TREE) in
+                           <cache>/build/<package> after a successful build; the
+                           next build of that package replaces it unless
+                           PKG_RESUME is set
+  --preserve-install-tree  keep the staged image (PKG_PRESERVE_INSTALL_TREE)
+                           as <cache>/pkg/<package>.installed after the install
+  They apply to every package that run builds, dependencies included.  A build
+  that fails always keeps its tree.
 
 install actions:
   install      builds and installs a package and what it depends on; a package
@@ -1237,24 +1250,58 @@ write_manifest() {
     done
 }
 
-clean_image_cache() {
+# True when a --preserve-* option (or the PKG_PRESERVE_* variable) asks to keep
+# something that is normally deleted.
+preserving() {
+    case ${1-} in
+        ''|0) return 1 ;;
+    esac
+    return 0
+}
+
+# Remove the staged image unconditionally (before a rebuild, and when a step
+# failed and the image is useless).
+discard_image_cache() {
     if [ -d "$IMAGE_DIR" ]; then
         log "cleaning staged image $IMAGE_DIR"
         rm -rf "$IMAGE_DIR"
     fi
 }
 
+# The staged image after a package was installed or packed.  With
+# --preserve-install-tree it is kept, under another name so that a later
+# install never mistakes it for a build to reuse.
+clean_image_cache() {
+    if [ -d "$IMAGE_DIR" ]; then
+        if preserving "$PKG_PRESERVE_INSTALL_TREE"; then
+            rm -rf "$IMAGE_DIR.installed"
+            mv "$IMAGE_DIR" "$IMAGE_DIR.installed"
+            log "keeping the staged image as $IMAGE_DIR.installed"
+        else
+            discard_image_cache
+        fi
+    fi
+}
+
 clean_source_cache() {
     if [ -d "$SRC_CACHE" ]; then
-        log "cleaning source cache $SRC_CACHE"
-        rm -rf "$SRC_CACHE"
+        if preserving "$PKG_PRESERVE_DOWNLOAD"; then
+            log "keeping the downloaded sources in $SRC_CACHE"
+        else
+            log "cleaning source cache $SRC_CACHE"
+            rm -rf "$SRC_CACHE"
+        fi
     fi
 }
 
 clean_build_cache() {
     if [ -d "$BUILD_ROOT" ]; then
-        log "cleaning build root $BUILD_ROOT"
-        rm -rf "$BUILD_ROOT"
+        if preserving "$PKG_PRESERVE_BUILD_TREE"; then
+            log "keeping the build tree $BUILD_ROOT (the next build of $PKG_NAME replaces it, unless PKG_RESUME is set)"
+        else
+            log "cleaning build root $BUILD_ROOT"
+            rm -rf "$BUILD_ROOT"
+        fi
     fi
 }
 
@@ -1342,7 +1389,7 @@ install_pkg() {
 
     if [ "x$install_force" = x1 ]; then
         log "reinstalling $PKG_NAME $PKG_VERSION: rebuilding it"
-        clean_image_cache
+        discard_image_cache
     fi
 
     build_or_reuse_image
@@ -1517,7 +1564,7 @@ binpkg_check_requires() {
 $bc_list
 EOF
     if [ -n "$bc_bad" ]; then
-        clean_image_cache
+        discard_image_cache
         die "$PKG_NAME needs these pkg.conf options set to 1:$bc_bad"
     fi
 }
@@ -1545,11 +1592,11 @@ binpkg_check_depends() {
     done < "$bd_meta/depends"
 
     if [ -n "$bd_missing" ]; then
-        clean_image_cache
+        discard_image_cache
         die "missing dependencies for $PKG_NAME (install them first):$bd_missing"
     fi
     if [ -n "$bd_conflicts" ]; then
-        clean_image_cache
+        discard_image_cache
         die "conflicting installed packages for $PKG_NAME:$bd_conflicts"
     fi
 }
@@ -1603,16 +1650,16 @@ installpkg_file() {
     set_paths
     log "starting install of binary package $PKG_NAME $PKG_VERSION from $ip_file"
 
-    clean_image_cache
+    discard_image_cache
     ensure_dir "$IMAGE_DIR"
     pkg_tar -xzpf "$ip_file" -C "$IMAGE_DIR" ||
-        { clean_image_cache; die "could not unpack $ip_file"; }
+        { discard_image_cache; die "could not unpack $ip_file"; }
 
     ip_meta=$CACHE_ROOT/binpkg-meta/$PKG_NAME
     rm -rf "$ip_meta"
     ensure_dir "$CACHE_ROOT/binpkg-meta"
     [ -d "$IMAGE_DIR/.pkg" ] ||
-        { clean_image_cache; die "$ip_file has no .pkg metadata"; }
+        { discard_image_cache; die "$ip_file has no .pkg metadata"; }
     mv "$IMAGE_DIR/.pkg" "$ip_meta"
 
     binpkg_check_requires "$ip_meta"
@@ -1746,7 +1793,43 @@ remove_name() {
 
 # Some old Bourne shells do not restore the positional parameters after a
 # function call, so take what we need from them before calling anything.
-ACTION=$1
+# Options for what to keep (they come before the action, and also work as
+# environment variables set to 1):
+#   --preserve-download      keep the downloaded sources after the build
+#   --preserve-build-tree    keep the build tree after the build
+#   --preserve-install-tree  keep the staged image after the install
+PKG_PRESERVE_DOWNLOAD=${PKG_PRESERVE_DOWNLOAD-0}
+PKG_PRESERVE_BUILD_TREE=${PKG_PRESERVE_BUILD_TREE-0}
+PKG_PRESERVE_INSTALL_TREE=${PKG_PRESERVE_INSTALL_TREE-0}
+while [ $# -gt 0 ]; do
+    case $1 in
+        --preserve-download)
+            PKG_PRESERVE_DOWNLOAD=1
+            shift
+        ;;
+        --preserve-build-tree)
+            PKG_PRESERVE_BUILD_TREE=1
+            shift
+        ;;
+        --preserve-install-tree)
+            PKG_PRESERVE_INSTALL_TREE=1
+            shift
+        ;;
+        --)
+            shift
+            break
+        ;;
+        --*)
+            die "unknown option: $1"
+        ;;
+        *)
+            break
+        ;;
+    esac
+done
+export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE
+
+ACTION=${1-}
 ARGC=$#
 FORCE_INSTALL=0
 PKG_FORCE=0
