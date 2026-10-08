@@ -804,10 +804,10 @@ extract_archive() {
 
     case $archive in
         *.tar.gz|*.tgz)
-            pkg_tar -xzf "$archive" -C "$target_dir"
+            pkg_tar -xzf "$archive" --no-same-owner -C "$target_dir"
         ;;
         *.tar)
-            pkg_tar -xf "$archive" -C "$target_dir"
+            pkg_tar -xf "$archive" --no-same-owner -C "$target_dir"
         ;;
         *.tar.bz2|*.tbz2|*.tar.xz|*.txz|*.tar.zst|*.tzst)
             (
@@ -825,7 +825,7 @@ extract_archive() {
                 trap 'exit 1' 1 2 3 15
                 "$unpack_path" -dc "$archive" > "$unpack_tmp" ||
                     die "decompression failed: $archive"
-                pkg_tar -xf "$unpack_tmp" -C "$target_dir" || exit 1
+                pkg_tar -xf "$unpack_tmp" --no-same-owner -C "$target_dir" || exit 1
                 cleanup_status=0
             )
         ;;
