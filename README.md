@@ -194,8 +194,22 @@ CMPFLAGS=`pkg_cmp_shim "\`pwd\`/openstep-cmp"`
 gnumake CPPFLAGS="$CPPFLAGS $CMPFLAGS"
 ```
 
-`git`, `python311`, `sed`, `grep`, `gawk`, `coreutils`, `diffutils`, `findutils` and `vim`
-use it; other packages that sort or compare binary data on SPARC should too.
+**The stock `/bin/cc` silently ignores `-include`**, so `pkg_cmp_shim` does nothing
+for it (it works with gcc-4.2).  `python311`, `sed`, `diffutils`, `findutils` and `vim`
+build with gcc-4.2 and use `pkg_cmp_shim`.  Packages built with the system cc use one of:
+
+- `pkg_cmp_obj DIR` (`coreutils`, `gawk`, `grep`, `wget-bootstrap`): compiles unsigned
+  `memcmp`, `strcmp` and `strncmp` into an object and prints its path; add it to
+  `LDFLAGS` at make time and the program's own definitions win over libc's.
+- `pkg_cmp_named DIR` (`openssl`): for a library that other programs link.  It prints
+  `-D` flags renaming the three functions to `ostep_*` and builds `DIR/ostep-cmp-named.o`;
+  add that object to the library with `ar r`, so a program that links the library gets the
+  definitions (and fails to link, loudly, if it somehow does not).
+
+`openssl` needed this: its object-identifier table is searched with `memcmp`, and with the
+signed one SHA1, the AES and SHA-2 OIDs and the secp384r1 family could not be found
+(`openssl ec -pubout`, and certificate chains using those, failed).  `openssl/oidtest.c`
+checks every built-in OID.
 
 Newer gnulib trees (such as `wget-bootstrap`'s) refuse a header that is included before
 `config.h`, so a forced `-include` cannot work there.  `pkg_cmp_obj DIR` does the same job
