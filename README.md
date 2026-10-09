@@ -249,6 +249,25 @@ Optional:
 - `pre-remove`
 - `test`
 
+## Verifying installed files
+
+When a package is installed, `pkg` records every installed file, directory and symbolic link in
+`<db>/installed/<name>/files`, with a SHA-256 for each regular file when `sha256sum` or `openssl`
+is available (a `-` means none was taken, for example for a name with a space in it).  The list
+is taken after `post-install` has run, so what a hook changes is part of the baseline.
+
+```sh
+pkg verify              # every installed package
+pkg verify gzip tar     # just these
+pkg verify --quick      # only check that each file, directory and link exists
+```
+
+`pkg verify` reports what is missing or changed and recommends `pkg reinstall <name>`; it exits 1 if
+anything failed.  `--quick` skips the checksums, so it also works without a hash tool and is much
+faster.  A package installed before the file list existed has only the older `manifest`, so it is
+checked for existence only until it is reinstalled.  Files that a package expects users to edit
+(for example `ntpd.conf`) will show as changed once edited.
+
 ## Resuming a failed build
 
 A failed build leaves its tree in `<cache>/build/<package>`.  Set `PKG_RESUME=1`

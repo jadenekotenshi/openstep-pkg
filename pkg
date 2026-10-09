@@ -322,6 +322,7 @@ usage:
   pkg list
   pkg remove <name>
   pkg test <name>...
+  pkg verify [--quick] [<name>...]
   pkg arch
   pkg config
 
@@ -355,6 +356,17 @@ install actions:
                package that fails, or has no checksum, unless PKG_NO_VERIFY=1.
                It also refuses a package built for another PKG_ARCH, and one
                whose dependencies are not installed
+
+verify:
+  An install records every installed file in <db>/installed/<name>/files, with
+  a SHA-256 for each regular file when sha256sum or openssl is available (taken
+  after post-install, so what a hook changed is the baseline).  pkg verify
+  checks that each recorded file, directory and link is there and unchanged and,
+  if it fails, lists what is missing or different and recommends a reinstall.
+  With no names it checks every installed package.  --quick checks only that
+  each exists, without comparing checksums (and needs no hash tool).  A package
+  installed before this was recorded is checked for existence only.  Exit
+  status 1 if anything failed.
 
 configuration:
   pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
@@ -1271,6 +1283,299 @@ write_manifest() {
     done
 }
 
+# ---- file lists and verify ----------------------------------------------------
+# A successful install records every installed file in <db>/installed/<pkg>/files:
+#   # pkg files 1 sha256         (or "none": no hash tool was found)
+#   d - /usr/local/share/foo       a directory
+#   l target /usr/local/bin/bar    a symbolic link and where it points
+#   f <hash> /usr/local/bin/foo    a file and its SHA-256, or "-" when none was taken
+# (the path is last, so it may contain spaces; a link target may not)
+# "pkg verify" checks the installed files against it.  The list is taken after
+# post-install has run, so what a hook changes is part of the baseline.  Paths
+# with white space or shell wildcard characters are listed but not checksummed.
+
+# Find a SHA-256 tool without installing anything (hash_file may bootstrap
+# wget-bootstrap, which verify must never do).  Sets VF_HASH_KIND to sha256sum,
+# openssl, or empty.
+pick_hash_tool() {
+    VF_HASH_KIND=
+    VF_HASH_TOOL=
+    PATH=$PATH:${LOCAL_ROOT:-/usr/local}/bin
+    VF_HASH_TOOL=`find_tool sha256sum 2>/dev/null || :`
+    if [ -n "$VF_HASH_TOOL" ]; then
+        VF_HASH_KIND=sha256sum
+        return 0
+    fi
+    VF_HASH_TOOL=`find_tool openssl 2>/dev/null || :`
+    if [ -n "$VF_HASH_TOOL" ]; then
+        VF_HASH_KIND=openssl
+    fi
+    return 0
+}
+
+# Hash the files named (one path per line, relative to the root) in the file
+# $hp_list, which sit under $hp_root.  Prints "<hash> <path>" lines.  Many
+# files go to the tool at a time: forking once per file is slow on a slow machine.
+hash_paths() {
+    hp_batch=
+    hp_count=0
+    while read hp_p; do
+        case $hp_p in
+            *' '*|*'	'*|*'*'*|*'?'*|*'['*|*'"'*|*"'"*|*'$'*|*'`'*|*'\'*) continue ;;
+        esac
+        hp_batch="$hp_batch $hp_root$hp_p"
+        hp_count=`expr $hp_count + 1`
+        if [ $hp_count -ge 40 ]; then
+            hash_batch
+            hp_batch=
+            hp_count=0
+        fi
+    done < "$hp_list"
+    if [ -n "$hp_batch" ]; then
+        hash_batch
+    fi
+}
+
+hash_batch() {
+    case $VF_HASH_KIND in
+        sha256sum)
+            "$VF_HASH_TOOL" $hp_batch 2>/dev/null |
+                sed -e 's/^\([0-9a-f][0-9a-f]*\)[ *][ *]*\(.*\)$/\1 \2/' \
+                    -e "s|^\\([0-9a-f]*\\) $hp_root|\\1 |"
+        ;;
+        openssl)
+            "$VF_HASH_TOOL" dgst -sha256 $hp_batch 2>/dev/null |
+                sed -e 's|^[A-Za-z0-9-]*(\(.*\))= *\([0-9a-f][0-9a-f]*\)$|\2 \1|' \
+                    -e "s|^\\([0-9a-f]*\\) $hp_root|\\1 |"
+        ;;
+    esac
+}
+
+# Record the files of the package just installed (INST_DIR, ROOT_DIR set).
+write_files() {
+    wf_tmp=${TMPDIR:-/tmp}/pkg-files-$$
+    wf_out=$INST_DIR/files
+    : > "$wf_tmp.dirs"
+    : > "$wf_tmp.links"
+    : > "$wf_tmp.regular"
+
+    while read wf_rel; do
+        wf_path=$ROOT_DIR$wf_rel
+        if [ -h "$wf_path" ]; then
+            wf_target=`ls -ld "$wf_path" | sed 's/.* -> //'`
+            echo "l $wf_target $wf_rel" >> "$wf_tmp.links"
+        elif [ -d "$wf_path" ]; then
+            echo "d - $wf_rel" >> "$wf_tmp.dirs"
+        elif [ -f "$wf_path" ]; then
+            echo "$wf_rel" >> "$wf_tmp.regular"
+        fi
+    done < "$INST_DIR/manifest"
+
+    pick_hash_tool
+    : > "$wf_tmp.hashes"
+    if [ -n "$VF_HASH_KIND" ]; then
+        hp_list=$wf_tmp.regular
+        hp_root=$ROOT_DIR
+        hash_paths > "$wf_tmp.hashes"
+    fi
+
+    {
+        if [ -n "$VF_HASH_KIND" ]; then
+            echo "# pkg files 1 sha256"
+        else
+            echo "# pkg files 1 none"
+        fi
+        cat "$wf_tmp.dirs" "$wf_tmp.links"
+        # Files with a checksum, then the rest of the regular files without one.
+        sed 's/^\([0-9a-f]*\) \(.*\)$/f \1 \2/' "$wf_tmp.hashes"
+        sort "$wf_tmp.regular" > "$wf_tmp.allsorted"
+        sed 's/^[0-9a-f]* //' "$wf_tmp.hashes" | sort > "$wf_tmp.hashedsorted"
+        comm -23 "$wf_tmp.allsorted" "$wf_tmp.hashedsorted" | sed 's/^\(.*\)$/f - \1/'
+    } | sort > "$wf_out.new"
+    mv "$wf_out.new" "$wf_out"
+    wf_total=`wc -l < "$wf_out" | sed 's/ //g'`
+    rm -f "$wf_tmp".dirs "$wf_tmp".links "$wf_tmp".regular "$wf_tmp".hashes \
+        "$wf_tmp".allsorted "$wf_tmp".hashedsorted
+    return 0
+}
+
+# Check one installed package (VF_NAME).  Sets VF_BAD to 1 when it fails.
+verify_one() {
+    vf_inst=$DB_ROOT/installed/$VF_NAME
+    if [ ! -d "$vf_inst" ]; then
+        echo "error: package is not installed: $VF_NAME" >&2
+        VF_BAD=1
+        return 0
+    fi
+    read vf_version vf_extra < "$vf_inst/version" || vf_version=unknown
+    log "verifying $VF_NAME $vf_version"
+
+    vf_tmp=${TMPDIR:-/tmp}/pkg-verify-$$
+    : > "$vf_tmp.missing"
+    : > "$vf_tmp.changed"
+    : > "$vf_tmp.expected"
+    : > "$vf_tmp.present"
+    vf_checked=0
+    vf_unsummed=0
+
+    if [ -f "$vf_inst/files" ]; then
+        vf_list=$vf_inst/files
+        vf_kind=full
+    else
+        require_file "$vf_inst/manifest"
+        vf_list=$vf_inst/manifest
+        vf_kind=manifest
+    fi
+
+    if [ "$vf_kind" = manifest ]; then
+        # No types in the old list: all that can be checked is that it exists.
+        while read vf_rel; do
+            vf_checked=`expr $vf_checked + 1`
+            vf_path=$ROOT_DIR$vf_rel
+            if [ ! -e "$vf_path" ] && [ ! -h "$vf_path" ]; then
+                echo "$vf_rel" >> "$vf_tmp.missing"
+            fi
+        done < "$vf_list"
+    else
+        while read vf_type vf_arg vf_rel; do
+            case $vf_type in
+                '#'*|'') continue ;;
+            esac
+            vf_path=$ROOT_DIR$vf_rel
+            vf_checked=`expr $vf_checked + 1`
+            case $vf_type in
+                d)
+                    [ -d "$vf_path" ] || echo "$vf_rel" >> "$vf_tmp.missing"
+                ;;
+                l)
+                    if [ -h "$vf_path" ]; then
+                        vf_now=`ls -ld "$vf_path" | sed 's/.* -> //'`
+                        [ "$vf_now" = "$vf_arg" ] || echo "$vf_rel" >> "$vf_tmp.changed"
+                    else
+                        echo "$vf_rel" >> "$vf_tmp.missing"
+                    fi
+                ;;
+                f)
+                    if [ -f "$vf_path" ] || [ -h "$vf_path" ]; then
+                        if [ "x$vf_arg" = x- ]; then
+                            vf_unsummed=`expr $vf_unsummed + 1`
+                        else
+                            echo "$vf_arg $vf_rel" >> "$vf_tmp.expected"
+                            echo "$vf_rel" >> "$vf_tmp.present"
+                        fi
+                    else
+                        echo "$vf_rel" >> "$vf_tmp.missing"
+                    fi
+                ;;
+            esac
+        done < "$vf_list"
+    fi
+
+    vf_summed=`wc -l < "$vf_tmp.expected" | sed 's/ //g'`
+    vf_nohash=0
+    vf_note=
+    if [ "$VF_QUICK" = 1 ]; then
+        vf_nohash=2
+        vf_note="--quick: only checked that the files exist, not their checksums"
+    elif [ "$vf_summed" -gt 0 ]; then
+        pick_hash_tool
+        if [ -z "$VF_HASH_KIND" ]; then
+            vf_note="no sha256sum or openssl to compare checksums with; only checked that the files exist"
+            vf_nohash=1
+        else
+            hp_list=$vf_tmp.present
+            hp_root=$ROOT_DIR
+            hash_paths | sort > "$vf_tmp.actual"
+            sort "$vf_tmp.expected" > "$vf_tmp.expected.sorted"
+            # Expected lines that did not come back: the file differs.
+            comm -23 "$vf_tmp.expected.sorted" "$vf_tmp.actual" |
+                sed 's/^[0-9a-f]* //' >> "$vf_tmp.changed"
+        fi
+    fi
+    if [ "$vf_kind" = manifest ]; then
+        vf_note="installed before checksums were recorded; only checked that the files exist"
+    fi
+    # The quick-mode success line already says so; don't repeat it as a note.
+    if [ "$vf_nohash" = 2 ]; then
+        vf_note=
+    fi
+
+    vf_nmissing=`wc -l < "$vf_tmp.missing" | sed 's/ //g'`
+    vf_nchanged=`wc -l < "$vf_tmp.changed" | sed 's/ //g'`
+    if [ "$vf_nmissing" -gt 0 ] || [ "$vf_nchanged" -gt 0 ]; then
+        VF_BAD=1
+        echo "verify FAILED for $VF_NAME $vf_version: $vf_nmissing missing, $vf_nchanged changed (of $vf_checked entries)"
+        if [ "$vf_nmissing" -gt 0 ]; then
+            sort "$vf_tmp.missing" | sed -n '1,50p' | sed 's/^/  missing:  /'
+            [ "$vf_nmissing" -le 50 ] || echo "  ... and `expr $vf_nmissing - 50` more missing"
+        fi
+        if [ "$vf_nchanged" -gt 0 ]; then
+            sort "$vf_tmp.changed" | sed -n '1,50p' | sed 's/^/  changed:  /'
+            [ "$vf_nchanged" -le 50 ] || echo "  ... and `expr $vf_nchanged - 50` more changed"
+        fi
+        [ -z "$vf_note" ] || echo "  note: $vf_note"
+        [ "$vf_nohash" != 2 ] || echo "  note: --quick checked only that the files exist, not their checksums"
+        echo "  recommended: pkg reinstall $VF_NAME"
+        VF_FAILED="$VF_FAILED $VF_NAME"
+    else
+        if [ "$vf_kind" = manifest ]; then
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist"
+        elif [ "$vf_nohash" = 2 ]; then
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist (--quick: $vf_summed checksums not compared)"
+        elif [ "$vf_nohash" = 1 ]; then
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist; $vf_summed checksums not compared"
+        else
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist, $vf_summed checksums match, $vf_unsummed files have no checksum"
+        fi
+        [ -z "$vf_note" ] || log "note: $vf_note"
+    fi
+    rm -f "$vf_tmp".missing "$vf_tmp".changed "$vf_tmp".expected "$vf_tmp".present \
+        "$vf_tmp".actual "$vf_tmp".expected.sorted
+    return 0
+}
+
+# pkg verify [name ...]: every installed package when no name is given.
+verify_pkgs() {
+    ROOT_DIR=`default_value "$PKG_ROOT" "/"`
+    ROOT_DIR=`trim_slash "$ROOT_DIR"`
+    LOCAL_ROOT=$ROOT_DIR/usr/local
+    DB_ROOT=`default_value "$PKG_DB" "$LOCAL_ROOT/var/pkg/db"`
+
+    VF_QUICK=0
+    vf_names=
+    for vf_word in $PKG_ARGS; do
+        case $vf_word in
+            --quick) VF_QUICK=1 ;;
+            -*) die "unknown verify option: $vf_word" ;;
+            *) vf_names="$vf_names $vf_word" ;;
+        esac
+    done
+    if [ -z "$vf_names" ]; then
+        vf_names=
+        for vf_d in $DB_ROOT/installed/*; do
+            if [ -d "$vf_d" ]; then
+                vf_names="$vf_names `path_leaf "$vf_d"`"
+            fi
+        done
+        [ -n "$vf_names" ] || die "no installed packages to verify"
+    fi
+
+    VF_BAD=0
+    VF_FAILED=
+    for vf_each in $vf_names; do
+        VF_NAME=$vf_each
+        verify_one
+    done
+
+    if [ "$VF_BAD" -ne 0 ]; then
+        if [ -n "$VF_FAILED" ]; then
+            echo "verify failed for:$VF_FAILED -- reinstall them with: pkg reinstall <name>" >&2
+        fi
+        exit 1
+    fi
+    log "verify passed"
+}
+
 # True when a --preserve-* option (or the PKG_PRESERVE_* variable) asks to keep
 # something that is normally deleted.
 preserving() {
@@ -1477,6 +1782,8 @@ commit_install() {
         PKG_NAME=$PKG_NAME PKG_VERSION=$PKG_VERSION ROOT_DIR=$ROOT_DIR \
             sh "$INST_DIR/post-install"
     fi
+
+    write_files || log "warning: could not record the file list with checksums for $PKG_NAME"
 
     clean_image_cache
     log "installed $PKG_NAME $PKG_VERSION"
@@ -1966,6 +2273,10 @@ case $ACTION in
 
     test)
         test_pkgs $PKG_ARGS
+    ;;
+
+    verify)
+        verify_pkgs
     ;;
 
     ""|-h|--help|help)
