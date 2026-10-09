@@ -266,6 +266,30 @@ Optional:
 - `test`
 - `verify-ignore` (paths `pkg verify` skips for this package; see "Verifying installed files")
 
+## Upgrading
+
+```sh
+pkg upgrade --dry-run     # what would change
+pkg upgrade               # install the tree's version of every older installed package
+pkg upgrade openssl curl  # just these
+```
+
+`pkg upgrade` compares each installed package's version with the version in the tree (the directory
+`pkg` is in; `PKG_TREE` overrides) and installs the tree's version of those that are older,
+dependencies first.  A package with the same or a newer version installed, or that is not in the
+tree, is left alone and mentioned.  It stops at the first package that fails to build, leaving the
+old version installed, and a second run carries on with the rest.
+
+Versions are compared in pieces: punctuation separates them, and so does the place where digits meet
+letters, so `1.1.1w` is `1 1 1 w`.  Numbers compare as numbers (`5.10` is newer than `5.3`), letters
+as text, and a version that runs out first is older (`1.1.1` is older than `1.1.1w`, and `1.0` is
+the same as `1.0.0`).  A suffix like `rc1` therefore sorts after the plain version, which is the
+wrong way round for release candidates; the packages in this tree do not use them.
+
+An upgrade does not rebuild what was built against the old version.  `pkg upgrade` lists the installed
+packages that depend on the ones it upgrades, which is the place to look when a static library such as
+`openssl` changes (`pkg reinstall curl openssh`).
+
 ## Cleaning up
 
 `--preserve-download`, `--preserve-build-tree` and `--preserve-install-tree` keep what a build
