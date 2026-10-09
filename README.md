@@ -266,6 +266,22 @@ Optional:
 - `test`
 - `verify-ignore` (paths `pkg verify` skips for this package; see "Verifying installed files")
 
+## Cleaning up
+
+`--preserve-download`, `--preserve-build-tree` and `--preserve-install-tree` keep what a build
+normally deletes, and a build that fails always keeps its tree.  `pkg cleanup` removes it all:
+
+```sh
+pkg cleanup --dry-run     # say what would go, and how much space it is
+pkg cleanup               # everything the cache keeps, for every package
+pkg cleanup gcc42 git     # just these
+```
+
+It removes the downloaded sources, the build trees (and their locks) and the staged images (the
+`<name>.installed` ones, and any left by an install that did not finish) under the cache
+(`/usr/local/var/pkg/cache`, or `PKG_CACHE`).  It never touches installed packages or the package
+database, and it skips a package that a running `pkg` is building.
+
 ## Verifying installed files
 
 When a package is installed, `pkg` records every installed file, directory and symbolic link in
