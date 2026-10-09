@@ -287,7 +287,8 @@ installed package and logs each result (`-q` for `--quick`, `-o "a b"` for just 
 `gen-bootstrap-pkg` builds the file you hand to someone with a bare OPENSTEP machine: a NeXT
 `.pkg` that puts this tree, and binary packages of the tools needed to build the rest, on the
 machine.  Run it on a machine of the architecture you are packaging, with `git`, `gzip`, `mkbom`
-and `compress`:
+and `compress` (it finds them on the `PATH`, else in `/usr/etc` and `/usr/ucb`, and checks first,
+before any long build):
 
 ```sh
 sh ./gen-bootstrap-pkg                          # HEAD, into ./bootstrap-out
