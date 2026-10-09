@@ -248,6 +248,7 @@ Optional:
 - `post-install`
 - `pre-remove`
 - `test`
+- `verify-ignore` (paths `pkg verify` skips for this package; see "Verifying installed files")
 
 ## Verifying installed files
 
@@ -265,8 +266,21 @@ pkg verify --quick      # only check that each file, directory and link exists
 `pkg verify` reports what is missing or changed and recommends `pkg reinstall <name>`; it exits 1 if
 anything failed.  `--quick` skips the checksums, so it also works without a hash tool and is much
 faster.  A package installed before the file list existed has only the older `manifest`, so it is
-checked for existence only until it is reinstalled.  Files that a package expects users to edit
-(for example `ntpd.conf`) will show as changed once edited.
+checked for existence only until it is reinstalled.
+
+Files that people edit on purpose would otherwise show as changed.  Two optional lists of shell
+patterns (one per line, `#` for comments, no white space inside a pattern, `*` also matches `/`)
+name paths under the root that `verify` skips, whether they are edited or gone:
+
+- `verify-ignore` in a package directory (copied into the database at install, and into a binary
+  package), for files the package installs that are meant to be edited.  `ca-certificates`,
+  `openssl` and `openssh` have one.
+- `<db>/verify-ignore` (by default `/usr/local/var/pkg/db/verify-ignore`), the site's own list for
+  every package, for example `/usr/local/etc/*.conf`.
+
+Files that a post-install hook creates from a `.dist` template (`ntpd.conf`, `sudoers`) are not in
+the package image, so they are never checked.  `pkg-world verify world` runs `pkg verify` on every
+installed package and logs each result (`-q` for `--quick`, `-o "a b"` for just those).
 
 ## Resuming a failed build
 
