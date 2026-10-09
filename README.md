@@ -240,6 +240,9 @@ Required:
 Optional:
 
 - `depends`
+- `arch` (the architectures the package builds for, as words such as `i386 sparc`; without
+  it the package is built everywhere.  `pkg` refuses to install it elsewhere, and
+  `pkg-world` skips it)
 - `sources`
 - `checksums` (required for remote sources)
 - `post-install`
