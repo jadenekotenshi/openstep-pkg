@@ -45,8 +45,9 @@
 #
 # The .pkg is built the way OpenWrite.pkg is laid out: <name>.pkg/ holding
 # <name>.info, <name>.tar.Z (compress), <name>.bom (mkbom), <name>.sizes and
-# <name>.post_install.  It needs mkbom, compress and tar on the build machine;
-# MKBOM and COMPRESS in the environment override the commands (for testing).
+# <name>.post_install.  It needs mkbom, compress and tar on the build machine,
+# found on the PATH or in /usr/etc and /usr/ucb; MKBOM and COMPRESS in the
+# environment override them (COMPRESS is a whole command, such as "compress -c").
 #
 # It uses only what the stock system has (no dirname, mkdir -p, printf, date
 # formats), apart from git and the tools the packages themselves need.
@@ -183,6 +184,33 @@ write_sha256() {
     echo "$ws_hash  $ws_name" > "$1.sha256"
     say "sha256 $ws_hash  $ws_name"
 }
+
+# Find a system tool by name: on the PATH, else where OPENSTEP keeps it
+# (mkbom is /usr/etc/mkbom and compress is /usr/ucb/compress, neither of which
+# is always on the PATH).  Prints the full path; fails if there is none.
+find_system_tool() {
+    fs_name=$1
+    for fs_dir in `echo "$PATH" | tr ':' ' '` /usr/etc /usr/ucb /usr/bin /bin /usr/local/bin; do
+        if [ -x "$fs_dir/$fs_name" ] && [ -f "$fs_dir/$fs_name" ]; then
+            echo "$fs_dir/$fs_name"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# MKBOM and COMPRESS in the environment override the commands (COMPRESS is a
+# whole command that compresses stdin to stdout, such as "compress -c").
+if [ $payload_only = 0 ]; then
+if [ -z "${MKBOM-}" ]; then
+    MKBOM=`find_system_tool mkbom` || die "cannot find mkbom (usually /usr/etc/mkbom); set MKBOM=/path/to/mkbom"
+fi
+if [ -z "${COMPRESS-}" ]; then
+    compress_tool=`find_system_tool compress` || die "cannot find compress (usually /usr/ucb/compress); set COMPRESS=\"/path/to/compress -c\""
+    COMPRESS="$compress_tool -c"
+fi
+[ -x "$MKBOM" ] || die "mkbom is not executable: $MKBOM"
+fi
 
 git --version > /dev/null 2>&1 || die "git is needed (pkg install git)"
 cd "$repo" || die "cannot cd to $repo"
@@ -331,23 +359,6 @@ leaf=`echo "$tree_dir" | sed 's#.*/##'`
 [ -n "$parent" ] || parent=/
 [ -n "$leaf" ] || die "--tree-dir must name a directory below /"
 
-MKBOM=${MKBOM-mkbom}
-COMPRESS=${COMPRESS-compress -c}
-case $MKBOM in
-    */*)
-        [ -x "$MKBOM" ] || die "MKBOM is not executable: $MKBOM"
-    ;;
-    *)
-        mk_found=
-        for mk_dir in `echo "$PATH" | tr ':' ' '` /usr/etc /usr/bin /bin /usr/local/bin; do
-            if [ -x "$mk_dir/$MKBOM" ] && [ -z "$mk_found" ]; then
-                mk_found=$mk_dir/$MKBOM
-            fi
-        done
-        [ -n "$mk_found" ] || die "need mkbom to build the .pkg (it comes with OPENSTEP); MKBOM=... names another"
-        MKBOM=$mk_found
-    ;;
-esac
 
 if [ -d "$pkgdir" ]; then
     rm -rf "$pkgdir" || die "cannot remove the old $pkgdir"
