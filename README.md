@@ -287,8 +287,19 @@ the same as `1.0.0`).  A suffix like `rc1` therefore sorts after the plain versi
 wrong way round for release candidates; the packages in this tree do not use them.
 
 An upgrade does not rebuild what was built against the old version.  `pkg upgrade` lists the installed
-packages that depend on the ones it upgrades, which is the place to look when a static library such as
-`openssl` changes (`pkg reinstall curl openssh`).
+packages that depend on the ones it upgrades (and the ones that depend on those), which is the place
+to look when a static library such as `openssl` changes.  To rebuild them yourself, `pkg reinstall
+curl openssh`; to have `pkg upgrade` do it:
+
+```sh
+pkg upgrade --revdep-rebuild --dry-run    # see the whole plan first
+pkg upgrade --revdep-rebuild openssl      # upgrade openssl, then rebuild everything built on it
+```
+
+`--revdep-rebuild` reinstalls each of those packages after the upgrades, dependencies first, whether or
+not its own version changed.  It prints a warning with the count: on a machine like these, with a
+tree such as `git` -> `curl` -> `openssl`, that can mean many hours of compiling.  Like an upgrade, it
+stops at the first failure and can be started again.
 
 ## Cleaning up
 

@@ -324,7 +324,7 @@ usage:
   pkg test <name>...
   pkg verify [--quick] [<name>...]
   pkg cleanup [--dry-run] [<name>...]
-  pkg upgrade [--dry-run] [<name>...]
+  pkg upgrade [--dry-run] [--revdep-rebuild] [<name>...]
   pkg arch
   pkg config
 
@@ -384,7 +384,9 @@ upgrade:
   numbers as numbers and letters as text ("1.1.1w" is newer than "1.1.1",
   "10.6p1" newer than "9.9p2").  A package that is the same or newer, or not in
   the tree, is left alone.  --dry-run only lists what it would do, and the
-  installed packages built against the ones it upgrades.  It stops at the first
+  installed packages built against the ones it upgrades.  --revdep-rebuild then
+  rebuilds those too (they, and what depends on them, reinstalled after the
+  upgrades, dependencies first); that can take very long.  It stops at the first
   failure; run it again to carry on.
 
 cleanup:
@@ -1817,6 +1819,42 @@ up_deps_of() {
     fi
 }
 
+# Put the packages of up_sort_in in dependency order (the ones they depend on,
+# when also in the list, first), into up_sort_out.  A dependency loop is carried
+# on in the order given rather than hanging.  Uses up_tree.
+up_sort() {
+    up_sort_out=
+    up_sort_left=$up_sort_in
+    while [ -n "$up_sort_left" ]; do
+        up_sort_next=
+        up_sort_progress=0
+        for up_name in $up_sort_left; do
+            up_deps_of
+            up_sort_ready=1
+            for up_dep in $up_deps; do
+                case " $up_sort_left " in
+                    *" $up_dep "*)
+                        if [ "$up_dep" != "$up_name" ]; then
+                            up_sort_ready=0
+                        fi
+                    ;;
+                esac
+            done
+            if [ $up_sort_ready = 1 ]; then
+                up_sort_out="$up_sort_out $up_name"
+                up_sort_progress=1
+            else
+                up_sort_next="$up_sort_next $up_name"
+            fi
+        done
+        if [ $up_sort_progress = 0 ]; then
+            up_sort_out="$up_sort_out$up_sort_next"
+            up_sort_next=
+        fi
+        up_sort_left=$up_sort_next
+    done
+}
+
 # pkg upgrade [--dry-run] [name ...]: install the tree's version of every
 # installed package (or just the named ones) that is older than the tree's, with
 # what they depend on first.  A package with the same or a newer version
@@ -1829,10 +1867,12 @@ upgrade_pkgs() {
     DB_ROOT=`default_value "$PKG_DB" "$LOCAL_ROOT/var/pkg/db"`
 
     up_dry=0
+    up_revdep=0
     up_names=
     for up_word in $PKG_ARGS; do
         case $up_word in
             --dry-run|-n) up_dry=1 ;;
+            --revdep-rebuild) up_revdep=1 ;;
             -*) die "unknown upgrade option: $up_word" ;;
             *) up_names="$up_names $up_word" ;;
         esac
@@ -1907,39 +1947,10 @@ upgrade_pkgs() {
         return 0
     fi
 
-    # Dependencies first: take, each round, the packages whose dependencies in
-    # this list are already placed.
-    up_order=
-    up_left=$up_todo
-    while [ -n "$up_left" ]; do
-        up_next=
-        up_progress=0
-        for up_name in $up_left; do
-            up_deps_of
-            up_ready=1
-            for up_dep in $up_deps; do
-                case " $up_left " in
-                    *" $up_dep "*)
-                        if [ "$up_dep" != "$up_name" ]; then
-                            up_ready=0
-                        fi
-                    ;;
-                esac
-            done
-            if [ $up_ready = 1 ]; then
-                up_order="$up_order $up_name"
-                up_progress=1
-            else
-                up_next="$up_next $up_name"
-            fi
-        done
-        if [ $up_progress = 0 ]; then
-            # A dependency loop; carry on in the order given rather than hang.
-            up_order="$up_order$up_next"
-            up_next=
-        fi
-        up_left=$up_next
-    done
+    # Dependencies first.
+    up_sort_in=$up_todo
+    up_sort
+    up_order=$up_sort_out
 
     echo "to upgrade, dependencies first:"
     for up_name in $up_order; do
@@ -1948,22 +1959,49 @@ upgrade_pkgs() {
         echo "  $up_name $up_h -> $up_n"
     done
 
-    # Installed packages that depend on one of these were built against the old
-    # one, and may want rebuilding (a library linked statically, say).
-    up_dependents=
-    for up_name in $up_installed; do
-        case " $up_order " in
-            *" $up_name "*) continue ;;
-        esac
-        up_deps_of
-        for up_dep in $up_deps; do
-            case " $up_order " in
-                *" $up_dep "*) up_dependents="$up_dependents $up_name($up_dep)" ; break ;;
+    # Installed packages that depend on one of these (and on those, and so on)
+    # were built against the old one, and may want rebuilding: a library linked
+    # statically, say.  Work out the whole set, then put it in order.
+    up_placed=" $up_order "
+    up_revdeps=
+    up_grew=1
+    while [ $up_grew = 1 ]; do
+        up_grew=0
+        for up_name in $up_installed; do
+            case "$up_placed" in
+                *" $up_name "*) continue ;;
             esac
+            [ -f "$up_tree/$up_name/build" ] || continue
+            up_deps_of
+            for up_dep in $up_deps; do
+                case "$up_placed" in
+                    *" $up_dep "*)
+                        up_revdeps="$up_revdeps $up_name"
+                        up_placed="$up_placed$up_name "
+                        up_grew=1
+                        break
+                    ;;
+                esac
+            done
         done
     done
-    if [ -n "$up_dependents" ]; then
-        echo "installed packages built against these, not rebuilt (consider pkg reinstall):$up_dependents"
+    up_sort_in=$up_revdeps
+    up_sort
+    up_revdeps=$up_sort_out
+
+    if [ -n "$up_revdeps" ]; then
+        if [ $up_revdep = 1 ]; then
+            up_count=`echo $up_revdeps | wc -w | sed 's/ //g'`
+            echo "to rebuild, because they depend on those (directly or not), dependencies first:"
+            for up_name in $up_revdeps; do
+                echo "  $up_name"
+            done
+            echo "WARNING: --revdep-rebuild rebuilds $up_count package(s) after the upgrades."
+            echo "         That is likely to take a very long time (hours on a slow machine)."
+        else
+            echo "installed packages built against these, not rebuilt:$up_revdeps"
+            echo "  (pkg upgrade --revdep-rebuild rebuilds them; or pkg reinstall them one by one)"
+        fi
     fi
     if [ -n "$up_note" ]; then
         echo "notes:$up_note"
@@ -1982,6 +2020,17 @@ upgrade_pkgs() {
         up_done=`expr $up_done + 1`
     done
     log "upgraded $up_done packages"
+
+    if [ $up_revdep = 1 ] && [ -n "$up_revdeps" ]; then
+        up_rebuilt=0
+        for up_name in $up_revdeps; do
+            log "rebuilding $up_name (it depends on an upgraded package)"
+            PKG_FORCE=1
+            install_pkg "$up_tree/$up_name"
+            up_rebuilt=`expr $up_rebuilt + 1`
+        done
+        log "rebuilt $up_rebuilt packages"
+    fi
 }
 
 # pkg verify [name ...]: every installed package when no name is given.
