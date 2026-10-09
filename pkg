@@ -1038,12 +1038,20 @@ run_build() {
         build_trace_flag=-x
     fi
 
+    # A failed build keeps its tree; say so, in the words used when a tree is
+    # kept on request, so that a caller (gen-bootstrap-pkg) can find it.  (The
+    # subshell is the left side of ||, where set -e is off, so the cd is checked.)
     (
-        cd "$BUILD_CWD"
+        cd "$BUILD_CWD" || exit 1
         DESTDIR=$IMAGE_DIR \
         PKG_BUILD_HELPERS=$PKG_DIR/../build-helpers.sh \
         "$build_shell" $build_trace_flag "$PKG_DIR/build" "$IMAGE_DIR" "$PKG_VERSION"
-    )
+    ) || {
+        build_rc=$?
+        log "build of $PKG_NAME failed (exit $build_rc)"
+        log "keeping the build tree $BUILD_ROOT (the next build of $PKG_NAME replaces it, unless PKG_RESUME is set)"
+        exit $build_rc
+    }
 
     release_build_lock
     clean_work_cache
@@ -1951,7 +1959,9 @@ binpkg_pkgs() {
 
     for pkg_arg
     do
-        ( binpkg_pkg "$pkg_arg" ) < /dev/null || exit 1
+        # No "|| exit 1" here: in the left side of a || list "set -e" is switched
+        # off for everything the subshell runs, so a build that failed would pass.
+        ( binpkg_pkg "$pkg_arg" ) < /dev/null
     done
 }
 
@@ -2093,7 +2103,8 @@ installpkg_files() {
 
     for ip_arg
     do
-        ( installpkg_file "$ip_arg" ) < /dev/null || exit 1
+        # (No "|| exit 1": see binpkg_pkgs.)
+        ( installpkg_file "$ip_arg" ) < /dev/null
     done
 }
 
