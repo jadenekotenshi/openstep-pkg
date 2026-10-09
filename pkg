@@ -401,7 +401,9 @@ package layout:
   build         required build script
   version       required, contains version
   arch          optional, the architectures the package builds for (i386 sparc ...); without it, all
-  depends       optional, one package name per line (?OPTION:name = only when OPTION is 1)
+  depends       optional, one package name per line (?OPTION:name = only when OPTION is 1;
+                a trailing "build" marks a build-time-only dependency, which installpkg
+                does not require; "runtime", the default, is needed to build and to run)
   requires      optional, pkg.conf options: HAVE_X11 (needed) or ?HAVE_X11 (extra features)
   sources       optional, one source per line
   checksums     SHA-256 and filename for each remote source
@@ -452,6 +454,21 @@ dep_is_negative() {
     esac
 
     return 1
+}
+
+# A depends entry may end with a word saying when the dependency is needed:
+#   libfoo            runtime (the default): needed to build and to run
+#   libfoo runtime    the same, said out loud
+#   bison build       build-time only: needed to build the package, not to run it
+# Source installs need both kinds.  Installing a binary package (installpkg)
+# needs only the runtime ones.  Print the kind of an entry's trailing word
+# ("runtime" or "build"), or fail for anything else.
+dep_kind() {
+    case ${1-} in
+        ''|'#'*|runtime) echo runtime ;;
+        build) echo build ;;
+        *) return 1 ;;
+    esac
 }
 
 require_file() {
@@ -1134,6 +1151,8 @@ check_depends() {
 
         dep_pkg=`dep_name "$dep"`
         [ -n "$dep_pkg" ] || die "invalid dependency entry for $PKG_NAME: $dep"
+        dep_kind "$extra" > /dev/null ||
+            die "unknown dependency kind \"$extra\" for $dep_pkg in $PKG_NAME (use runtime or build)"
 
         if dep_is_negative "$dep"; then
             if [ -d "$DB_ROOT/installed/$dep_pkg" ]; then
@@ -1893,7 +1912,13 @@ write_resolved_depends() {
                 continue
             ;;
         esac
-        echo "$rd_dep"
+        rd_kind=`dep_kind "$rd_extra"` ||
+            die "unknown dependency kind \"$rd_extra\" for $rd_dep in $PKG_NAME (use runtime or build)"
+        if [ "$rd_kind" = build ]; then
+            echo "$rd_dep build"
+        else
+            echo "$rd_dep"
+        fi
     done < "$PKG_DIR/depends"
 }
 
@@ -2005,10 +2030,16 @@ binpkg_check_depends() {
             ;;
         esac
         bd_pkg=`dep_name "$bd_dep"`
+        # Only runtime dependencies are needed to install a built package; one
+        # marked build was needed to build it, not to run it.  (Conflicts count
+        # whatever their kind.)
+        bd_kind=`dep_kind "$bd_extra"` || bd_kind=runtime
         if dep_is_negative "$bd_dep"; then
             if [ -d "$DB_ROOT/installed/$bd_pkg" ]; then
                 bd_conflicts="$bd_conflicts $bd_pkg"
             fi
+        elif [ "$bd_kind" = build ]; then
+            :
         elif [ ! -d "$DB_ROOT/installed/$bd_pkg" ]; then
             bd_missing="$bd_missing $bd_pkg"
         fi

@@ -127,6 +127,22 @@ A `depends` entry can be made conditional on an option with `?OPTION:package`, f
 `?HAVE_X11:neXtaw`: the dependency is installed (and checked) only when that option is 1, and is
 ignored otherwise.  `!package` conflicts work the same way (`?HAVE_X11:!package`).
 
+A dependency can say when it is needed, with a word after the name:
+
+```
+libfoo              # runtime (the default): needed to build and to run
+libfoo runtime      # the same, said out loud
+bison build         # build-time only: needed to build the package, not to run it
+?HAVE_X11:neXtaw build
+```
+
+Installing from source needs both kinds, as before.  `pkg installpkg` (a binary package) requires
+only the runtime ones, and `pkg binpkg` records each dependency with its kind in the package.  Until
+a package's `depends` is sorted out, every dependency without a word counts as runtime, so nothing
+changes yet; mark the build-only ones (`bison`, `flex`, `texinfo`, `gawk`, `m4`, `patch`, ...) as
+they are checked.  Any other word is an error, so a typo is caught.  `--no-deps` still skips the
+check altogether (the bootstrap installer uses it for now).
+
 A `build` script typically does:
 
 ```sh
