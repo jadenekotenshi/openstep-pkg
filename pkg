@@ -1380,12 +1380,14 @@ pick_hash_tool() {
 # $hp_list, which sit under $hp_root.  Prints "<hash> <path>" lines.  Many
 # files go to the tool at a time: forking once per file is slow on a slow machine.
 hash_paths() {
+    # Only names made of safe characters are hashed (the others, with spaces or
+    # shell wildcards in them, are left without a checksum).  The names are read
+    # with command substitution, not a "while read < file" loop: the stock sh runs
+    # that in a subshell, which would lose the last partial batch.
+    hp_names=`grep '^[-A-Za-z0-9._/+@%,:=~]*$' "$hp_list"`
     hp_batch=
     hp_count=0
-    while read hp_p; do
-        case $hp_p in
-            *' '*|*'	'*|*'*'*|*'?'*|*'['*|*'"'*|*"'"*|*'$'*|*'`'*|*'\'*) continue ;;
-        esac
+    for hp_p in $hp_names; do
         hp_batch="$hp_batch $hp_root$hp_p"
         hp_count=`expr $hp_count + 1`
         if [ $hp_count -ge 40 ]; then
@@ -1393,7 +1395,7 @@ hash_paths() {
             hp_batch=
             hp_count=0
         fi
-    done < "$hp_list"
+    done
     if [ -n "$hp_batch" ]; then
         hash_batch
     fi
@@ -1481,14 +1483,10 @@ vf_load_patterns() {
     VF_PATTERNS=
     for vf_ign in "$DB_ROOT/installed/$VF_NAME/verify-ignore" "$DB_ROOT/verify-ignore"; do
         if [ -f "$vf_ign" ]; then
-            while read vf_line; do
-                case $vf_line in
-                    '#'*|'') continue ;;
-                esac
-                for vf_w in $vf_line; do
-                    VF_PATTERNS="$VF_PATTERNS $vf_w"
-                done
-            done < "$vf_ign"
+            vf_text=`sed -e 's/#.*//' "$vf_ign"`
+            for vf_w in $vf_text; do
+                VF_PATTERNS="$VF_PATTERNS $vf_w"
+            done
         fi
     done
 }
@@ -1506,15 +1504,15 @@ verify_one() {
 
     set -f
     vf_load_patterns
-    vf_ignored=0
 
     vf_tmp=${TMPDIR:-/tmp}/pkg-verify-$$
     : > "$vf_tmp.missing"
     : > "$vf_tmp.changed"
     : > "$vf_tmp.expected"
     : > "$vf_tmp.present"
-    vf_checked=0
-    vf_unsummed=0
+    : > "$vf_tmp.checked"
+    : > "$vf_tmp.ignored"
+    : > "$vf_tmp.unsummed"
 
     if [ -f "$vf_inst/files" ]; then
         vf_list=$vf_inst/files
@@ -1529,10 +1527,10 @@ verify_one() {
         # No types in the old list: all that can be checked is that it exists.
         while read vf_rel; do
             if vf_is_ignored; then
-                vf_ignored=`expr $vf_ignored + 1`
+                echo "$vf_rel" >> "$vf_tmp.ignored"
                 continue
             fi
-            vf_checked=`expr $vf_checked + 1`
+            echo "$vf_rel" >> "$vf_tmp.checked"
             vf_path=$ROOT_DIR$vf_rel
             if [ ! -e "$vf_path" ] && [ ! -h "$vf_path" ]; then
                 echo "$vf_rel" >> "$vf_tmp.missing"
@@ -1544,11 +1542,11 @@ verify_one() {
                 '#'*|'') continue ;;
             esac
             if vf_is_ignored; then
-                vf_ignored=`expr $vf_ignored + 1`
+                echo "$vf_rel" >> "$vf_tmp.ignored"
                 continue
             fi
             vf_path=$ROOT_DIR$vf_rel
-            vf_checked=`expr $vf_checked + 1`
+            echo "$vf_rel" >> "$vf_tmp.checked"
             case $vf_type in
                 d)
                     [ -d "$vf_path" ] || echo "$vf_rel" >> "$vf_tmp.missing"
@@ -1564,7 +1562,7 @@ verify_one() {
                 f)
                     if [ -f "$vf_path" ] || [ -h "$vf_path" ]; then
                         if [ "x$vf_arg" = x- ]; then
-                            vf_unsummed=`expr $vf_unsummed + 1`
+                            echo "$vf_rel" >> "$vf_tmp.unsummed"
                         else
                             echo "$vf_arg $vf_rel" >> "$vf_tmp.expected"
                             echo "$vf_rel" >> "$vf_tmp.present"
@@ -1577,6 +1575,11 @@ verify_one() {
         done < "$vf_list"
     fi
 
+    # The counts come from the files, not from variables set in the loops above
+    # (the stock sh runs a redirected loop in a subshell).
+    vf_checked=`wc -l < "$vf_tmp.checked" | sed 's/ //g'`
+    vf_ignored=`wc -l < "$vf_tmp.ignored" | sed 's/ //g'`
+    vf_unsummed=`wc -l < "$vf_tmp.unsummed" | sed 's/ //g'`
     vf_summed=`wc -l < "$vf_tmp.expected" | sed 's/ //g'`
     vf_nohash=0
     vf_note=
@@ -1640,7 +1643,8 @@ verify_one() {
         [ -z "$vf_note" ] || log "note: $vf_note"
     fi
     rm -f "$vf_tmp".missing "$vf_tmp".changed "$vf_tmp".expected "$vf_tmp".present \
-        "$vf_tmp".actual "$vf_tmp".expected.sorted
+        "$vf_tmp".actual "$vf_tmp".expected.sorted "$vf_tmp".checked "$vf_tmp".ignored \
+        "$vf_tmp".unsummed
     set +f
     return 0
 }
@@ -2231,18 +2235,17 @@ install_pkg() {
 # be built for (words such as i386 sparc); without one it is built everywhere.
 check_arch_supported() {
     [ -f "$PKG_DIR/arch" ] || return 0
-    arch_list=
+    # (No while-read loop: the stock sh runs a redirected loop in a subshell, so
+    # what it sets is lost afterwards.)
+    arch_list=`sed -e 's/#.*//' "$PKG_DIR/arch" | tr '\n' ' '`
     arch_ok=0
-    while read arch_line; do
-        for arch_word in $arch_line; do
-            arch_list="$arch_list $arch_word"
-            if [ "$arch_word" = "$PKG_ARCH" ]; then
-                arch_ok=1
-            fi
-        done
-    done < "$PKG_DIR/arch"
+    for arch_word in $arch_list; do
+        if [ "$arch_word" = "$PKG_ARCH" ]; then
+            arch_ok=1
+        fi
+    done
     if [ $arch_ok = 0 ]; then
-        die "$PKG_NAME is not available for $PKG_ARCH (it is for:$arch_list)"
+        die "$PKG_NAME is not available for $PKG_ARCH (it is for: $arch_list)"
     fi
 }
 
@@ -2436,12 +2439,13 @@ binpkg_check_depends() {
 
     bd_missing=
     bd_conflicts=
-    while read bd_dep bd_extra || [ -n "$bd_dep" ]; do
-        case $bd_dep in
-            ''|\#*)
-                continue
-            ;;
-        esac
+    # One "name:kind" word per entry (no while-read loop: the stock sh runs a
+    # redirected loop in a subshell, and what it set would be lost).
+    bd_ents=`sed -e 's/#.*//' -e '/^[ 	]*$/d' \
+        -e 's/^[ 	]*\([^ 	]*\)[ 	]*\([^ 	]*\).*$/\1:\2/' "$bd_meta/depends"`
+    for bd_ent in $bd_ents; do
+        bd_dep=`echo "$bd_ent" | sed 's/:.*//'`
+        bd_extra=`echo "$bd_ent" | sed 's/^[^:]*://'`
         bd_pkg=`dep_name "$bd_dep"`
         # Only runtime dependencies are needed to install a built package; one
         # marked build was needed to build it, not to run it.  (Conflicts count
@@ -2456,7 +2460,7 @@ binpkg_check_depends() {
         elif [ ! -d "$DB_ROOT/installed/$bd_pkg" ]; then
             bd_missing="$bd_missing $bd_pkg"
         fi
-    done < "$bd_meta/depends"
+    done
 
     if [ -n "$bd_missing" ]; then
         if [ "x$PKG_NO_DEPS" = x1 ]; then
