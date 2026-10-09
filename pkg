@@ -323,6 +323,7 @@ usage:
   pkg remove <name>
   pkg test <name>...
   pkg verify [--quick] [<name>...]
+  pkg cleanup [--dry-run] [<name>...]
   pkg arch
   pkg config
 
@@ -374,6 +375,14 @@ verify:
   shell patterns for paths under the root, one per line (# starts a comment;
   * also matches /), for example /usr/local/etc/*.conf.  An ignored path is not
   reported whether it is changed or gone.
+
+cleanup:
+  pkg cleanup removes what the cache keeps of builds: downloaded sources, build
+  trees (those kept by --preserve-build-tree, and those of builds that failed),
+  and staged images (those kept by --preserve-install-tree, and any left by an
+  install that did not finish).  With names it cleans just those packages; with
+  --dry-run it only says what it would remove.  It never touches installed
+  packages or the database, and skips a package a running pkg is building.
 
 configuration:
   pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
@@ -1623,6 +1632,98 @@ verify_one() {
     return 0
 }
 
+# pkg cleanup [--dry-run] [name ...]: remove what the cache keeps of builds -
+# downloaded sources (--preserve-download), build trees (--preserve-build-tree,
+# and the tree of any failed build), staged images (--preserve-install-tree,
+# and one left by an install that did not finish) - for the named packages, or
+# for all of them.  It never touches installed packages or the database.  A
+# package whose build lock is held by a running pkg is skipped.
+cleanup_pkgs() {
+    ROOT_DIR=`default_value "$PKG_ROOT" "/"`
+    ROOT_DIR=`trim_slash "$ROOT_DIR"`
+    LOCAL_ROOT=$ROOT_DIR/usr/local
+    CACHE_ROOT=`default_value "$PKG_CACHE" "$LOCAL_ROOT/var/pkg/cache"`
+
+    cu_dry=0
+    cu_names=
+    for cu_word in $PKG_ARGS; do
+        case $cu_word in
+            --dry-run|-n) cu_dry=1 ;;
+            -*) die "unknown cleanup option: $cu_word" ;;
+            *) cu_names="$cu_names $cu_word" ;;
+        esac
+    done
+
+    # Every package with something in the cache.
+    cu_all=
+    for cu_path in $CACHE_ROOT/sources/* $CACHE_ROOT/build/* $CACHE_ROOT/pkg/*; do
+        [ -e "$cu_path" ] || continue
+        cu_leaf=`path_leaf "$cu_path"`
+        cu_leaf=`echo "$cu_leaf" | sed -e 's/\.lock$//' -e 's/\.installed$//'`
+        case " $cu_all " in
+            *" $cu_leaf "*) : ;;
+            *) cu_all="$cu_all $cu_leaf" ;;
+        esac
+    done
+
+    if [ -z "$cu_all" ]; then
+        log "nothing to clean up in $CACHE_ROOT"
+        return 0
+    fi
+
+    if [ -n "$cu_names" ]; then
+        for cu_want in $cu_names; do
+            case " $cu_all " in
+                *" $cu_want "*) : ;;
+                *) log "nothing kept for $cu_want" ;;
+            esac
+        done
+    fi
+
+    cu_total=0
+    cu_removed=0
+    for cu_pkg in $cu_all; do
+        if [ -n "$cu_names" ]; then
+            case " $cu_names " in
+                *" $cu_pkg "*) : ;;
+                *) continue ;;
+            esac
+        fi
+
+        # A running build owns its lock: leave that package alone.
+        cu_lock=$CACHE_ROOT/build/$cu_pkg.lock
+        if [ -d "$cu_lock" ]; then
+            cu_pid=`cat "$cu_lock/pid" 2>/dev/null || :`
+            if [ -n "$cu_pid" ] && kill -0 "$cu_pid" 2>/dev/null; then
+                log "skipping $cu_pkg: pid $cu_pid is building it"
+                continue
+            fi
+        fi
+
+        for cu_item in "$CACHE_ROOT/sources/$cu_pkg" "$CACHE_ROOT/build/$cu_pkg" \
+                       "$CACHE_ROOT/build/$cu_pkg.lock" \
+                       "$CACHE_ROOT/pkg/$cu_pkg.installed" "$CACHE_ROOT/pkg/$cu_pkg"; do
+            [ -e "$cu_item" ] || continue
+            cu_kb=`du -sk "$cu_item" 2>/dev/null | sed 's/[^0-9].*//'`
+            [ -n "$cu_kb" ] || cu_kb=0
+            if [ $cu_dry = 1 ]; then
+                log "would remove $cu_item (${cu_kb}K)"
+            else
+                log "removing $cu_item (${cu_kb}K)"
+                rm -rf "$cu_item" || die "could not remove $cu_item"
+            fi
+            cu_total=`expr $cu_total + $cu_kb`
+            cu_removed=`expr $cu_removed + 1`
+        done
+    done
+
+    if [ $cu_dry = 1 ]; then
+        log "dry run: $cu_removed items, ${cu_total}K would be freed"
+    else
+        log "cleaned up $cu_removed items, ${cu_total}K freed"
+    fi
+}
+
 # pkg verify [name ...]: every installed package when no name is given.
 verify_pkgs() {
     ROOT_DIR=`default_value "$PKG_ROOT" "/"`
@@ -2393,6 +2494,10 @@ case $ACTION in
 
     verify)
         verify_pkgs
+    ;;
+
+    cleanup)
+        cleanup_pkgs
     ;;
 
     ""|-h|--help|help)
