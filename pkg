@@ -1532,7 +1532,7 @@ verify_one() {
             fi
             echo "$vf_rel" >> "$vf_tmp.checked"
             vf_path=$ROOT_DIR$vf_rel
-            if [ ! -e "$vf_path" ] && [ ! -h "$vf_path" ]; then
+            if [ ! -f "$vf_path" ] && [ ! -d "$vf_path" ] && [ ! -h "$vf_path" ]; then
                 echo "$vf_rel" >> "$vf_tmp.missing"
             fi
         done < "$vf_list"
@@ -1674,7 +1674,10 @@ cleanup_pkgs() {
     # Every package with something in the cache.
     cu_all=
     for cu_path in $CACHE_ROOT/sources/* $CACHE_ROOT/build/* $CACHE_ROOT/pkg/*; do
-        [ -e "$cu_path" ] || continue
+        # (No test -e: the stock sh's test lacks it.)
+        if [ ! -f "$cu_path" ] && [ ! -d "$cu_path" ] && [ ! -h "$cu_path" ]; then
+            continue
+        fi
         cu_leaf=`path_leaf "$cu_path"`
         cu_leaf=`echo "$cu_leaf" | sed -e 's/\.lock$//' -e 's/\.installed$//'`
         case " $cu_all " in
@@ -1720,7 +1723,9 @@ cleanup_pkgs() {
         for cu_item in "$CACHE_ROOT/sources/$cu_pkg" "$CACHE_ROOT/build/$cu_pkg" \
                        "$CACHE_ROOT/build/$cu_pkg.lock" \
                        "$CACHE_ROOT/pkg/$cu_pkg.installed" "$CACHE_ROOT/pkg/$cu_pkg"; do
-            [ -e "$cu_item" ] || continue
+            if [ ! -f "$cu_item" ] && [ ! -d "$cu_item" ] && [ ! -h "$cu_item" ]; then
+                continue
+            fi
             cu_kb=`du -sk "$cu_item" 2>/dev/null | sed 's/[^0-9].*//'`
             [ -n "$cu_kb" ] || cu_kb=0
             if [ $cu_dry = 1 ]; then
@@ -2359,7 +2364,9 @@ binpkg_pkg() {
     bp_file=$bp_dir/$PKG_NAME-$PKG_VERSION-$PKG_ARCH.binpkg.tar.gz
 
     bp_meta=$IMAGE_DIR/.pkg
-    [ ! -e "$bp_meta" ] || die "$PKG_NAME's image already contains a .pkg: $bp_meta"
+    if [ -f "$bp_meta" ] || [ -d "$bp_meta" ] || [ -h "$bp_meta" ]; then
+        die "$PKG_NAME's image already contains a .pkg: $bp_meta"
+    fi
     mkdir "$bp_meta"
 
     echo 1 > "$bp_meta/format"
