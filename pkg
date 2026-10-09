@@ -367,6 +367,11 @@ verify:
   each exists, without comparing checksums (and needs no hash tool).  A package
   installed before this was recorded is checked for existence only.  Exit
   status 1 if anything failed.
+  Paths a person edits on purpose can be skipped: a package may carry a
+  verify-ignore file, and <db>/verify-ignore is the site's own list.  Each holds
+  shell patterns for paths under the root, one per line (# starts a comment;
+  * also matches /), for example /usr/local/etc/*.conf.  An ignored path is not
+  reported whether it is changed or gone.
 
 configuration:
   pkg reads options from /usr/local/etc/pkg.conf (override with PKG_CONF; under
@@ -1281,6 +1286,13 @@ write_manifest() {
             rm -f "$INST_DIR/$hook"
         fi
     done
+
+    # Paths pkg verify skips for this package (not a hook, so not executable).
+    if [ -f "$HOOK_DIR/verify-ignore" ]; then
+        cp "$HOOK_DIR/verify-ignore" "$INST_DIR/verify-ignore"
+    else
+        rm -f "$INST_DIR/verify-ignore"
+    fi
 }
 
 # ---- file lists and verify ----------------------------------------------------
@@ -1399,6 +1411,37 @@ write_files() {
     return 0
 }
 
+# True when the path in vf_rel matches a pattern in VF_PATTERNS (shell patterns
+# over the path under the root, such as /usr/local/etc/ssh_config or
+# /usr/local/ssl/*.cnf; * also matches /).  Globbing must be off (set -f).
+vf_is_ignored() {
+    for vf_pat in $VF_PATTERNS; do
+        case $vf_rel in
+            $vf_pat) return 0 ;;
+        esac
+    done
+    return 1
+}
+
+# The patterns that apply to VF_NAME: its own verify-ignore (from the package)
+# and <db>/verify-ignore (the site's, for files its users edit on purpose).
+# One pattern per line, # starts a comment, no white space inside a pattern.
+vf_load_patterns() {
+    VF_PATTERNS=
+    for vf_ign in "$DB_ROOT/installed/$VF_NAME/verify-ignore" "$DB_ROOT/verify-ignore"; do
+        if [ -f "$vf_ign" ]; then
+            while read vf_line; do
+                case $vf_line in
+                    '#'*|'') continue ;;
+                esac
+                for vf_w in $vf_line; do
+                    VF_PATTERNS="$VF_PATTERNS $vf_w"
+                done
+            done < "$vf_ign"
+        fi
+    done
+}
+
 # Check one installed package (VF_NAME).  Sets VF_BAD to 1 when it fails.
 verify_one() {
     vf_inst=$DB_ROOT/installed/$VF_NAME
@@ -1409,6 +1452,10 @@ verify_one() {
     fi
     read vf_version vf_extra < "$vf_inst/version" || vf_version=unknown
     log "verifying $VF_NAME $vf_version"
+
+    set -f
+    vf_load_patterns
+    vf_ignored=0
 
     vf_tmp=${TMPDIR:-/tmp}/pkg-verify-$$
     : > "$vf_tmp.missing"
@@ -1430,6 +1477,10 @@ verify_one() {
     if [ "$vf_kind" = manifest ]; then
         # No types in the old list: all that can be checked is that it exists.
         while read vf_rel; do
+            if vf_is_ignored; then
+                vf_ignored=`expr $vf_ignored + 1`
+                continue
+            fi
             vf_checked=`expr $vf_checked + 1`
             vf_path=$ROOT_DIR$vf_rel
             if [ ! -e "$vf_path" ] && [ ! -h "$vf_path" ]; then
@@ -1441,6 +1492,10 @@ verify_one() {
             case $vf_type in
                 '#'*|'') continue ;;
             esac
+            if vf_is_ignored; then
+                vf_ignored=`expr $vf_ignored + 1`
+                continue
+            fi
             vf_path=$ROOT_DIR$vf_rel
             vf_checked=`expr $vf_checked + 1`
             case $vf_type in
@@ -1500,11 +1555,15 @@ verify_one() {
         vf_note=
     fi
 
+    vf_inote=
+    if [ "$vf_ignored" -gt 0 ]; then
+        vf_inote=" ($vf_ignored ignored)"
+    fi
     vf_nmissing=`wc -l < "$vf_tmp.missing" | sed 's/ //g'`
     vf_nchanged=`wc -l < "$vf_tmp.changed" | sed 's/ //g'`
     if [ "$vf_nmissing" -gt 0 ] || [ "$vf_nchanged" -gt 0 ]; then
         VF_BAD=1
-        echo "verify FAILED for $VF_NAME $vf_version: $vf_nmissing missing, $vf_nchanged changed (of $vf_checked entries)"
+        echo "verify FAILED for $VF_NAME $vf_version: $vf_nmissing missing, $vf_nchanged changed (of $vf_checked entries)$vf_inote"
         if [ "$vf_nmissing" -gt 0 ]; then
             sort "$vf_tmp.missing" | sed -n '1,50p' | sed 's/^/  missing:  /'
             [ "$vf_nmissing" -le 50 ] || echo "  ... and `expr $vf_nmissing - 50` more missing"
@@ -1519,18 +1578,19 @@ verify_one() {
         VF_FAILED="$VF_FAILED $VF_NAME"
     else
         if [ "$vf_kind" = manifest ]; then
-            log "verified $VF_NAME $vf_version: all $vf_checked entries exist"
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist$vf_inote"
         elif [ "$vf_nohash" = 2 ]; then
-            log "verified $VF_NAME $vf_version: all $vf_checked entries exist (--quick: $vf_summed checksums not compared)"
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist (--quick: $vf_summed checksums not compared)$vf_inote"
         elif [ "$vf_nohash" = 1 ]; then
-            log "verified $VF_NAME $vf_version: all $vf_checked entries exist; $vf_summed checksums not compared"
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist; $vf_summed checksums not compared$vf_inote"
         else
-            log "verified $VF_NAME $vf_version: all $vf_checked entries exist, $vf_summed checksums match, $vf_unsummed files have no checksum"
+            log "verified $VF_NAME $vf_version: all $vf_checked entries exist, $vf_summed checksums match, $vf_unsummed files have no checksum$vf_inote"
         fi
         [ -z "$vf_note" ] || log "note: $vf_note"
     fi
     rm -f "$vf_tmp".missing "$vf_tmp".changed "$vf_tmp".expected "$vf_tmp".present \
         "$vf_tmp".actual "$vf_tmp".expected.sorted
+    set +f
     return 0
 }
 
@@ -1808,6 +1868,7 @@ install_pkgs() {
 #   requires    pkg.conf options the package needs
 #   features    optional options it was built with
 #   post-install, pre-remove, test   the package's hooks, when it has them
+#   verify-ignore   the paths pkg verify skips, when it has any
 # installpkg then does what install does after the build: it replaces any
 # installed version, copies the files in, records the package database and
 # runs post-install.
@@ -1860,7 +1921,7 @@ binpkg_pkg() {
     if [ -f "$PKG_DIR/requires" ]; then
         cp "$PKG_DIR/requires" "$bp_meta/requires"
     fi
-    for hook in pre-remove post-install test; do
+    for hook in pre-remove post-install test verify-ignore; do
         if [ -f "$PKG_DIR/$hook" ]; then
             cp "$PKG_DIR/$hook" "$bp_meta/$hook"
         fi

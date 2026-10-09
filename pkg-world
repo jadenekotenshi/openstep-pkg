@@ -2,10 +2,13 @@
 # pkg-world - test, rebuild or remake every package, and log the results.
 #
 # usage: pkg-world [options] test world
+#        pkg-world [options] verify world
 #        pkg-world [options] reinstall world
 #        pkg-world [options] remake entire-world
 #
 #   test world           run "pkg test" for every installed package
+#   verify world         run "pkg verify" for every installed package: are the
+#                        installed files all there, with their checksums
 #   reinstall world      rebuild and reinstall every installed package ("pkg
 #                        reinstall"), dependencies first, then test it
 #   remake entire-world  remove every installed package, then rebuild the tree
@@ -16,6 +19,7 @@
 #   -l DIR   put the logs in DIR (default: $PKG_WORLD_LOGS, else
 #            <tree>/world-logs, plus a directory named for the mode and time)
 #   -n       do not run the tests after a build (reinstall and remake)
+#   -q       verify world: only check that the files exist (pkg verify --quick)
 #   -s       stop at the first failure instead of carrying on
 #   -y       do not ask before "remake entire-world" removes everything
 #   -i       remake: put back only the packages that were installed, not the
@@ -40,11 +44,13 @@
 # pkg settings in the environment.
 
 usage() {
-    sed -n '2,41p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 logdir=
 run_tests=1
+verify_quick=
+st_opt=
 stop_on_fail=0
 assume_yes=0
 installed_only=0
@@ -64,6 +70,10 @@ while [ $# -gt 0 ]; do
         ;;
         -n)
             run_tests=0
+            shift
+        ;;
+        -q)
+            verify_quick=--quick
             shift
         ;;
         -s)
@@ -97,6 +107,9 @@ mode=
 case "$*" in
     "test world")
         mode=test
+    ;;
+    "verify world")
+        mode=verify
     ;;
     "reinstall world")
         mode=reinstall
@@ -411,6 +424,13 @@ verify_step() {
             echo "no 'test passed' line"
             return 1
         ;;
+        verify)
+            if grep "==> verified $vs_pkg " "$vs_log" > /dev/null 2>&1; then
+                return 0
+            fi
+            echo "no 'verified' line"
+            return 1
+        ;;
         install|reinstall)
             if grep "==> installed $vs_pkg " "$vs_log" > /dev/null 2>&1; then
                 return 0
@@ -440,15 +460,16 @@ step() {
         install) st_verb=building ;;
         reinstall) st_verb=rebuilding ;;
         remove) st_verb=removing ;;
+        verify) st_verb=verifying ;;
         *) st_verb=testing ;;
     esac
     say "`stamp`  ...   $st_verb $st_pkg"
     st_log=$logdir/$st_pkg.$st_action.log
     {
         echo "### $st_action $st_pkg  `stamp`"
-        echo "### /bin/sh $PKG $st_action $st_arg"
+        echo "### /bin/sh $PKG $st_action $st_opt $st_arg"
     } > "$st_log"
-    /bin/sh "$PKG" "$st_action" "$st_arg" >> "$st_log" 2>&1
+    /bin/sh "$PKG" "$st_action" $st_opt "$st_arg" >> "$st_log" 2>&1
     st_rc=$?
     echo "### exit status $st_rc  `stamp`" >> "$st_log"
     st_why=`verify_step "$st_action" "$st_pkg" "$st_log"`
@@ -474,7 +495,15 @@ step() {
         return 0
     fi
     if [ $st_rc -ne 0 ]; then
-        record FAIL "$st_action" "$st_pkg" "exit $st_rc, see $st_pkg.$st_action.log"
+        st_detail=
+        if [ "$st_action" = verify ]; then
+            st_detail=`grep '^verify FAILED' "$st_log" | sed -e 's/^[^:]*: //' -e 's/ (of .*//' | head -1`
+        fi
+        if [ -n "$st_detail" ]; then
+            record FAIL "$st_action" "$st_pkg" "$st_detail; see $st_pkg.$st_action.log; reinstall it"
+        else
+            record FAIL "$st_action" "$st_pkg" "exit $st_rc, see $st_pkg.$st_action.log"
+        fi
         return $st_rc
     fi
     record FAIL "$st_action" "$st_pkg" "exit 0 but $st_why, see $st_pkg.$st_action.log"
@@ -564,7 +593,7 @@ if [ $mode = check ]; then
     fi
     exit 2
 fi
-if [ $mode != test ]; then
+if [ $mode != test ] && [ $mode != verify ]; then
     check_cycles "`tree_set`" || { echo "pkg-world: not starting; fix the loop first" >&2; exit 2; }
 fi
 
@@ -635,6 +664,26 @@ case $mode in
                     run_test
                 else
                     record SKIP test "$name" "not installed"
+                fi
+            fi
+        done
+    ;;
+    verify)
+        set_to_do=$installed
+        if [ -n "$selected" ]; then
+            set_to_do=$selected
+        fi
+        for name in $set_to_do; do
+            if [ $stop_now = 0 ]; then
+                if in_set "$name" "$installed"; then
+                    st_action=verify
+                    st_pkg=$name
+                    st_arg=$name
+                    st_opt=$verify_quick
+                    step || :
+                    st_opt=
+                else
+                    record SKIP verify "$name" "not installed"
                 fi
             fi
         done
