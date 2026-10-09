@@ -495,10 +495,39 @@ run_test() {
     fi
 }
 
+# The architecture pkg is running on, and whether package $1 is built for it
+# (a package directory may have an "arch" file listing the ones it supports).
+host_arch=`/bin/sh "$PKG" arch 2>/dev/null | sed -n 's/^PKG_ARCH=//p'`
+arch_note=
+arch_supported() {
+    arch_note=
+    if [ ! -f "$tree/$1/arch" ] || [ -z "$host_arch" ]; then
+        return 0
+    fi
+    as_list=`cat "$tree/$1/arch" | tr '\n' ' '`
+    case " $as_list " in
+        *" $host_arch "*) return 0 ;;
+    esac
+    arch_note="only for: `echo $as_list`"
+    return 1
+}
+
 # build_and_test: build package $bt_name with pkg action $bt_action (install or
 # reinstall), then test it
 build_and_test() {
+    bt_present=0
     if [ -d "$tree/$bt_name" ] && [ -f "$tree/$bt_name/build" ] && [ -f "$tree/$bt_name/version" ]; then
+        bt_present=1
+    fi
+    bt_arch_ok=1
+    if [ $bt_present = 1 ]; then
+        arch_supported "$bt_name" || bt_arch_ok=0
+    fi
+    if [ $bt_present = 0 ]; then
+        record SKIP "$bt_action" "$bt_name" "not in this package tree"
+    elif [ $bt_arch_ok = 0 ]; then
+        record SKIP "$bt_action" "$bt_name" "$arch_note"
+    else
         st_action=$bt_action
         st_pkg=$bt_name
         st_arg=$tree/$bt_name
@@ -512,8 +541,6 @@ build_and_test() {
                 record SKIP test "$bt_name" "the build failed"
             fi
         fi
-    else
-        record SKIP "$bt_action" "$bt_name" "not in this package tree"
     fi
 }
 

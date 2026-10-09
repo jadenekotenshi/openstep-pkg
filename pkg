@@ -381,6 +381,7 @@ architecture:
 package layout:
   build         required build script
   version       required, contains version
+  arch          optional, the architectures the package builds for (i386 sparc ...); without it, all
   depends       optional, one package name per line (?OPTION:name = only when OPTION is 1)
   requires      optional, pkg.conf options: HAVE_X11 (needed) or ?HAVE_X11 (extra features)
   sources       optional, one source per line
@@ -1391,6 +1392,7 @@ install_pkg() {
     export PKG_INSTALL_STACK
 
     log "starting install for $PKG_NAME"
+    check_arch_supported
     install_depends
     check_depends
 
@@ -1419,6 +1421,25 @@ install_pkg() {
     commit_install
 
     restore_install_context
+}
+
+# A package directory may hold an "arch" file naming the architectures it can
+# be built for (words such as i386 sparc); without one it is built everywhere.
+check_arch_supported() {
+    [ -f "$PKG_DIR/arch" ] || return 0
+    arch_list=
+    arch_ok=0
+    while read arch_line; do
+        for arch_word in $arch_line; do
+            arch_list="$arch_list $arch_word"
+            if [ "$arch_word" = "$PKG_ARCH" ]; then
+                arch_ok=1
+            fi
+        done
+    done < "$PKG_DIR/arch"
+    if [ $arch_ok = 0 ]; then
+        die "$PKG_NAME is not available for $PKG_ARCH (it is for:$arch_list)"
+    fi
 }
 
 # Build the package into its staged image unless one is already there.
