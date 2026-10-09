@@ -34,7 +34,21 @@
 #   --no-binpkgs     leave the binary packages out (a tree-only payload; for
 #                    testing the packaging itself)
 #   --payload-only   stop after the payload archive; do not make the .pkg
+#   --resume         continue a build that failed part way (PKG_RESUME=1: the
+#                    kept build tree is reused, not started afresh)
+#   --cleanup        delete what earlier runs kept (see below), then stop
 #   -h               this text
+#
+# Nothing a run compiles is thrown away by the run.  Every binary package is
+# built with pkg's --preserve-build-tree and --preserve-install-tree, so the
+# build trees and staged images stay on disk (they are listed in
+# <out>/preserved.list), and finished binary packages are kept in
+# <out>/binpkgs, stamped with the commit they were built from.  A rerun after an
+# error (a failure in mkbom, say, hours after the compiles) reuses them and
+# compiles nothing again.  The disk space comes back only when you run
+#     sh ./gen-bootstrap-pkg --cleanup [--out DIR]
+# which removes the kept build trees, staged images, binary packages and work
+# directories, and leaves the finished .pkg and .tar.gz alone.
 #
 # Results in the output directory:
 #   openstep-pkg-bootstrap-<version>-<arch>.payload.tar.gz   the payload, to unpack
@@ -53,7 +67,7 @@
 # formats), apart from git and the tools the packages themselves need.
 
 usage() {
-    sed -n '2,58p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,72p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 die() {
@@ -73,6 +87,8 @@ packages="wget-bootstrap gcc42 cctools-as git"
 binpkg_dir=
 make_binpkgs=1
 payload_only=0
+resume=0
+cleanup=0
 
 while [ $# -gt 0 ]; do
     case $1 in
@@ -112,6 +128,14 @@ while [ $# -gt 0 ]; do
         ;;
         --payload-only)
             payload_only=1
+            shift
+        ;;
+        --resume)
+            resume=1
+            shift
+        ;;
+        --cleanup)
+            cleanup=1
             shift
         ;;
         -h|--help)
@@ -166,6 +190,48 @@ mkdirs() {
     done
     return 0
 }
+
+# --cleanup: delete what earlier runs kept, and nothing else.  The kept build
+# trees and staged images are named in preserved.list; only paths that look
+# like pkg's own cache entries are removed.
+if [ $cleanup = 1 ]; then
+    [ -d "$out" ] || die "no output directory $out; nothing to clean up (use --out)"
+    out=`cd "$out" && pwd`
+    removed=0
+    if [ -f "$out/preserved.list" ]; then
+        while read kept; do
+            case $kept in
+                */cache/build/*|*/cache/pkg/*.installed)
+                    if [ -d "$kept" ]; then
+                        say "removing $kept"
+                        rm -rf "$kept" || echo "gen-bootstrap-pkg: could not remove $kept" >&2
+                        removed=`expr $removed + 1`
+                    fi
+                    # A failed build also leaves its lock beside the build tree.
+                    case $kept in
+                        */cache/build/*) rm -rf "$kept.lock" ;;
+                    esac
+                ;;
+                '') : ;;
+                *) echo "gen-bootstrap-pkg: not removing $kept (not a pkg cache entry)" >&2 ;;
+            esac
+        done < "$out/preserved.list"
+        rm -f "$out/preserved.list"
+    fi
+    if [ -d "$out/binpkgs" ]; then
+        say "removing $out/binpkgs"
+        rm -rf "$out/binpkgs"
+    fi
+    for w in $out/work-*; do
+        if [ -d "$w" ]; then
+            say "removing $w"
+            rm -rf "$w"
+        fi
+    done
+    rm -f $out/binpkg-*.log
+    say "cleaned up ($removed kept build trees and staged images removed); the finished .pkg and .tar.gz files are untouched"
+    exit 0
+fi
 
 # SHA-256 of a file, as a hex string, from whatever tool this machine has.
 sha256_of() {
@@ -267,7 +333,7 @@ if [ $make_binpkgs = 1 ]; then
     if [ -n "$binpkg_dir" ]; then
         bdir=`cd "$binpkg_dir" && pwd` || die "no such directory: $binpkg_dir"
     else
-        bdir=$work/binpkgs
+        bdir=$out/binpkgs
         mkdirs "$bdir" || die "cannot create $bdir"
     fi
     for p in $packages; do
@@ -283,9 +349,39 @@ if [ $make_binpkgs = 1 ]; then
             esac
         fi
         if [ -z "$binpkg_dir" ]; then
-            say "building the binary package of $p"
-            PKG_BINPKG_DIR=$bdir /bin/sh "$dest/pkg" binpkg "$dest/$p" ||
-                die "pkg binpkg $p failed"
+            # A binary package built from this commit by an earlier run is reused.
+            have=
+            for f in $bdir/$p-*.binpkg.tar.gz; do
+                [ -f "$f" ] && have=$f
+            done
+            stamp=
+            [ -f "$bdir/$p.commit" ] && read stamp < "$bdir/$p.commit"
+            if [ -n "$have" ] && [ "x$stamp" = "x$commit" ] && [ -f "$have.sha256" ]; then
+                say "reusing the binary package of $p built from this commit: `echo "$have" | sed 's#.*/##'`"
+            else
+                rm -f $bdir/$p-*.binpkg.tar.gz $bdir/$p-*.binpkg.tar.gz.sha256 "$bdir/$p.commit"
+                say "building the binary package of $p (build tree and staged image are kept)"
+                logf=$out/binpkg-$p.log
+                statusf=$out/.status-$$
+                resume_env=
+                [ $resume = 1 ] && resume_env=PKG_RESUME=1
+                ( env PKG_BINPKG_DIR=$bdir $resume_env /bin/sh "$dest/pkg" \
+                      --preserve-build-tree --preserve-install-tree binpkg "$dest/$p"
+                  echo $? > "$statusf" ) 2>&1 | tee "$logf"
+                rc=1
+                read rc < "$statusf"
+                rm -f "$statusf"
+                # Remember what pkg kept, whether or not the build worked.
+                sed -n -e 's/^==> keeping the build tree \(.*\) (the next build.*$/\1/p' \
+                       -e 's/^==> keeping the staged image as \(.*\)$/\1/p' "$logf" >> "$out/preserved.list"
+                if [ -f "$out/preserved.list" ]; then
+                    sort -u "$out/preserved.list" > "$out/preserved.list.new" && mv "$out/preserved.list.new" "$out/preserved.list"
+                fi
+                if [ "$rc" != 0 ]; then
+                    die "pkg binpkg $p failed (exit $rc). Its build tree is kept: fix the cause and rerun (--resume continues the build); --cleanup frees the space. Log: $logf"
+                fi
+                echo "$commit" > "$bdir/$p.commit"
+            fi
         fi
         got=
         for f in $bdir/$p-*.binpkg.tar.gz; do

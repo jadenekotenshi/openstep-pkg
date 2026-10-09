@@ -308,6 +308,21 @@ sh ./gen-bootstrap-pkg --ref v1.0 --tree-dir /usr/local/openstep-pkg
 4. It writes `openstep-pkg-bootstrap-<version>-<arch>.pkg.tar.gz` and a `.sha256` for it, plus a
    `.payload.tar.gz` of the same files for unpacking by hand (`--payload-only` stops there).
 
+The compiles are the expensive part, so a run never throws them away.  Each binary package is built
+with `--preserve-build-tree --preserve-install-tree`, so the build trees and staged images stay on
+disk and are listed in `<out>/preserved.list`; finished binary packages stay in `<out>/binpkgs`,
+stamped with the commit they were built from.  If something fails afterwards (in `mkbom`, say), fix it
+and rerun: binary packages built from the same commit are reused and nothing is recompiled.  If a
+build itself fails, fix the cause and rerun (`--resume` continues in the kept build tree).  The disk
+space comes back only when you ask for it:
+
+```sh
+sh ./gen-bootstrap-pkg --cleanup            # same --out as the runs it cleans up after
+```
+
+which removes the kept build trees and staged images, `<out>/binpkgs` and the work directories, and
+leaves the finished `.pkg` and `.pkg.tar.gz` files alone.
+
 The tree goes to `/usr/local/openstep-pkg` unless `--tree-dir` (or `GEN_BOOTSTRAP_TREE_DIR`) says
 otherwise; the package is not relocatable, since the location is built into `install-bootstrap`.
 On the target, after the Installer has run, build everything else with
