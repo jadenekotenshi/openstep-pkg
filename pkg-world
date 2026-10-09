@@ -216,11 +216,12 @@ in_set() {
 
 # The dependencies named in a package's depends file: options are ignored (an
 # optional dependency is listed, and only matters for ordering when it is in
-# the set), and "!conflict" lines are dropped.
+# the set), "!conflict" lines are dropped, and so is a trailing runtime or
+# build word: for building, both kinds come first.
 deps_of() {
     if [ -f "$tree/$1/depends" ]; then
         sed -e 's/#.*//' -e 's/^ *//' -e 's/ *$//' -e 's/^?[^:]*://' \
-            -e '/^!/d' -e '/^$/d' "$tree/$1/depends"
+            -e '/^!/d' -e '/^$/d' -e 's/ .*//' "$tree/$1/depends"
     fi
 }
 
