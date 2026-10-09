@@ -355,7 +355,9 @@ install actions:
                <file>.sha256 (written by binpkg) or PKG_SHA256, and refuses a
                package that fails, or has no checksum, unless PKG_NO_VERIFY=1.
                It also refuses a package built for another PKG_ARCH, and one
-               whose dependencies are not installed
+               whose dependencies are not installed (unless --no-deps, which
+               the bootstrap installer uses: the dependencies of gcc42 and git
+               are mostly needed to build them, not to run them)
 
 verify:
   An install records every installed file in <db>/installed/<name>/files, with
@@ -2003,8 +2005,12 @@ binpkg_check_depends() {
     done < "$bd_meta/depends"
 
     if [ -n "$bd_missing" ]; then
-        discard_image_cache
-        die "missing dependencies for $PKG_NAME (install them first):$bd_missing"
+        if [ "x$PKG_NO_DEPS" = x1 ]; then
+            log "warning: installing $PKG_NAME without its dependencies (--no-deps):$bd_missing"
+        else
+            discard_image_cache
+            die "missing dependencies for $PKG_NAME (install them first):$bd_missing"
+        fi
     fi
     if [ -n "$bd_conflicts" ]; then
         discard_image_cache
@@ -2226,9 +2232,12 @@ remove_name() {
 #   --preserve-download      keep the downloaded sources after the build
 #   --preserve-build-tree    keep the build tree after the build (or --preserve-build)
 #   --preserve-install-tree  keep the staged image after the install (or --preserve-install)
+#   --no-deps                installpkg: do not require the package's dependencies to be
+#                            installed (PKG_NO_DEPS=1); conflicts are still refused
 PKG_PRESERVE_DOWNLOAD=${PKG_PRESERVE_DOWNLOAD-0}
 PKG_PRESERVE_BUILD_TREE=${PKG_PRESERVE_BUILD_TREE-0}
 PKG_PRESERVE_INSTALL_TREE=${PKG_PRESERVE_INSTALL_TREE-0}
+PKG_NO_DEPS=${PKG_NO_DEPS-0}
 while [ $# -gt 0 ]; do
     case $1 in
         --preserve-download)
@@ -2243,6 +2252,10 @@ while [ $# -gt 0 ]; do
             PKG_PRESERVE_INSTALL_TREE=1
             shift
         ;;
+        --no-deps)
+            PKG_NO_DEPS=1
+            shift
+        ;;
         --)
             shift
             break
@@ -2255,7 +2268,7 @@ while [ $# -gt 0 ]; do
         ;;
     esac
 done
-export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE
+export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE PKG_NO_DEPS
 
 ACTION=${1-}
 ARGC=$#

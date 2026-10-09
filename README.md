@@ -282,6 +282,36 @@ Files that a post-install hook creates from a `.dist` template (`ntpd.conf`, `su
 the package image, so they are never checked.  `pkg-world verify world` runs `pkg verify` on every
 installed package and logs each result (`-q` for `--quick`, `-o "a b"` for just those).
 
+## Making the bootstrap distribution (maintainers)
+
+`gen-bootstrap-pkg` builds the file you hand to someone with a bare OPENSTEP machine: a NeXT
+`.pkg` that puts this tree, and binary packages of the tools needed to build the rest, on the
+machine.  Run it on a machine of the architecture you are packaging, with `git`, `gzip`, `mkbom`
+and `compress`:
+
+```sh
+sh ./gen-bootstrap-pkg                          # HEAD, into ./bootstrap-out
+sh ./gen-bootstrap-pkg --ref v1.0 --tree-dir /usr/local/openstep-pkg
+```
+
+1. It archives the ref with `git archive`, so the tree is pristine (uncommitted changes are not
+   in it; it says so) and includes `pkg`, `pkg-missing`, `pkg-world`, `gen-bootstrap-pkg` and
+   every package directory.
+2. It builds binary packages (`pkg binpkg`) of `wget-bootstrap`, `gcc42`, `cctools-as` (i386 only,
+   from its `arch` file) and `git`, from that archived tree, installing whatever they need on the
+   build machine as `pkg binpkg` does.  `--packages "a b"` changes the list, `--binpkg-dir DIR`
+   reuses binary packages already built, `--no-binpkgs` leaves them out.
+3. It adds `bootstrap/install-bootstrap`, which installs those with `pkg --no-deps installpkg`
+   (their dependencies are mostly needed to build them, not to run them), and makes the `.pkg`
+   (`.info`, `.tar.Z`, `.bom`, `.sizes` and a `.post_install` that runs `install-bootstrap`).
+4. It writes `openstep-pkg-bootstrap-<version>-<arch>.pkg.tar.gz` and a `.sha256` for it, plus a
+   `.payload.tar.gz` of the same files for unpacking by hand (`--payload-only` stops there).
+
+The tree goes to `/usr/local/openstep-pkg` unless `--tree-dir` (or `GEN_BOOTSTRAP_TREE_DIR`) says
+otherwise; the package is not relocatable, since the location is built into `install-bootstrap`.
+On the target, after the Installer has run, build everything else with
+`cd /usr/local/openstep-pkg && sh pkg-missing`.
+
 ## Resuming a failed build
 
 A failed build leaves its tree in `<cache>/build/<package>`.  Set `PKG_RESUME=1`
