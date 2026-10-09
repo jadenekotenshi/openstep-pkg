@@ -1982,7 +1982,10 @@ commit_install() {
 install_pkgs() {
     [ $# -ge 1 ] || die "$ACTION requires at least one <package-dir>"
 
-    for pkg_arg
+    # Walk a saved copy of the arguments: the stock sh leaves $1... holding a
+    # called function's arguments, which a bare "for x" would pick up.
+    ip_list="$*"
+    for pkg_arg in $ip_list
     do
         PKG_FORCE=$FORCE_INSTALL
         install_pkg "$pkg_arg"
@@ -2304,7 +2307,8 @@ test_name() {
 test_pkgs() {
     [ $# -ge 1 ] || die "test requires at least one <name>"
 
-    for pkg_name
+    tp_list="$*"
+    for pkg_name in $tp_list
     do
         test_name "$pkg_name"
     done
