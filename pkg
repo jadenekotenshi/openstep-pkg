@@ -324,6 +324,7 @@ usage:
   pkg test <name>...
   pkg verify [--quick] [<name>...]
   pkg cleanup [--dry-run] [<name>...]
+  pkg upgrade [--dry-run] [<name>...]
   pkg arch
   pkg config
 
@@ -375,6 +376,16 @@ verify:
   shell patterns for paths under the root, one per line (# starts a comment;
   * also matches /), for example /usr/local/etc/*.conf.  An ignored path is not
   reported whether it is changed or gone.
+
+upgrade:
+  pkg upgrade installs the tree's version of every installed package (or the
+  named ones) that is older than it, dependencies first; the tree is the
+  directory pkg is in (PKG_TREE overrides).  Versions are compared in pieces,
+  numbers as numbers and letters as text ("1.1.1w" is newer than "1.1.1",
+  "10.6p1" newer than "9.9p2").  A package that is the same or newer, or not in
+  the tree, is left alone.  --dry-run only lists what it would do, and the
+  installed packages built against the ones it upgrades.  It stops at the first
+  failure; run it again to carry on.
 
 cleanup:
   pkg cleanup removes what the cache keeps of builds: downloaded sources, build
@@ -1724,6 +1735,255 @@ cleanup_pkgs() {
     fi
 }
 
+# ---- upgrade ------------------------------------------------------------------
+# Compare two version strings.  Each is cut into words at punctuation and where
+# digits meet letters ("1.1.1w" is 1 1 1 w, "10.6p1" is 10 6 p 1); numbers are
+# compared as numbers and letters as strings, and a version that runs out first
+# is older ("1.1.1" is older than "1.1.1w"), except for trailing zeros ("1.0" is
+# "1.0.0").  Takes vc_a and vc_b; sets vc_result to older, same or newer (a
+# against b).  Calls no function, so $@ may be used freely.
+version_cmp() {
+    vc_ta=`echo "$vc_a" | sed -e 's/[^0-9A-Za-z]/ /g' -e 's/\([0-9]\)\([A-Za-z]\)/\1 \2/g' -e 's/\([A-Za-z]\)\([0-9]\)/\1 \2/g'`
+    vc_tb=`echo "$vc_b" | sed -e 's/[^0-9A-Za-z]/ /g' -e 's/\([0-9]\)\([A-Za-z]\)/\1 \2/g' -e 's/\([A-Za-z]\)\([0-9]\)/\1 \2/g'`
+    vc_result=same
+    while :; do
+        set -f
+        set -- $vc_ta
+        vc_x=${1-}
+        if [ $# -gt 0 ]; then shift; fi
+        vc_ta="$*"
+        set -- $vc_tb
+        vc_y=${1-}
+        if [ $# -gt 0 ]; then shift; fi
+        vc_tb="$*"
+        set +f
+        if [ -z "$vc_x" ] && [ -z "$vc_y" ]; then
+            return 0
+        fi
+        # One side has run out: the other is newer unless all it has left is zeros.
+        if [ -z "$vc_x" ]; then
+            case $vc_y in
+                *[!0]*) vc_result=older; return 0 ;;
+            esac
+            continue
+        fi
+        if [ -z "$vc_y" ]; then
+            case $vc_x in
+                *[!0]*) vc_result=newer; return 0 ;;
+            esac
+            continue
+        fi
+        vc_xn=1; vc_yn=1
+        case $vc_x in *[!0-9]*) vc_xn=0 ;; esac
+        case $vc_y in *[!0-9]*) vc_yn=0 ;; esac
+        if [ $vc_xn = 1 ] && [ $vc_yn = 1 ]; then
+            if [ "`expr "$vc_x" + 0`" = "`expr "$vc_y" + 0`" ]; then
+                continue
+            fi
+            if [ "`expr "$vc_x" + 0 \< "$vc_y" + 0`" = 1 ]; then
+                vc_result=older
+            else
+                vc_result=newer
+            fi
+            return 0
+        fi
+        if [ $vc_xn = 1 ]; then
+            vc_result=older       # a number before letters: 1.0 before 1.0rc
+            return 0
+        fi
+        if [ $vc_yn = 1 ]; then
+            vc_result=newer
+            return 0
+        fi
+        if [ "$vc_x" = "$vc_y" ]; then
+            continue
+        fi
+        if [ "`expr "$vc_x" \< "$vc_y"`" = 1 ]; then
+            vc_result=older
+        else
+            vc_result=newer
+        fi
+        return 0
+    done
+}
+
+# The packages a tree package depends on (names only, conditional and kind
+# words dropped, conflicts left out).  Sets up_deps.
+up_deps_of() {
+    up_deps=
+    if [ -f "$up_tree/$up_name/depends" ]; then
+        up_deps=`sed -e 's/#.*//' -e 's/^ *//' -e 's/ *$//' -e 's/^?[^:]*://' \
+            -e '/^!/d' -e '/^$/d' -e 's/ .*//' "$up_tree/$up_name/depends"`
+    fi
+}
+
+# pkg upgrade [--dry-run] [name ...]: install the tree's version of every
+# installed package (or just the named ones) that is older than the tree's, with
+# what they depend on first.  A package with the same or a newer version
+# installed, or that is not in the tree, is left alone.  It stops at the first
+# one that fails to build; run it again to carry on (the ones done are skipped).
+upgrade_pkgs() {
+    ROOT_DIR=`default_value "$PKG_ROOT" "/"`
+    ROOT_DIR=`trim_slash "$ROOT_DIR"`
+    LOCAL_ROOT=$ROOT_DIR/usr/local
+    DB_ROOT=`default_value "$PKG_DB" "$LOCAL_ROOT/var/pkg/db"`
+
+    up_dry=0
+    up_names=
+    for up_word in $PKG_ARGS; do
+        case $up_word in
+            --dry-run|-n) up_dry=1 ;;
+            -*) die "unknown upgrade option: $up_word" ;;
+            *) up_names="$up_names $up_word" ;;
+        esac
+    done
+
+    # The tree is the directory this pkg lives in (PKG_TREE overrides).
+    up_tree=${PKG_TREE-}
+    if [ -z "$up_tree" ]; then
+        case $0 in
+            */*) up_tree=`echo "$0" | sed 's#/[^/]*$##'` ;;
+            *) up_tree=. ;;
+        esac
+    fi
+    up_tree=`cd "$up_tree" 2>/dev/null && pwd` ||
+        die "cannot find the package tree; set PKG_TREE to its directory"
+    [ -f "$up_tree/pkg" ] || [ -f "$up_tree/build-helpers.sh" ] ||
+        die "$up_tree does not look like a package tree; set PKG_TREE to its directory"
+
+    # Installed packages, wanted ones first.
+    up_installed=
+    for up_d in $DB_ROOT/installed/*; do
+        if [ -d "$up_d" ]; then
+            up_installed="$up_installed `path_leaf "$up_d"`"
+        fi
+    done
+    [ -n "$up_installed" ] || die "no installed packages"
+
+    if [ -n "$up_names" ]; then
+        for up_want in $up_names; do
+            case " $up_installed " in
+                *" $up_want "*) : ;;
+                *) die "not installed: $up_want" ;;
+            esac
+        done
+        up_check=$up_names
+    else
+        up_check=$up_installed
+    fi
+
+    # Which are older than the tree's?
+    up_todo=
+    up_note=
+    for up_name in $up_check; do
+        if [ ! -f "$up_tree/$up_name/version" ] || [ ! -f "$up_tree/$up_name/build" ]; then
+            up_note="$up_note
+  $up_name: installed, but not in the tree"
+            continue
+        fi
+        read vc_a up_junk < "$DB_ROOT/installed/$up_name/version" || vc_a=
+        read vc_b up_junk < "$up_tree/$up_name/version" || vc_b=
+        up_have=$vc_a
+        up_want_v=$vc_b
+        version_cmp
+        case $vc_result in
+            older)
+                up_todo="$up_todo $up_name"
+                eval up_have_$up_name=\$up_have
+                eval up_new_$up_name=\$up_want_v
+            ;;
+            newer)
+                up_note="$up_note
+  $up_name: installed $up_have is newer than the tree's $up_want_v"
+            ;;
+        esac
+    done
+
+    if [ -z "$up_todo" ]; then
+        log "all installed packages are up to date with $up_tree"
+        if [ -n "$up_note" ]; then
+            echo "notes:$up_note"
+        fi
+        return 0
+    fi
+
+    # Dependencies first: take, each round, the packages whose dependencies in
+    # this list are already placed.
+    up_order=
+    up_left=$up_todo
+    while [ -n "$up_left" ]; do
+        up_next=
+        up_progress=0
+        for up_name in $up_left; do
+            up_deps_of
+            up_ready=1
+            for up_dep in $up_deps; do
+                case " $up_left " in
+                    *" $up_dep "*)
+                        if [ "$up_dep" != "$up_name" ]; then
+                            up_ready=0
+                        fi
+                    ;;
+                esac
+            done
+            if [ $up_ready = 1 ]; then
+                up_order="$up_order $up_name"
+                up_progress=1
+            else
+                up_next="$up_next $up_name"
+            fi
+        done
+        if [ $up_progress = 0 ]; then
+            # A dependency loop; carry on in the order given rather than hang.
+            up_order="$up_order$up_next"
+            up_next=
+        fi
+        up_left=$up_next
+    done
+
+    echo "to upgrade, dependencies first:"
+    for up_name in $up_order; do
+        eval up_h=\$up_have_$up_name
+        eval up_n=\$up_new_$up_name
+        echo "  $up_name $up_h -> $up_n"
+    done
+
+    # Installed packages that depend on one of these were built against the old
+    # one, and may want rebuilding (a library linked statically, say).
+    up_dependents=
+    for up_name in $up_installed; do
+        case " $up_order " in
+            *" $up_name "*) continue ;;
+        esac
+        up_deps_of
+        for up_dep in $up_deps; do
+            case " $up_order " in
+                *" $up_dep "*) up_dependents="$up_dependents $up_name($up_dep)" ; break ;;
+            esac
+        done
+    done
+    if [ -n "$up_dependents" ]; then
+        echo "installed packages built against these, not rebuilt (consider pkg reinstall):$up_dependents"
+    fi
+    if [ -n "$up_note" ]; then
+        echo "notes:$up_note"
+    fi
+
+    if [ $up_dry = 1 ]; then
+        log "dry run: nothing changed"
+        return 0
+    fi
+
+    up_done=0
+    for up_name in $up_order; do
+        log "upgrading $up_name"
+        PKG_FORCE=0
+        install_pkg "$up_tree/$up_name"
+        up_done=`expr $up_done + 1`
+    done
+    log "upgraded $up_done packages"
+}
+
 # pkg verify [name ...]: every installed package when no name is given.
 verify_pkgs() {
     ROOT_DIR=`default_value "$PKG_ROOT" "/"`
@@ -2502,6 +2762,10 @@ case $ACTION in
 
     cleanup)
         cleanup_pkgs
+    ;;
+
+    upgrade)
+        upgrade_pkgs
     ;;
 
     ""|-h|--help|help)
