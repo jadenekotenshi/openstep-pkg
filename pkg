@@ -340,6 +340,11 @@ options (before the action; each also works as an environment variable set to 1)
                            as <cache>/pkg/<package>.installed after the install
   They apply to every package that run builds, dependencies included.  A build
   that fails always keeps its tree.
+  --no-deps                installpkg: do not require the package's dependencies
+                           to be installed (PKG_NO_DEPS); conflicts are still
+                           refused
+  -h, --help               print this text (also after an action, or as
+                           "pkg help")
 
 install actions:
   install      builds and installs a package and what it depends on; a package
@@ -2727,6 +2732,10 @@ while [ $# -gt 0 ]; do
             shift
             break
         ;;
+        -h|--help)
+            usage
+            exit 0
+        ;;
         --*)
             die "unknown option: $1"
         ;;
@@ -2736,6 +2745,17 @@ while [ $# -gt 0 ]; do
     esac
 done
 export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE PKG_NO_DEPS
+
+# "pkg <action> --help" (or -h) prints the usage too, rather than being taken
+# for a package name.
+for help_arg in "$@"; do
+    case $help_arg in
+        -h|--help)
+            usage
+            exit 0
+        ;;
+    esac
+done
 
 ACTION=${1-}
 ARGC=$#
