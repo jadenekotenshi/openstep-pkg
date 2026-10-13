@@ -106,7 +106,7 @@ mpg123 have no SPARC result.
 | pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) |
 | python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | validated (2026-10-10; content-free dedicated-server startup test) |
-| quickjs | validated | validated 2025-09-13-2 (2026-10-09) |
+| quickjs | validated | validated 2025-09-13-2 (2026-10-13; SPARC needs memcpy accessors and an 8-byte aligned constant pool) |
 | roboclient | validated (1.1 with `rc.dhcp` installs and tests clean on x86) | validated 1.1 (2026-10-09) |
 | rsync | validated | validated (2026-10-10) |
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) |
