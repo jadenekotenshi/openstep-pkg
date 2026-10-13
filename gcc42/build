@@ -28,11 +28,7 @@ sparc*) ARCH=sparc ;;
 m68k*|m68*) ARCH=m68k ;;
 *)      ARCH=i386 ;;
 esac
-# NeXT's 68k machines run NeXTSTEP 3.3, not OPENSTEP 4.
-case $ARCH in
-m68k) TARGET=$ARCH-next-nextstep3 ;;
-*)    TARGET=$ARCH-next-openstep4 ;;
-esac
+TARGET=$ARCH-next-openstep4
 PREFIX=/usr/local
 PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
 TMPDIR=/tmp
