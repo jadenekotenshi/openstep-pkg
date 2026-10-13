@@ -82,7 +82,7 @@ mpg123 have no SPARC result.
 | libpng | validated | validated 1.6.59 (2026-10-09) |
 | libsvgtiny | validated | validated 0.1.8 (2026-10-09) |
 | libwapcaplet | validated | validated 0.4.3 (rebootstrap, 2026-10-08) |
-| libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-09) |
+| libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-13) |
 | lua | validated | validated (2026-10-10) |
 | lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) |
 | lz4 | validated | validated (2026-10-10) |
@@ -104,7 +104,7 @@ mpg123 have no SPARC result.
 | pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) |
 | perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) |
 | pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) |
-| python311 | validated | validated 3.11.17 (rebootstrap, 2026-10-08) |
+| python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | validated (2026-10-10; content-free dedicated-server startup test) |
 | quickjs | validated | validated 2025-09-13-2 (2026-10-09) |
 | roboclient | validated (1.1 with `rc.dhcp` installs and tests clean on x86) | validated 1.1 (2026-10-09) |
