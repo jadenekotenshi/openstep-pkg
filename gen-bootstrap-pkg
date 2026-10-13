@@ -454,7 +454,8 @@ fi
 
 # 5. The NeXT .pkg.  Relocatable NO and DefaultLocation = the tree's parent
 # directory, with only the tree's own directory in the archive: the Installer
-# then never touches the ownership or modes of /usr or /usr/local.
+# then never touches the ownership or modes of /usr (DefaultLocation itself is
+# only the BOM's "." entry, below).
 pkgname=$name
 pkgdir=$out/$pkgname.pkg
 parent=`echo "$tree_dir" | sed 's#/[^/]*$##'`
@@ -534,9 +535,14 @@ case $cz_status in
     ;;
 esac
 
-# The bill of materials, of the tree as it will be installed.
+# The bill of materials, of the tree as it will be installed.  Its paths are
+# relative to DefaultLocation, like the archive's (./LEAF/...), so make it from
+# the parent, which holds nothing but the tree; made from the tree itself the
+# Installer lists (and may install) everything directly in DefaultLocation.
+# The first entry is DefaultLocation itself, so give it the usual mode.
 say "making the bill of materials"
-$MKBOM "$payload$parent/$leaf" "$pkgdir/$pkgname.bom" || die "mkbom failed"
+chmod 755 "$payload$parent" || die "cannot set the mode of $payload$parent"
+$MKBOM "$payload$parent" "$pkgdir/$pkgname.bom" || die "mkbom failed"
 
 # Sizes in K.  NumFiles counts files and directories.
 nfiles=`cd "$payload$parent" && find "$leaf" -print | wc -l | sed 's/ //g'`
