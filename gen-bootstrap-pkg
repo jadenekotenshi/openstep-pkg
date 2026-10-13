@@ -480,20 +480,49 @@ chmod 755 "$pkgdir/$pkgname.post_install"
 
 # The archive: paths relative to DefaultLocation, as in OpenWrite.pkg.
 say "compressing the payload"
-( cd "$payload$parent" && tar cf - "$leaf" ) | $COMPRESS > "$pkgdir/$pkgname.tar.Z" || {
-    # Say what is known: the usual cause is a full disk, and the tools' own
-    # messages scroll past before this one.
-    got=`wc -c < "$pkgdir/$pkgname.tar.Z" 2>/dev/null | sed 's/ //g'`
-    payload_k=`cd "$payload$parent" && du -sk "$leaf" | sed 's/[^0-9].*//'`
-    echo "gen-bootstrap-pkg: the compressed archive stopped at ${got:-0} bytes; the payload is ${payload_k}K" >&2
-    echo "gen-bootstrap-pkg: free space where $pkgdir is (the archive needs roughly half the payload):" >&2
-    df "$pkgdir" >&2 || :
-    echo "gen-bootstrap-pkg: everything is written under the output directory ($out).  If the disk is full," >&2
-    echo "gen-bootstrap-pkg: free space or use a bigger disk; the finished binary packages are kept and can be reused" >&2
-    echo "gen-bootstrap-pkg: without compiling anything:  sh gen-bootstrap-pkg --out BIGGERDIR --binpkg-dir $out/binpkgs" >&2
-    echo "gen-bootstrap-pkg: to see the tools' own message: ( cd $payload$parent && tar cf - $leaf ) | $COMPRESS > /dev/null" >&2
-    die "could not write $pkgname.tar.Z"
-}
+( cd "$payload$parent" && tar cf - "$leaf" ) | $COMPRESS > "$pkgdir/$pkgname.tar.Z"
+cz_status=$?
+case $cz_status in
+    0)
+        :
+    ;;
+    2)
+        # compress exits 2 when what it wrote is not smaller than what it read.
+        # The binary packages in the payload are already compressed, so LZW grows
+        # them and the archive is complete anyway.  Don't take its word for it:
+        # decompress it and compare the size of the stream with the tar's.
+        say "note: compress exited 2: the archive is not smaller than the payload (the binary packages in it are already compressed)"
+        cz_unc=`find_system_tool uncompress` || cz_unc=`find_system_tool zcat` || cz_unc=
+        case $cz_unc in
+            *zcat) cz_unc="$cz_unc" ;;
+            '') : ;;
+            *) cz_unc="$cz_unc -c" ;;
+        esac
+        if [ -z "$cz_unc" ]; then
+            say "warning: no uncompress or zcat to check the archive with; its size is `wc -c < "$pkgdir/$pkgname.tar.Z" | sed 's/ //g'` bytes"
+        else
+            cz_want=`( cd "$payload$parent" && tar cf - "$leaf" ) | wc -c | sed 's/ //g'`
+            cz_have=`$cz_unc < "$pkgdir/$pkgname.tar.Z" | wc -c | sed 's/ //g'`
+            [ -n "$cz_want" ] && [ "$cz_want" = "$cz_have" ] ||
+                die "$pkgname.tar.Z is damaged: it decompresses to $cz_have bytes, the payload is $cz_want"
+            say "checked: $pkgname.tar.Z decompresses to the $cz_want bytes of the payload"
+        fi
+    ;;
+    *)
+        # Say what is known: the usual cause is a full disk, and the tools' own
+        # messages scroll past before this one.
+        got=`wc -c < "$pkgdir/$pkgname.tar.Z" 2>/dev/null | sed 's/ //g'`
+        payload_k=`cd "$payload$parent" && du -sk "$leaf" | sed 's/[^0-9].*//'`
+        echo "gen-bootstrap-pkg: compression failed (exit $cz_status) after ${got:-0} bytes; the payload is ${payload_k}K" >&2
+        echo "gen-bootstrap-pkg: free space where $pkgdir is (the archive can be bigger than the payload):" >&2
+        df "$pkgdir" >&2 || :
+        echo "gen-bootstrap-pkg: everything is written under the output directory ($out).  If the disk is full," >&2
+        echo "gen-bootstrap-pkg: free space or use a bigger disk; the finished binary packages are kept and can be reused" >&2
+        echo "gen-bootstrap-pkg: without compiling anything:  sh gen-bootstrap-pkg --out BIGGERDIR --binpkg-dir $out/binpkgs" >&2
+        echo "gen-bootstrap-pkg: to see the tools' own message: ( cd $payload$parent && tar cf - $leaf ) | $COMPRESS > /dev/null" >&2
+        die "could not write $pkgname.tar.Z"
+    ;;
+esac
 
 # The bill of materials, of the tree as it will be installed.
 say "making the bill of materials"
