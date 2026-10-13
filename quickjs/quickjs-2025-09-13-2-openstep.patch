@@ -969,3 +969,33 @@ index 1371ab5..96bed33 100644
  }
  
  static inline uint32_t get_u8(const uint8_t *tab)
+diff --git a/quickjs.c b/quickjs.c
+index 72e71c6..ee0a7a9 100644
+--- a/quickjs.c
++++ b/quickjs.c
+@@ -34793,8 +34793,11 @@ static JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd)
+     } else {
+         function_size = sizeof(*b);
+     }
+-    cpool_offset = function_size;
+-    function_size += fd->cpool_count * sizeof(*fd->cpool);
++    /* The constant pool is an array of JSValue, which needs 8-byte alignment
++       (NaN boxing makes it a uint64_t); the struct before it need not be a
++       multiple of 8 on strict-alignment CPUs such as SPARC. */
++    cpool_offset = (function_size + 7) & ~7;
++    function_size = cpool_offset + fd->cpool_count * sizeof(*fd->cpool);
+     vardefs_offset = function_size;
+     if (!fd->strip_debug || fd->has_eval_call) {
+         function_size += (fd->arg_count + fd->var_count) * sizeof(*b->vardefs);
+@@ -37393,8 +37396,9 @@ static JSValue JS_ReadFunctionTag(BCReaderState *s)
+     } else {
+         function_size = offsetof(JSFunctionBytecode, debug);
+     }
+-    cpool_offset = function_size;
+-    function_size += bc.cpool_count * sizeof(*bc.cpool);
++    /* (aligned for the JSValue array, as in js_create_function) */
++    cpool_offset = (function_size + 7) & ~7;
++    function_size = cpool_offset + bc.cpool_count * sizeof(*bc.cpool);
+     vardefs_offset = function_size;
+     function_size += local_count * sizeof(*bc.vardefs);
+     closure_var_offset = function_size;
