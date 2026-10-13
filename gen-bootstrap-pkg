@@ -472,10 +472,16 @@ mkdirs "$pkgdir" || die "cannot create $pkgdir"
 say "building $pkgname.pkg (installs into $tree_dir)"
 
 # The scripts the Installer runs (they run as root, after the files are in).
+# The Installer reports "errors" when this exits nonzero, so say what the
+# script returned (in the Installer's window, and in post_install.status).
 cat > "$pkgdir/$pkgname.post_install" <<EOF
 #!/bin/sh
 # Run by the Installer after the tree is in place.
-exec /bin/sh $tree_dir/bootstrap/install-bootstrap
+/bin/sh $tree_dir/bootstrap/install-bootstrap
+status=\$?
+echo "post_install: install-bootstrap exited \$status"
+echo "\$status" > $tree_dir/bootstrap/post_install.status
+exit \$status
 EOF
 chmod 755 "$pkgdir/$pkgname.post_install"
 
