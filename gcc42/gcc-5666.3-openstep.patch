@@ -11643,3 +11643,245 @@ index b649e9b..3e00047 100644
  /* APPLE LOCAL begin radar 3904178 */
  #undef LANG_HOOKS_FOLD_OBJ_TYPE_REF
  #define LANG_HOOKS_FOLD_OBJ_TYPE_REF objc_fold_obj_type_ref
+diff --git a/gcc/config.gcc b/gcc/config.gcc
+index 1111111..2222222 100644
+--- a/gcc/config.gcc
++++ b/gcc/config.gcc
+@@ -1485,6 +1485,14 @@ m68hc12-*-*|m6812-*-*)
+ 	extra_options="${extra_options} m68hc11/m68hc11.opt"
+ 	use_fixproto=yes
+         ;;
++m68k-next-*)
++	tm_p_file="${tm_p_file} nextstep-protos.h"
++	tm_file="${tm_file} nextstep.h m68k/next.h"
++	tmake_file=m68k/t-next
++	extra_objs=nextstep.o
++	extra_parts="crtbegin.o crtend.o"
++	use_collect2=no
++	;;
+ m68k-*-aout*)
+ 	tmake_file=m68k/t-m68kbare
+ 	tm_file="m68k/m68k.h m68k/m68k-none.h m68k/m68kemb.h m68k/m68k-aout.h libgloss.h"
+diff --git a/gcc/config/m68k/ARCH_INCLUDE.h b/gcc/config/m68k/ARCH_INCLUDE.h
+new file mode 100644
+index 0000000..27bdeaf
+--- /dev/null
++++ b/gcc/config/m68k/ARCH_INCLUDE.h
+@@ -0,0 +1,9 @@
++#ifndef _ARCH_INCLUDE_H_
++#define _ARCH_INCLUDE_H_
++
++/* GCC's preprocessor does not accept OPENSTEP's adjacent-string form in
++   include directives.  Use an angle-bracket name and a token that cannot
++   be expanded like the predefined m68k macro.  */
++#define ARCH_INCLUDE(prefix, suffix) <prefix __next_m68k__/suffix>
++
++#endif
+diff --git a/gcc/config/m68k/next.h b/gcc/config/m68k/next.h
+new file mode 100644
+index 0000000..804cf36
+--- /dev/null
++++ b/gcc/config/m68k/next.h
+@@ -0,0 +1,126 @@
++/* Target definitions for GNU compiler for mc680x0 running NeXTSTEP.
++   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997, 1999
++   Free Software Foundation, Inc.
++
++This file is part of GCC.
++
++GCC is free software; you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation; either version 2, or (at your option)
++any later version.
++
++GCC is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with GCC; see the file COPYING.  If not, write to
++the Free Software Foundation, 51 Franklin Street, Fifth Floor,
++Boston, MA 02110-1301, USA.  */
++
++/* This file layers the Mach-O/NeXT conventions in nextstep.h over the
++   generic m68k back end (MIT assembler syntax, as the stock NeXT cc used).
++   It follows GCC 2.95's m68k/next.h, the last FSF version of the port.  */
++
++/* 68020 instructions and bit-fields, 68881/2 floating point, scheduled for
++   the 68040 (-m68020-40): runs on the 68030+68882 and on the 68040.  */
++#undef TARGET_DEFAULT
++#define TARGET_DEFAULT (MASK_68040 | MASK_BITFIELD | MASK_68881 | MASK_68020)
++
++#undef TARGET_OS_CPP_BUILTINS
++#define TARGET_OS_CPP_BUILTINS()                 \
++  do                                             \
++    {                                            \
++      builtin_define ("NeXT");                  \
++      builtin_define ("__MACH__");              \
++      builtin_define ("__BIG_ENDIAN__");        \
++      builtin_define_std ("unix");              \
++      builtin_define_std ("m68k");              \
++      builtin_define ("_NEXT_SOURCE");          \
++      builtin_define_with_value ("__ARCHITECTURE__", "m68k", 1); \
++      builtin_assert ("system=unix");            \
++      builtin_assert ("system=mach");            \
++    }                                            \
++  while (0)
++
++#undef TEXT_SECTION_ASM_OP
++#define TEXT_SECTION_ASM_OP "\t.text"
++
++#undef DATA_SECTION_ASM_OP
++#define DATA_SECTION_ASM_OP "\t.data"
++
++#undef GLOBAL_ASM_OP
++#define GLOBAL_ASM_OP "\t.globl "
++
++#undef LINKER_NAME
++#define LINKER_NAME "ld"
++
++/* OPENSTEP's assembler does not accept the hot/cold section names.  */
++#undef HOT_TEXT_SECTION_NAME
++#define HOT_TEXT_SECTION_NAME TEXT_SECTION_ASM_OP
++
++#undef UNLIKELY_EXECUTED_TEXT_SECTION_NAME
++#define UNLIKELY_EXECUTED_TEXT_SECTION_NAME TEXT_SECTION_ASM_OP
++
++#ifndef ASM_DECLARE_FUNCTION_NAME
++#define ASM_DECLARE_FUNCTION_NAME(FILE, NAME, DECL) ASM_OUTPUT_LABEL (FILE, NAME)
++#endif
++
++#undef	ASM_APP_ON
++#define ASM_APP_ON "#APP\n"
++
++#undef	ASM_APP_OFF
++#define ASM_APP_OFF "#NO_APP\n"
++
++/* The stack is kept on a 4-byte boundary.  */
++#undef	STACK_BOUNDARY
++#define STACK_BOUNDARY 32
++
++/* Every structure or union's size must be a multiple of 2 bytes.  */
++#undef	STRUCTURE_SIZE_BOUNDARY
++#define STRUCTURE_SIZE_BOUNDARY 16
++
++/* NeXT's assembler has .space rather than .skip.  */
++#undef ASM_OUTPUT_SKIP
++#define ASM_OUTPUT_SKIP(FILE,SIZE)  \
++  fprintf (FILE, "\t.space "HOST_WIDE_INT_PRINT_UNSIGNED"\n", (SIZE))
++
++/* m68k.h's version is `.comm' without the leading tab.  */
++#undef ASM_OUTPUT_COMMON
++#define ASM_OUTPUT_COMMON(FILE, NAME, SIZE, ROUNDED)  \
++( fputs ("\t.comm ", (FILE)),			\
++  assemble_name ((FILE), (NAME)),		\
++  fprintf ((FILE), ",%u\n", (int)(ROUNDED)))
++
++/* Case vectors stay as m68k.h has them (pc-relative): the 4.2 m68k.md only
++   has a tablejump pattern for that form.  They are addressed relative to the
++   code, so they must be in the same section: the text section.  */
++#define JUMP_TABLES_IN_TEXT_SECTION 1
++
++/* The stock assembler knows the frame pointer as a6, not as fp.  */
++#undef M68K_FP_REG_NAME
++#define M68K_FP_REG_NAME REGISTER_PREFIX"a6"
++
++/* GCC is the primary compiler for NeXTSTEP, so structures are returned
++   as GCC does (the address is passed to the callee), never in a static
++   area.  */
++#undef PCC_STATIC_STRUCT_RETURN
++
++/* This accounts for the return pc and saved fp on the m68k.  */
++
++#define OBJC_FORWARDING_STACK_OFFSET 8
++#define OBJC_FORWARDING_MIN_OFFSET 8
++
++/* Trampolines are in the stack, which the system makes executable on request
++   (__enable_execute_stack also clears the instruction cache).  */
++#undef FINALIZE_TRAMPOLINE
++#define FINALIZE_TRAMPOLINE(TRAMP) \
++  emit_library_call (gen_rtx_SYMBOL_REF (Pmode, "__enable_execute_stack"), \
++		     LCT_NORMAL, VOIDmode, 1, \
++		     memory_address (SImode, (TRAMP)), Pmode)
++
++/* On NeXTSTEP clearing the instruction cache is a system trap.  */
++#undef CLEAR_INSN_CACHE
++#define CLEAR_INSN_CACHE(BEG, END)   \
++   __asm__ __volatile__ ("trap #2")
+diff --git a/gcc/config/m68k/t-next b/gcc/config/m68k/t-next
+new file mode 100644
+index 0000000..30653f1
+--- /dev/null
++++ b/gcc/config/m68k/t-next
+@@ -0,0 +1,47 @@
++# Specify other dirs of system header files to be fixed.
++OTHER_FIXINCLUDES_DIRS= /LocalDeveloper/Headers
++
++# <limits.h> is sometimes in /usr/include/ansi/limits.h.
++LIMITS_H_TEST = [ -f $(SYSTEM_HEADER_DIR)/limits.h -o -f $(SYSTEM_HEADER_DIR)/ansi/limits.h ]
++
++nextstep.o: $(srcdir)/config/nextstep.c $(CONFIG_H) $(TM_H) $(TM_P_H) flags.h tree.h
++	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $(srcdir)/config/nextstep.c
++
++# OPENSTEP uses setjmp/longjmp exceptions and has no DWARF unwinder.
++LIB2ADDEH = $(srcdir)/unwind-sjlj.c $(srcdir)/unwind-c.c
++LIB2ADDEHSTATIC = $(LIB2ADDEH)
++LIB2ADDEHSHARED = $(LIB2ADDEH)
++LIB2ADDEHDEP = $(UNWIND_H) unwind-pe.h unwind.inc
++
++# fixincludes recreates gcc/include while all-gcc is running.  Populate the
++# OPENSTEP computed-include aliases and framework-style include directories
++# after that step, but before xgcc starts compiling libgcc.
++libgcc.a stmp-multilib: stmp-nextstep-headers
++
++stmp-nextstep-headers: stmp-int-hdrs
++	test -d include/architecture || mkdir include/architecture
++	/bin/rm -f include/architecture/ARCH_INCLUDE.h
++	/bin/cp $(srcdir)/config/m68k/ARCH_INCLUDE.h include/architecture/
++	# OPENSTEP's cdefs.h mistakes every GCC x.y with y < 5 for GCC 1.x.
++	test -d include/sys || mkdir include/sys
++	sed 's/__GNUC__ < 2 || __GNUC_MINOR__ < 5/__GNUC__ < 2 || (__GNUC__ == 2 \&\& __GNUC_MINOR__ < 5)/' \
++	  /NextDeveloper/Headers/bsd/sys/cdefs.h > include/sys/cdefs.h
++	for header_m68k_dir in /NextDeveloper/Headers/*/m68k; do \
++	  if [ -d "$$header_m68k_dir" ]; then \
++	    header_family=`echo "$$header_m68k_dir" | sed 's#^/NextDeveloper/Headers/##; s#/m68k$$##'`; \
++	    test -d "include/$$header_family" || mkdir "include/$$header_family"; \
++	    /bin/rm -rf "include/$$header_family/__next_m68k__"; \
++	    /bin/cp -r "$$header_m68k_dir" "include/$$header_family/__next_m68k__"; \
++	  fi; \
++	done
++	for framework_dir in /NextLibrary/Frameworks/*.framework; do \
++	  if [ -d "$$framework_dir/Headers" ]; then \
++	    framework_name=`echo "$$framework_dir" | sed 's#^.*/##; s#\.framework$$##'`; \
++	    if [ -d "include/$$framework_name" ]; then chmod u+w "include/$$framework_name"; fi; \
++	    /bin/rm -rf "include/$$framework_name"; \
++	    mkdir "include/$$framework_name"; \
++	    set -- "$$framework_dir"/Headers/*.h; \
++	    if [ -f "$$1" ]; then /bin/cp "$$@" "include/$$framework_name/"; fi; \
++	  fi; \
++	done
++	echo timestamp > $@
+diff --git a/gcc/final.c b/gcc/final.c
+index 1111111..2222222 100644
+--- a/gcc/final.c
++++ b/gcc/final.c
+@@ -801,6 +801,10 @@ struct tree_opt_pass pass_compute_alignments =
+    reorg.c, since the branch splitting exposes new instructions with delay
+    slots.  */
+ 
++/* Needed by calculate_alignments even where the target has no insn length
++   attribute (HAVE_ATTR_length), such as m68k.  */
++#define MAX_CODE_ALIGN 16
++
+ void
+ shorten_branches (rtx first ATTRIBUTE_UNUSED)
+ {
+@@ -812,7 +816,6 @@ shorten_branches (rtx first ATTRIBUTE_UNUSED)
+   /* APPLE LOCAL begin ARM compact switch tables */
+   /* Removed seq.  */
+ #ifdef HAVE_ATTR_length
+-#define MAX_CODE_ALIGN 16
+   int something_changed = 1;
+   char *varying_length;
+   rtx body;
