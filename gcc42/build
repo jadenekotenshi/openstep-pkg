@@ -25,9 +25,14 @@ BUILDDIR="$SRCDIR/build-openstep"
 # prints i386, sparc, ...; GCC42_ARCH overrides it.  i386 stays the default.
 case "${GCC42_ARCH:-`/usr/bin/arch 2>/dev/null`}" in
 sparc*) ARCH=sparc ;;
+m68k*|m68*) ARCH=m68k ;;
 *)      ARCH=i386 ;;
 esac
-TARGET=$ARCH-next-openstep4
+# NeXT's 68k machines run NeXTSTEP 3.3, not OPENSTEP 4.
+case $ARCH in
+m68k) TARGET=$ARCH-next-nextstep3 ;;
+*)    TARGET=$ARCH-next-openstep4 ;;
+esac
 PREFIX=/usr/local
 PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
 TMPDIR=/tmp

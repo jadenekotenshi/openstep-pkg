@@ -17,6 +17,7 @@ MACHINE=`"$CC" -dumpmachine`
 case "$MACHINE" in
 i386-*) ARCH=i386 ;;
 sparc-*) ARCH=sparc ;;
+m68k-*) ARCH=m68k ;;
 *) echo "gcc42: unexpected target $MACHINE"; exit 1 ;;
 esac
 
