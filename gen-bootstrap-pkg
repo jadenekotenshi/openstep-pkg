@@ -478,6 +478,16 @@ exec /bin/sh $tree_dir/bootstrap/install-bootstrap
 EOF
 chmod 755 "$pkgdir/$pkgname.post_install"
 
+# LongFileNames NO makes Installer use installer_tar, since installer_bigtar
+# fails with "directory checksum error".  tar names are 100 bytes at most (a
+# directory's trailing slash counts), so refuse a payload that has longer ones.
+longnames=`cd "$payload$parent" && find "$leaf" -print | sed -n '/^.\{100,\}$/p'`
+if [ -n "$longnames" ]; then
+    echo "gen-bootstrap-pkg: these paths are 100 characters or longer, too long for installer_tar:" >&2
+    echo "$longnames" | sed 5q | sed 's/^/gen-bootstrap-pkg:   /' >&2
+    die "the payload has file names too long for LongFileNames NO"
+fi
+
 # The archive: paths relative to DefaultLocation, as in OpenWrite.pkg.
 say "compressing the payload"
 ( cd "$payload$parent" && tar cf - "$leaf" ) | $COMPRESS > "$pkgdir/$pkgname.tar.Z"
@@ -555,7 +565,7 @@ ck=`expr \( $cbytes + 1023 \) / 1024`
     echo "Relocatable NO"
     echo "Application NO"
     echo "UseUserMask NO"
-    echo "LongFileNames YES"
+    echo "LongFileNames NO"
     echo ""
     echo "# End of .info file"
 } > "$pkgdir/$pkgname.info"
