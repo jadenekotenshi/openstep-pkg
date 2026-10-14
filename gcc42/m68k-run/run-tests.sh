@@ -1,6 +1,6 @@
 #!/bin/sh
-# Link and run the self-checking programs whose assembly the cross-compiled
-# cc1 produced (selftest-*.s), with the stock cc as assembler and linker.
+# Link and run the self-checking programs (C, C++ and Objective-C) whose assembly the cross-compiled
+# cc1, cc1plus and cc1obj produced, with the stock cc as assembler and linker.
 # libgcc/*.s are GCC's libgcc2.c units (64-bit integer and conversion
 # routines), compiled the same way, linked in because the stock library does
 # not have them.
@@ -10,7 +10,7 @@ CC=${CC:-/bin/cc}
 TMPD=${TMPDIR:-/tmp}/run-tests.$$
 mkdir $TMPD || exit 1
 bad=0
-for f in selftest-*.s; do
+for f in selftest-*.s cxxtest-*.s objctest-*.s; do
     name=`echo $f | sed 's/\.s$//'`
     if $CC -o $TMPD/$name $f libgcc/*.s > $TMPD/log 2>&1; then
         $TMPD/$name > $TMPD/out 2>&1

@@ -11885,3 +11885,16 @@ index 1111111..2222222 100644
    int something_changed = 1;
    char *varying_length;
    rtx body;
+diff --git a/gcc/config/m68k/next.h b/gcc/config/m68k/next.h
+--- a/gcc/config/m68k/next.h
++++ b/gcc/config/m68k/next.h
+@@ -28,6 +28,9 @@
+ #undef TARGET_DEFAULT
+ #define TARGET_DEFAULT (MASK_68040 | MASK_BITFIELD | MASK_68881 | MASK_68020)
+ 
++/* Apple's Objective-C front end asks; m68k has no 64-bit mode.  */
++#define TARGET_64BIT 0
++
+ #undef TARGET_OS_CPP_BUILTINS
+ #define TARGET_OS_CPP_BUILTINS()                 \
+   do                                             \
