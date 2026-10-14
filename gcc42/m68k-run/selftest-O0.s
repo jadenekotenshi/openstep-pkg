@@ -417,6 +417,8 @@ LC0:
 LC1:
 	.ascii "%s %d %ld %5.2f %c\12\0"
 LC2:
+	.ascii "printf returned %d\12\0"
+LC3:
 	.ascii "selftest: %d failures\12\0"
 	.text
 	.align	1
@@ -1515,23 +1517,17 @@ L192:
 	pea LC1
 	jbsr _printf
 	addw #28,sp
-	moveq #22,d3
-	cmpl d0,d3
-	jeq L193
-	pea 51:w
-	pea LC0
+	movel d0,a6@(-44)
+	movel a6@(-44),sp@-
+	pea LC2
 	jbsr _printf
 	addql #8,sp
-	movel _failures,d0
-	addql #1,d0
-	movel d0,_failures
-L193:
 	jbsr _bump
 	jbsr _bump
 	movel _cnt,d0
-	moveq #2,d4
-	cmpl d0,d4
-	jeq L195
+	moveq #2,d3
+	cmpl d0,d3
+	jeq L193
 	pea 52:w
 	pea LC0
 	jbsr _printf
@@ -1539,10 +1535,10 @@ L193:
 	movel _failures,d0
 	addql #1,d0
 	movel d0,_failures
-L195:
+L193:
 	movel _failures,d0
 	movel d0,sp@-
-	pea LC2
+	pea LC3
 	jbsr _printf
 	addql #8,sp
 	movel _failures,d0

@@ -316,6 +316,8 @@ LC0:
 LC1:
 	.ascii "%s %d %ld %5.2f %c\12\0"
 LC2:
+	.ascii "printf returned %d\12\0"
+LC3:
 	.ascii "selftest: %d failures\12\0"
 	.text
 	.align	1
@@ -431,7 +433,7 @@ L117:
 	addw #16,a0
 	moveq #15,d3
 	cmpl a0,d3
-	jcs L240
+	jcs L238
 L119:
 	movel _vu,d2
 	movel d2,d1
@@ -490,7 +492,7 @@ L127:
 	moveq #5,d2
 	andl d2,d0
 	cmpl d0,d2
-	jeq L241
+	jeq L239
 L129:
 	pea 15:w
 	pea LC0
@@ -636,7 +638,7 @@ L144:
 	movel _vm,d0
 	movel _vm+4,d1
 	tstl d0
-	jmi L242
+	jmi L240
 L146:
 	pea 22:w
 	pea LC0
@@ -668,24 +670,24 @@ L150:
 	fmoved _ve,fp1
 	fmulx fp1,fp0
 	fcmpd #0r-3.125e-1,fp0
-	fjne L243
+	fjne L241
 	fmoved _vd,fp0
 	fmoved _ve,fp1
 	fdivx fp1,fp0
 	fcmpd #0r-2.0e+1,fp0
-	fjne L244
+	fjne L242
 L154:
 	movel _vf,d0
 	fmoved _vd,fp1
 	fmoves d0,fp0
 	faddx fp1,fp0
 	fcmpd #0r4.0e+0,fp0
-	fjne L245
+	fjne L243
 L156:
 	fmoves _vf,fp0
 	faddx fp0,fp0
 	fcmps #0r3.00000000e+0,fp0
-	fjne L246
+	fjne L244
 L158:
 	fmoved _vd,fp0
 	fmoveml fpcr,d3
@@ -697,7 +699,7 @@ L158:
 	fmoveml d3,fpcr
 	moveq #2,d2
 	cmpl d0,d2
-	jeq L247
+	jeq L245
 L160:
 	pea 28:w
 	pea LC0
@@ -708,7 +710,7 @@ L162:
 	movel _vi,d0
 	fmovel d0,fp0
 	fcmpd #0r7.0e+0,fp0
-	fjne L248
+	fjne L246
 L163:
 	fmoved _vd,fp0
 	fmuld #0r1.0e+10,fp0
@@ -743,10 +745,10 @@ L170:
 	fmoves fp0,d3
 	fmoves d3,fp0
 	fcmps #0r2.50000000e+0,fp0
-	fjne L249
+	fjne L247
 	fmoved _vd,fp0
 	fcmpd #0r2.5e+0,fp0
-	fjne L250
+	fjne L248
 L173:
 	fmoved _vd,fp0
 	fmuld #0r4.0e+0,fp0
@@ -795,7 +797,7 @@ L184:
 	addql #4,sp
 	moveq #11,d1
 	cmpl d0,d1
-	jeq L251
+	jeq L249
 L185:
 	pea 36:w
 	pea LC0
@@ -810,7 +812,7 @@ L192:
 	addql #1,d0
 	moveq #99,d2
 	cmpl d0,d2
-	jlt L252
+	jlt L250
 L193:
 	btst #0,d0
 	jeq L192
@@ -818,7 +820,7 @@ L193:
 	moveq #99,d2
 	cmpl d0,d2
 	jge L193
-L252:
+L250:
 	cmpl #2450,d1
 	jeq L196
 	pea 37:w
@@ -880,7 +882,7 @@ L202:
 	movel d0,sp@-
 	fmoved sp@+,fp0
 	fcmpd #0r7.0e+0,fp0
-	fjne L253
+	fjne L251
 L204:
 	pea 9:w
 	jbsr _mksmall
@@ -902,7 +904,7 @@ L206:
 	addql #4,sp
 	moveq #5,d0
 	cmpl a6@(-102),d0
-	jeq L254
+	jeq L252
 	pea 43:w
 	pea LC0
 	jbsr a4@
@@ -935,7 +937,7 @@ L211:
 	fjne L213
 	moveq #7,d0
 	cmpl a6@(-14),d0
-	jeq L255
+	jeq L253
 L213:
 	pea 45:w
 	pea LC0
@@ -957,7 +959,7 @@ L217:
 	movel d0,sp@-
 	fmoved sp@+,fp0
 	fcmpd #0r5.000000003e+9,fp0
-	fjne L256
+	fjne L254
 L218:
 	pea 1:w
 	lea a6@(-182),a1
@@ -1003,7 +1005,7 @@ L222:
 L224:
 	moveb #120,_buf+3
 	tstb _buf+4
-	jne L257
+	jne L255
 L226:
 	moveb #104,a6@(-8)
 	moveb #105,a6@(-7)
@@ -1017,28 +1019,22 @@ L226:
 	pea LC1
 	lea _printf,a3
 	jbsr a4@
-	addw #28,sp
-	moveq #22,d2
-	cmpl d0,d2
-	jeq L228
-	pea 51:w
-	pea LC0
-	jbsr a3@
-	addql #1,_failures
-	addql #8,sp
-L228:
+	movel d0,sp@-
+	pea LC2
+	jbsr a4@
+	addw #36,sp
 	lea _bump,a2
 	jbsr a2@
 	jbsr a2@
-	moveq #2,d3
-	cmpl _cnt,d3
-	jeq L230
+	moveq #2,d2
+	cmpl _cnt,d2
+	jeq L228
 	pea 52:w
 	pea LC0
 	jbsr a3@
 	addql #1,_failures
 	addql #8,sp
-	jra L230
+	jra L228
 L176:
 	faddd #0r-2.147483648e+9,fp0
 	fmoveml fpcr,d3
@@ -1050,7 +1046,7 @@ L176:
 	fmoveml d3,fpcr
 	addl #-2147483648,d0
 	jra L177
-L254:
+L252:
 	moveq #24,d1
 	cmpl a6@(-26),d1
 	jeq L210
@@ -1060,7 +1056,7 @@ L254:
 	addql #1,_failures
 	addql #8,sp
 	jra L210
-L247:
+L245:
 	fmoved _ve,fp0
 	fmuld #0r1.6e+1,fp0
 	fmoveml fpcr,d3
@@ -1079,7 +1075,7 @@ L247:
 	addql #1,_failures
 	addql #8,sp
 	jra L162
-L241:
+L239:
 	movel _vi,d0
 	moveq #8,d3
 	orl d3,d0
@@ -1099,7 +1095,7 @@ L241:
 	addql #1,_failures
 	addql #8,sp
 	jra L133
-L246:
+L244:
 	pea 27:w
 	pea LC0
 	jbsr a4@
@@ -1116,8 +1112,8 @@ L246:
 	moveq #2,d2
 	cmpl d0,d2
 	jne L160
-	jra L247
-L245:
+	jra L245
+L243:
 	pea 26:w
 	pea LC0
 	jbsr a4@
@@ -1127,22 +1123,22 @@ L245:
 	faddx fp0,fp0
 	fcmps #0r3.00000000e+0,fp0
 	fjeq L158
-	jra L246
-L253:
+	jra L244
+L251:
 	pea 41:w
 	pea LC0
 	jbsr a4@
 	addql #1,_failures
 	addql #8,sp
 	jra L204
-L250:
+L248:
 	pea 33:w
 	pea LC0
 	jbsr a4@
 	addql #1,_failures
 	addql #8,sp
 	jra L173
-L249:
+L247:
 	pea 32:w
 	pea LC0
 	jbsr a4@
@@ -1151,15 +1147,15 @@ L249:
 	fmoved _vd,fp0
 	fcmpd #0r2.5e+0,fp0
 	fjeq L173
-	jra L250
-L248:
+	jra L248
+L246:
 	pea 29:w
 	pea LC0
 	jbsr a4@
 	addql #1,_failures
 	addql #8,sp
 	jra L163
-L244:
+L242:
 	pea 25:w
 	pea LC0
 	jbsr a4@
@@ -1171,8 +1167,8 @@ L244:
 	faddx fp1,fp0
 	fcmpd #0r4.0e+0,fp0
 	fjeq L156
-	jra L245
-L243:
+	jra L243
+L241:
 	pea 24:w
 	pea LC0
 	jbsr a4@
@@ -1183,29 +1179,29 @@ L243:
 	fdivx fp1,fp0
 	fcmpd #0r-2.0e+1,fp0
 	fjeq L154
-	jra L244
-L240:
+	jra L242
+L238:
 	pea 10:w
 	pea LC0
 	jbsr a4@
 	addql #1,_failures
 	addql #8,sp
 	jra L119
-L257:
+L255:
 	pea 50:w
 	pea LC0
 	jbsr a4@
 	addql #1,_failures
 	addql #8,sp
 	jra L226
-L256:
+L254:
 	pea 46:w
 	pea LC0
 	jbsr a4@
 	addql #1,_failures
 	addql #8,sp
 	jra L218
-L251:
+L249:
 	pea 3:w
 	jbsr a2@
 	addql #4,sp
@@ -1242,7 +1238,7 @@ L251:
 	addql #1,_failures
 	addql #8,sp
 	jra L191
-L255:
+L253:
 	cmpb #122,a6@(-10)
 	jeq L217
 	pea 45:w
@@ -1251,7 +1247,7 @@ L255:
 	addql #1,_failures
 	addql #8,sp
 	jra L217
-L242:
+L240:
 	movel _vl,d2
 	movel _vl+4,d3
 	movel _vm,d0
@@ -1265,9 +1261,9 @@ L242:
 	addql #1,_failures
 	addql #8,sp
 	jra L149
-L230:
+L228:
 	movel _failures,sp@-
-	pea LC2
+	pea LC3
 	jbsr a3@
 	movel _failures,d0
 	moveml a6@(-212),#0x1c3c
