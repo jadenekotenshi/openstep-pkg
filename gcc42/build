@@ -2,7 +2,7 @@
 
 set -e
 
-ulimit -d 65536
+ulimit -d ${GCC42_ULIMIT_D:-65536}
 ulimit -s 8192
 
 DESTDIR=$1
@@ -82,6 +82,25 @@ export am_cv_CC_dependencies_compiler_type ac_cv_func_mmap
 if [ "`"$AWK" 'BEGIN { printf "%d", -1 }'`" != -1 ]; then
     echo "gcc42: rebuild and reinstall the corrected gawk package first" >&2
     exit 1
+fi
+
+# m68k: the system library has no __divdi3, __moddi3, __udivdi3, __fixdfdi or
+# __floatdidf, which GCC's own programs need for their long long arithmetic
+# (i386 and sparc have them).  libgcc-stage0/ holds those routines (GCC's
+# libgcc2.c units, as assembly); archive them and link them into everything the
+# stock cc builds.  Later stages use the libgcc.a that stage 1 builds.
+if [ "$ARCH" = m68k ]; then
+    STAGE0_LIBGCC="$SRCDIR/libgcc-stage0.a"
+    if [ ! -f "$STAGE0_LIBGCC" ]; then
+        ( cd "$SRCDIR/libgcc-stage0" && \
+          for stage0_s in *.s; do
+              "$AS" -o "`echo "$stage0_s" | sed 's/\.s$/.o/'`" "$stage0_s" || exit 1
+          done && \
+          /bin/rm -f "$STAGE0_LIBGCC" && /bin/ar cr "$STAGE0_LIBGCC" *.o && /bin/ranlib "$STAGE0_LIBGCC" ) ||
+            { echo "gcc42: could not build the stage-0 libgcc archive" >&2; exit 1; }
+    fi
+    LIBS="$STAGE0_LIBGCC"
+    export LIBS STAGE0_LIBGCC
 fi
 
 # GCC42_RESUME=1 continues an interrupted build in place: it skips the patch,
