@@ -132,23 +132,6 @@ L_OBJC_IMAGE_INFO:
 	unlk a6
 	rts
 	.align	1
-"-[Kid result:]":
-	link a6,#-28
-	movel a2,sp@-
-	movel a1,a2
-	movel a6@(8),a6@(-8)
-	movel L_OBJC_CLASS_Kid+4,a6@(-4)
-	movel a6@(16),sp@-
-	movel L_OBJC_SELECTOR_REFERENCES_0,sp@-
-	pea a6@(-8)
-	jbsr _objc_msgSendSuper_stret
-	moveq #100,d0
-	addl d0,a2@(8)
-	movel a2,d0
-	movel a6@(-32),a2
-	unlk a6
-	rts
-	.align	1
 "+[Kid tag]":
 	link a6,#-8
 	movel a6@(8),a6@(-8)
@@ -181,6 +164,23 @@ L_OBJC_IMAGE_INFO:
 	pea a6@(-8)
 	jbsr _objc_msgSendSuper
 	addl d0,d0
+	unlk a6
+	rts
+	.align	1
+"-[Kid result:]":
+	link a6,#-28
+	movel a2,sp@-
+	movel a1,a2
+	movel a6@(8),a6@(-8)
+	movel L_OBJC_CLASS_Kid+4,a6@(-4)
+	movel a6@(16),sp@-
+	movel L_OBJC_SELECTOR_REFERENCES_0,sp@-
+	pea a6@(-8)
+	jbsr _objc_msgSendSuper
+	moveq #100,d0
+	addl d0,a2@(8)
+	movel a2,d0
+	movel a6@(-32),a2
 	unlk a6
 	rts
 .cstring
@@ -235,6 +235,7 @@ L30:
 	pea 3:w
 	movel d2,sp@-
 	movel d3,sp@-
+	lea _objc_msgSend,a4
 	jbsr a3@
 	addw #16,sp
 	moveq #12,d6
@@ -250,7 +251,7 @@ L31:
 	pea 3:w
 	movel d2,sp@-
 	movel d4,sp@-
-	jbsr _objc_msgSend
+	jbsr a4@
 	addw #16,sp
 	moveq #28,d1
 	cmpl d0,d1
@@ -265,10 +266,9 @@ L33:
 	pea 11:w
 	movel d2,sp@-
 	movel d3,sp@-
-	lea a6@(-20),a4
-	movel a4,a1
-	lea _objc_msgSend_stret,a2
-	jbsr a2@
+	lea a6@(-20),a2
+	movel a2,a1
+	jbsr a4@
 	addw #12,sp
 	moveq #5,d5
 	cmpl a6@(-20),d5
@@ -283,8 +283,8 @@ L39:
 	pea 11:w
 	movel d2,sp@-
 	movel d4,sp@-
-	movel a4,a1
-	jbsr a2@
+	movel a2,a1
+	jbsr a3@
 	addw #12,sp
 	moveq #7,d0
 	cmpl a6@(-20),d0

@@ -152,7 +152,7 @@
 	movel a0,sp@-
 	lea a6@(-20),a0
 	movel a0,a1
-	jbsr _objc_msgSendSuper_stret
+	jbsr _objc_msgSendSuper
 	addw #12,sp
 	movel a6@(-12),a0
 	addw #100,a0
@@ -342,7 +342,7 @@ L33:
 	movel d1,sp@-
 	lea a6@(-32),a0
 	movel a0,a1
-	jbsr _objc_msgSend_stret
+	jbsr _objc_msgSend
 	addw #12,sp
 	movel a6@(-32),d0
 	moveq #5,d1
@@ -379,7 +379,7 @@ L39:
 	movel d1,sp@-
 	lea a6@(-56),a0
 	movel a0,a1
-	jbsr _objc_msgSend_stret
+	jbsr _objc_msgSend
 	addw #12,sp
 	lea a6@(-56),a1
 	lea a6@(-32),a0
