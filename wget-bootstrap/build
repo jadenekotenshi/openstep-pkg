@@ -6,6 +6,11 @@ VERSION=$2
 PATH=/usr/ucb:/bin:/usr/bin
 CC="/bin/cc -traditional-cpp $PKG_SYSCC_ARCH_FLAGS"
 CFLAGS='-O0'
+# The stock cc on m68k aborts (cc1obj fatal signal 6) on gnulib's mktime.c at
+# -O0; -O1 compiles it.
+if [ "$PKG_ARCH" = m68k ]; then
+    CFLAGS='-O1'
+fi
 CPPFLAGS='-I/usr/local/include'
 LDFLAGS='-L/usr/local/lib'
 GREP=/usr/local/bin/grep
