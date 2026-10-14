@@ -94,7 +94,7 @@ pkg_apply_patch() {
 # (a program) or pkg_cmp_named (a library).
 #
 # pkg_cmp_shim DIR
-# OPENSTEP's SPARC libc compares bytes as signed in memcmp() (for 20 bytes, and
+# OPENSTEP's SPARC and m68k libc compare bytes as signed in memcmp() (for 20 bytes, and
 # so for any word-sized and larger input) and strcmp(), so data with bytes of
 # 0x80 or more sorts wrongly: git's pack indexes came out corrupt.  This writes
 # DIR/ostep-cmp.h, which defines correct unsigned versions as static inline
@@ -114,7 +114,11 @@ pkg_cmp_shim() {
             :
         ;;
         *)
-            [ "${PKG_ARCH-}" = sparc ] || return 0
+            # SPARC and m68k libc compare bytes as signed.
+            case ${PKG_ARCH-} in
+                sparc|m68k) : ;;
+                *) return 0 ;;
+            esac
         ;;
     esac
 
@@ -191,7 +195,11 @@ pkg_cmp_obj() {
             :
         ;;
         *)
-            [ "${PKG_ARCH-}" = sparc ] || return 0
+            # SPARC and m68k libc compare bytes as signed.
+            case ${PKG_ARCH-} in
+                sparc|m68k) : ;;
+                *) return 0 ;;
+            esac
         ;;
     esac
 
@@ -277,7 +285,11 @@ pkg_cmp_named() {
             :
         ;;
         *)
-            [ "${PKG_ARCH-}" = sparc ] || return 0
+            # SPARC and m68k libc compare bytes as signed.
+            case ${PKG_ARCH-} in
+                sparc|m68k) : ;;
+                *) return 0 ;;
+            esac
         ;;
     esac
 
