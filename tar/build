@@ -5,7 +5,9 @@ VERSION=$2
 . "$PKG_BUILD_HELPERS"
 PATH=/usr/ucb:/bin:/usr/bin:/usr/local/bin
 CC='/bin/cc -traditional-cpp'
-CFLAGS=-O0
+# -O1, not -O0: on m68k the stock cc aborts (cc1obj fatal signal 6) on
+# human.c and names.c at -O0.
+CFLAGS=-O1
 # NeXT's POSIX headers otherwise define __STRICT_ANSI__ without a value.
 CPPFLAGS='-D_POSIX_SOURCE -D__STRICT_ANSI__=1 -D_NEXT_SOURCE'
 GREP=/usr/local/bin/grep
@@ -16,19 +18,7 @@ ac_cv_header_dirent_dirent_h=no
 export PATH CC CFLAGS CPPFLAGS GREP EGREP AWK ac_cv_header_dirent_dirent_h
 /usr/local/bin/patch -p1 < "tar-$VERSION-openstep.patch"
 /usr/local/bin/patch -p1 < "tar-$VERSION-cve.patch"
-# Keep long double out of human.c on m68k: plain double is enough for the
-# human-readable sizes this computes, and it avoids relying on the stock
-# libc's printf handling %Lf with 96-bit extended precision.
-if [ "$PKG_ARCH" = m68k ]; then
-    sed 's/long double/double/g; s/Lf"/f"/g' lib/human.c > lib/human.c.m68k
-    mv lib/human.c.m68k lib/human.c
-fi
 run_configure --prefix=/usr/local --program-prefix=gnu \
     --disable-nls --disable-dependency-tracking
-# The stock cc on m68k aborts compiling human.c at -O0 (-O1 and up are fine),
-# so build that one object with -O1 first; the make below finds it up to date.
-if [ "$PKG_ARCH" = m68k ]; then
-    ( cd lib && /bin/gnumake human.o CFLAGS=-O1 )
-fi
 /bin/gnumake
 /bin/gnumake install DESTDIR="$DESTDIR"
