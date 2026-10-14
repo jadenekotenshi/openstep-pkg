@@ -4,9 +4,20 @@ Which packages have been built, installed and tested on real (emulated)
 OPENSTEP, and where.  "validated" means the package built, installed and its
 `test` hook passed.  "—" means no result has been recorded, not that it fails.
 
-Last updated 2026-10-06.  Results come from test runs on the x86 and SPARC
-OPENSTEP 4.2 machines; most packages have only been tried on x86 so far.  M68k
-has not been attempted.
+Last updated 2026-10-14.  Results come from test runs on the x86 and SPARC
+OPENSTEP 4.2 machines.  M68k: only gcc42 has been started (see below).
+
+**SPARC, 2026-10-14:** `test world` passes: every package in the tree that
+supports SPARC has been built, installed and tested there (cctools-as is i386-only).
+The SPARC fixes of October 2026 (unaligned and big-endian code in duktape, quickjs,
+emacs, ntp and others; unsigned `memcmp`; the `ldexp()` that flushes subnormals in
+python311) are in the tree.
+
+**M68k, 2026-10-14:** gcc 4.2.1 (gcc42) for `m68k-next-openstep4` is being ported
+(see `gcc42/M68K.md`).  The C, C++ and Objective-C compilers, cross-built on Linux,
+produce code that the stock `as` accepts and that runs correctly on a 68k machine
+(self-checking programs in `gcc42/m68k-run`).  The native bootstrap has not been
+tried; no other package has been tried on m68k.
 
 **x86, 2026-10-08:** a rebootstrap on a fresh host built, installed and tested
 all 93 packages in the tree, including the October 2026 security fixes (bzip2,
@@ -15,11 +26,7 @@ version bumps (mpg123 1.33.7, ca-certificates 2026.09.25, expat 2.9.0, libpng
 1.6.59, python311 3.11.17, vim 9.2.1091).  vim needed seven build fixes for the
 9.2.1091 bump (`wait()` in `osdef.h`, int `W*()` macros, no `<sys/utsname.h>`, no
 `<utime.h>`, `FD_CLOEXEC`, `struct sockaddr_storage`, and `tcgetattr`/`tcsetattr`
-from the BSD ioctls).  The tables below show earlier results.  SPARC is being
-rebuilt from scratch in dependency order (2026-10-08): so far the packages marked "rebootstrap, 2026-10-08" or "2026-10-09" below have been
-rebuilt, installed and tested there, including bash, curl, gcc42, tar, patch,
-python311, expat, ca-certificates, openssl and openssh; vim, wget and the
-remaining 20 or so packages are still to come.  The October 2026 security fixes are only partly covered on SPARC.  pkg itself gained a
+from the BSD ioctls).  The tables below show the result per package.  pkg itself gained a
 retry through `tarfix` for tarballs whose uid/gid exceed OPENSTEP's 16-bit uid_t.
 
 lha was removed from the tree (October 2026): its test failed on x86 even unpatched on the
@@ -28,12 +35,8 @@ extract .lzh/.lha archives.  It can be put back from git history (the last versi
 1.14i-ac20050924p1 with a hand-ported security patch).
 
 In the SPARC column, the number after "validated" is the package version that
-was tested (taken from the tree at the commit that recorded the result).  "tree
-is now X" means the package has since been bumped and the result no longer
-covers it.  A matching version does not cover the October 2026 security
-patches, which changed some packages without bumping them: of the SPARC rows
-below, bzip2, gzip, patch, tar and openssl have been rebuilt with them; wget, zip and
-mpg123 have no SPARC result.
+was tested (taken from the tree at the commit that recorded the result).  The
+SPARC `test world` of 2026-10-14 covers every row.
 
 | Package | x86 | SPARC |
 |---|---|---|
@@ -41,7 +44,7 @@ mpg123 have no SPARC result.
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) |
 | ca-certificates | validated | validated 2026.09.25 (rebootstrap, 2026-10-08) |
-| cctools-as | 806 validated (reinstalled on messer 2026-10-10) | — |
+| cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) |
 | class-dump | validated | validated (2026-10-10; builds with `-arch $PKG_ARCH`) |
 | coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) |
 | curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) |
