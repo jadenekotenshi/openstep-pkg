@@ -1,11 +1,18 @@
 #!/bin/sh
 # pkg-world - test, rebuild or remake every package, and log the results.
 #
-# usage: pkg-world [options] test world
+# usage: pkg-world [options] install missing
+#        pkg-world [options] test world
 #        pkg-world [options] verify world
 #        pkg-world [options] reinstall world
 #        pkg-world [options] remake entire-world
 #
+#   install missing      install every package in the tree that is not installed,
+#                        dependencies first, and test each one; a package whose
+#                        dependency failed to install is skipped, not tried again.
+#                        Works on an empty system, so it is the way to bootstrap
+#                        (after pdksh, "sh ./pkg-missing --install-missing" does the
+#                        same)
 #   test world           run "pkg test" for every installed package
 #   verify world         run "pkg verify" for every installed package: are the
 #                        installed files all there, with their checksums
@@ -18,13 +25,14 @@
 # options:
 #   -l DIR   put the logs in DIR (default: $PKG_WORLD_LOGS, else
 #            <tree>/world-logs, plus a directory named for the mode and time)
-#   -n       do not run the tests after a build (reinstall and remake)
+#   -n       do not run the tests after a build (install, reinstall and remake)
 #   -q       verify world: only check that the files exist (pkg verify --quick)
 #   -s       stop at the first failure instead of carrying on
 #   -y       do not ask before "remake entire-world" removes everything
 #   -i       remake: put back only the packages that were installed, not the
 #            whole tree
-#   -o "A B" work on only these packages (a quick way to try the script)
+#   -o "A B" work on only these packages (a quick way to try the script;
+#            for install missing, only those of them that are not installed)
 #   -h       this text
 #
 #   sh ./pkg-world check dependencies
@@ -44,7 +52,7 @@
 # pkg settings in the environment.
 
 usage() {
-    sed -n '2,45p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,52p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 logdir=
@@ -105,6 +113,9 @@ done
 
 mode=
 case "$*" in
+    "install missing")
+        mode=install
+    ;;
     "test world")
         mode=test
     ;;
@@ -125,6 +136,11 @@ case "$*" in
         exit 2
     ;;
 esac
+
+title="$mode world"
+if [ $mode = install ]; then
+    title="install missing"
+fi
 
 # No dirname here: the stock system lacks it (it comes with coreutils, which
 # "remake entire-world" removes).
@@ -586,7 +602,7 @@ build_and_test() {
 
 finish() {
     say ""
-    say "==== `stamp`  $mode world finished ===="
+    say "==== `stamp`  $title finished ===="
     say "passed: $n_pass   failed: $n_fail   skipped: $n_skip"
     if [ $n_fail -gt 0 ]; then
         say "FAILURES:$failures"
@@ -644,7 +660,7 @@ summary=$logdir/summary.log
 installed=`installed_set`
 selected=$only
 
-say "==== `stamp`  pkg-world $mode world ===="
+say "==== `stamp`  pkg-world $title ===="
 say "tree:   $tree"
 say "root:   ${PKG_ROOT:-/}"
 say "host:   `hostname 2>/dev/null`"
@@ -657,7 +673,7 @@ if [ -z "$tree_pkgs" ]; then
     say "ERROR: no packages found in the tree $tree (a package directory holds build and version files)"
     exit 2
 fi
-if [ -z "$installed" ] && [ $mode != remake ]; then
+if [ -z "$installed" ] && [ $mode != remake ] && [ $mode != install ]; then
     say "ERROR: no installed packages found in $installed_dir (PKG_ROOT=${PKG_ROOT:-unset}, PKG_DB=${PKG_DB:-unset}); nothing to do"
     exit 2
 fi
@@ -717,6 +733,53 @@ case $mode in
                 fi
             fi
         done
+    ;;
+    install)
+        if [ -n "$selected" ]; then
+            target=$selected
+        else
+            target=$tree_pkgs
+        fi
+        missing=
+        for name in $target; do
+            if in_set "$name" "$installed"; then
+                :
+            else
+                missing="$missing $name"
+            fi
+        done
+        if [ -z "$missing" ]; then
+            say "nothing to install: every package is installed"
+        else
+            say "installing, dependencies first: `order_words "$missing"`"
+            say ""
+            for name in `order_set "$missing"`; do
+                if [ $stop_now = 0 ]; then
+                    # pkg installs a package's missing dependencies itself, so
+                    # one that just failed would be built again for each
+                    # package that needs it; skip those instead.  (An optional
+                    # dependency that is not needed is counted too: its absence
+                    # skips the package, which is the safe side.)
+                    dep_failed=
+                    for dep in `deps_of "$name"`; do
+                        if [ "$dep" != "$name" ]; then
+                            if in_set "$dep" "$missing"; then
+                                if [ ! -d "$installed_dir/$dep" ]; then
+                                    dep_failed=$dep
+                                fi
+                            fi
+                        fi
+                    done
+                    if [ -n "$dep_failed" ]; then
+                        record SKIP install "$name" "dependency $dep_failed is not installed"
+                    else
+                        bt_action=install
+                        bt_name=$name
+                        build_and_test
+                    fi
+                fi
+            done
+        fi
     ;;
     remake)
         if [ $installed_only = 1 ]; then
