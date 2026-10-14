@@ -11898,3 +11898,19 @@ diff --git a/gcc/config/m68k/next.h b/gcc/config/m68k/next.h
  #undef TARGET_OS_CPP_BUILTINS
  #define TARGET_OS_CPP_BUILTINS()                 \
    do                                             \
+diff --git a/gcc/config/m68k/next.h b/gcc/config/m68k/next.h
+--- a/gcc/config/m68k/next.h
++++ b/gcc/config/m68k/next.h
+@@ -110,6 +110,12 @@
+    area.  */
+ #undef PCC_STATIC_STRUCT_RETURN
+ 
++/* Classic NeXT has no objc_msgSend_stret or objc_msgSendSuper_stret: the
++   address of an aggregate result (in a1 here) is not a hidden argument, so
++   messages with such results go through the ordinary messengers.  The macro
++   only tells objc-act.c so; the register is m68k.h's M68K_STRUCT_VALUE_REGNUM.  */
++#define NEXTSTEP_STRUCT_VALUE_REGNUM M68K_STRUCT_VALUE_REGNUM
++
+ /* This accounts for the return pc and saved fp on the m68k.  */
+ 
+ #define OBJC_FORWARDING_STACK_OFFSET 8
