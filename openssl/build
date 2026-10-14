@@ -37,6 +37,18 @@ CMPFLAGS=`pkg_cmp_named "\`pwd\`/openstep-cmp"`
 # PKG_OPENSSL_OPT overrides it, for example PKG_OPENSSL_OPT=-O0 to compare.
 OPT=${PKG_OPENSSL_OPT-"-O"}
 
+# m68k: the stock cc writes invalid instructions for some 64-bit arithmetic
+# above -O0 (poly1305.c: "addl a2,a6@(-176)", an add from an address register
+# into memory, which the assembler rejects), so build those objects at -O0
+# first; the library build then finds them up to date.  PKG_OPENSSL_O0_FILES
+# adds more, as paths below the source directory without the .c, for example
+# PKG_OPENSSL_O0_FILES="crypto/sha/sha512 crypto/bn/bn_mul".
+if [ "$PKG_ARCH" = m68k ]; then
+    for o0_file in crypto/poly1305/poly1305 $PKG_OPENSSL_O0_FILES; do
+        /bin/gnumake CC=/bin/cc CFLAGS="$PKG_SYSCC_ARCH_FLAGS -pipe -O0 $CMPFLAGS" "$o0_file.o"
+    done
+fi
+
 /bin/gnumake CC=/bin/cc CFLAGS="$PKG_SYSCC_ARCH_FLAGS -pipe $OPT $CMPFLAGS" build_libs
 if [ -n "$CMPFLAGS" ]; then
     ar r libcrypto.a openstep-cmp/ostep-cmp-named.o
