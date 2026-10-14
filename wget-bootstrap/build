@@ -41,6 +41,15 @@ $SED 's/^#include "localtime-buffer.h"$/&\
 $SED 's/^#ifdef HAVE_NANOSLEEP$/#if defined HAVE_NANOSLEEP \&\& !defined NeXT \&\& !defined __NeXT__/' \
     src/utils.c > src/utils.c.new
 /bin/mv src/utils.c.new src/utils.c
+# m68k: the stock cc segfaults compiling gnulib's sha512.c.  Only wget's
+# Metalink code uses it, and this build is --without-metalink, so leave the
+# module empty (it is still listed in lib/Makefile).
+if [ "$PKG_ARCH" = m68k ]; then
+    /bin/cat > lib/sha512.c <<'SHA512EOF'
+/* sha512.c is left out of this build on m68k (see wget-bootstrap/build). */
+typedef int sha512_omitted_on_m68k;
+SHA512EOF
+fi
 run_configure --build=$PKG_TARGET --host=$PKG_TARGET \
   --prefix=/usr/local --with-ssl=openssl \
   --with-libssl-prefix=/usr/local --without-libpsl --without-zlib \
