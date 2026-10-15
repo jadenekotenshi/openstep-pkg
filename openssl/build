@@ -17,8 +17,10 @@ fi
 
 . "$PKG_BUILD_HELPERS"
 
-patch -p1 < "$PATCHFILE"
-patch -p1 < "$CVEPATCH"
+# pkg_apply_patch skips a patch already applied to a resumed (PKG_RESUME=1)
+# build tree, so a rebuild can reuse the objects compiled earlier.
+pkg_apply_patch "$PATCHFILE"
+pkg_apply_patch "$CVEPATCH"
 
 # OPENSTEP's SPARC libc compares bytes as signed in memcmp(), strcmp() and
 # strncmp(); see pkg_cmp_named in build-helpers.sh.  Empty on x86.  libcrypto
