@@ -13,11 +13,15 @@ The SPARC fixes of October 2026 (unaligned and big-endian code in duktape, quick
 emacs, ntp and others; unsigned `memcmp`; the `ldexp()` that flushes subnormals in
 python311) are in the tree.
 
-**M68k, 2026-10-14:** gcc 4.2.1 (gcc42) for `m68k-next-openstep4` is being ported
+**M68k, 2026-10-15:** gcc 4.2.1 (gcc42) for `m68k-next-openstep4` is being ported
 (see `gcc42/M68K.md`).  The C, C++ and Objective-C compilers, cross-built on Linux,
 produce code that the stock `as` accepts and that runs correctly on a 68k machine
-(self-checking programs in `gcc42/m68k-run`).  The native bootstrap has not been
-tried; no other package has been tried on m68k.
+(self-checking programs in `gcc42/m68k-run`).  The native bootstrap of gcc42 is
+under way; its dependencies are being built on the 68k with the stock cc, which
+aborts at `-O0` on some 64-bit-heavy files (`tar` now builds at `-O1` on every
+architecture; `wget-bootstrap`, `openssl` and others have m68k-only workarounds)
+and, like SPARC's, compares bytes as signed in `memcmp()`/`strcmp()`.  No package
+has a validated m68k result yet.
 
 **x86, 2026-10-08:** a rebootstrap on a fresh host built, installed and tested
 all 93 packages in the tree, including the October 2026 security fixes (bzip2,
