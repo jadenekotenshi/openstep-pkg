@@ -1,0 +1,144 @@
+Pantomime on OPENSTEP, and pmail
+================================
+
+Pantomime is the mail library behind GNUMail: MIME parsing and generation,
+IMAP, POP3 and SMTP clients, local mbox and Maildir folders, and character set
+conversion.  This package builds it for OPENSTEP 4.2 as a static library
+(`/usr/local/lib/libPantomime.a`, headers in `/usr/local/include/Pantomime`)
+and adds `pmail`, a command line client that fetches over IMAP or POP3 and
+sends over SMTP, with TLS.
+
+The point of the port is to have a mail engine that can talk to current mail
+servers.  It is the foundation for a NeXTMail-style application; `pmail` is how
+the engine is exercised until that exists.
+
+pmail
+-----
+
+    pmail [options] command [argument ...]
+
+    imap-folders              list the mailboxes
+    imap-list [FOLDER]        list the messages in FOLDER (default INBOX)
+    imap-get [FOLDER] N       print message number N (or uid:N for a UID)
+    pop3-list                 list the messages in the maildrop
+    pop3-get N                print message number N
+    send [FILE]               send a message (FILE or standard input)
+
+    -h HOST   -p PORT   -u USER   -m MECHANISM   -T tls|starttls|none
+    -C CAFILE   -k   -f FROM   -t TO   -s SUBJECT   -w SECONDS   -d
+
+The password comes from the environment variable `PMAIL_PASSWORD`, or is
+asked for on the terminal.
+
+    PMAIL_PASSWORD=... pmail -h imap.example.org -u me imap-list
+    PMAIL_PASSWORD=... pmail -h imap.example.org -u me imap-get INBOX 3 > msg.txt
+    echo "See you at 10." | pmail -h smtp.example.org -u me \
+        -f me@example.org -t you@example.net -s "Tomorrow" send
+
+Output of `imap-list` is one tab separated line per message: number, UID, date,
+sender, subject.  `pop3-list` has the number and the size only, because POP3
+does not give the headers without fetching the message.  `imap-get` and
+`pop3-get` print the whole message with its headers; line ends are LF.
+
+`send` with `-s` composes a plain text message (UTF-8, quoted-printable) from the
+text it reads; without `-s` the input must be a complete message with
+headers.  `-t` may be given more than once, and with a complete message it
+overrides the recipients in the headers.
+
+Ports default to the usual ones for the chosen security: 993, 995 and 465 for
+`-T tls` (the default; TLS from the first byte), 143, 110 and 587 for
+`-T starttls` and `-T none`.  Use `-T starttls` for submission on port 587.
+
+### Authentication
+
+IMAP uses AUTHENTICATE LOGIN by default; `-m CRAM-MD5` is also supported.  SMTP
+uses PLAIN by default (`-m LOGIN` and `-m CRAM-MD5` also work).  POP3 uses
+USER/PASS.
+
+Servers that insist on OAuth 2 (Gmail and Microsoft 365 for most accounts) cannot
+be used; only servers that accept a user name and password, which for those
+providers means an application-specific password where they still allow one.
+
+### TLS
+
+TLS 1.2 or later only.  The server's certificate is checked against the trusted
+authorities in `/usr/local/ssl/cert.pem` (the `ca-certificates` package) and
+must name the host you connect to (in its subject alternative names, or its
+common name if it has none).  The host name is sent for SNI.  If the check
+fails, the connection is dropped before any password is sent and `pmail`
+says why.
+
+  * `-C FILE` trusts the authorities in FILE instead.  Use it for a server with
+    its own certificate authority.
+  * `-k` turns the checks off.  Do not do that over a network you do not
+    control.
+
+`-d` prints the conversation with the server on standard error.  That includes
+the password (in base64 for most mechanisms), so do not paste it anywhere.
+
+Using the library
+-----------------
+
+Pantomime is event driven: you create a `CWIMAPStore`, `CWPOP3Store` or `CWSMTP`
+with a host and port, set a delegate, call `-connectInBackgroundAndNotify`
+and run the run loop; the delegate hears about the connection, authentication,
+folders and messages as they happen.  `pmail.m` is a complete example, and the
+`Examples` directory of the Pantomime sources has two more.
+
+For TLS from the first byte, call `-startSSL` on the service's connection in
+`-connectionEstablished:`; for STARTTLS call `-startTLS` on the service in
+`-serviceInitialized:` and wait for it to be called again.  Both check
+certificates; `+[CWTCPConnection setCertificateVerification:]` and
+`+setCAFile:` change that for the whole program, and `-sslError` on the
+connection says what went wrong.
+
+Compile with `-DCW_OPENSTEP -I/usr/local/include/Pantomime-compat` and link
+with `-ObjC libPantomime.a -lssl -lcrypto -liconv -framework Foundation`; the
+`-ObjC` matters, because most of the library is categories and the linker would
+otherwise leave them out.
+
+What was changed from Pantomime 1.4.0
+-------------------------------------
+
+The patch (`pantomime-1.4.0-openstep.patch`) is deliberately small in the
+parts that matter, and works the same on every platform:
+
+  * GNUstep's run loop extensions, which Pantomime used to learn when a socket
+    is readable or writable, are replaced by `CWRunLoopWatcher`, which polls
+    with `select()` from a 10 ms timer.  It needs nothing but Foundation.
+  * DNS lookups use `gethostbyname()`.  Pantomime's own resolver parsed
+    `/etc/resolv.conf`, which OPENSTEP does not use.  Lookups block.  IPv4 only.
+  * TLS uses `TLS_client_method()` with a TLS 1.2 minimum, SNI, certificate
+    and host name verification; the old code asked for SSLv23 and verified
+    nothing.  A handshake that fails closes the connection.
+  * A refused connection or unknown host is reported at once, not after the
+    60 second connect timeout.
+  * IMAP mailbox names are encoded and decoded with a new modified UTF-7
+    (RFC 3501, 5.1.3) routine; the old one needed UTF-7 support in NSString.
+  * The `Date:` header of a message is formatted by hand, in English, with the
+    time zone offset.
+
+`CWCompat.h` and `CWCompat.m`, compiled only with `-DCW_OPENSTEP`, supply what
+OPENSTEP 4.2's Foundation lacks: `NSInteger`, `NSNull`, `-UTF8String`,
+`-replaceOccurrencesOfString:...`, `NSValue` ranges, `-valueForKey:`,
+`-replaceBytesInRange:withBytes:length:` and a few more.  Character sets that
+NSString cannot convert (ISO 8859-3 to 15, KOI8-R, Big5, GB 2312, UTF-7, EUC-KR)
+go through libiconv.
+
+Not done, and not planned in this package: OAuth 2, IPv6, IMAP IDLE.
+
+Pantomime uses POSIX `regcomp()` for threading subjects; `pmail-selftest` checks that
+it works on your system.
+
+Testing
+-------
+
+`pmail-selftest` (installed) checks MIME parsing and generation, header
+encodings, character sets, mailbox name encoding and the compatibility code
+without a network; `pkg test pantomime` runs it.  To try a real server set
+`PMAIL_TEST_SERVER=host[:port]`, `PMAIL_TEST_USER`, `PMAIL_PASSWORD` (and
+`PMAIL_TEST_CAFILE`) first.
+
+The source tree has `linux-test/`: a script that starts Dovecot (IMAP, POP3) and a
+small SMTP receiver with a throw-away certificate authority on 127.0.0.1, for
+running the library and `pmail` end to end on a Linux machine.

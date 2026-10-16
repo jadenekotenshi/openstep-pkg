@@ -1,0 +1,49 @@
+#!/bin/sh
+
+set -e
+
+PMAIL="$ROOT_DIR/usr/local/bin/pmail"
+SELFTEST="$ROOT_DIR/usr/local/bin/pmail-selftest"
+LIBRARY="$ROOT_DIR/usr/local/lib/libPantomime.a"
+HEADERS="$ROOT_DIR/usr/local/include/Pantomime"
+
+[ -x "$PMAIL" ]
+[ -x "$SELFTEST" ]
+[ -s "$LIBRARY" ]
+[ -f "$HEADERS/Pantomime.h" ]
+[ -f "$HEADERS/CWIMAPStore.h" ]
+[ -f "$HEADERS/CWCompat.h" ]
+[ -f "$ROOT_DIR/usr/local/include/Pantomime-compat/stdint.h" ]
+
+# MIME parsing and generation, header and mailbox name encodings, character
+# sets, and the Foundation compatibility code, all without a network.
+out=`"$SELFTEST"`
+echo "$out" | tail -3
+echo "$out" | grep ' 0 failed$' >/dev/null
+
+# Usage errors are reported, not crashes.
+status=0
+"$PMAIL" >/dev/null 2>&1 || status=$?
+[ "$status" = 2 ]
+
+# A name that cannot be resolved ends quickly with an error.
+status=0
+"$PMAIL" -w 20 -h no-such-host.invalid -u nobody imap-folders </dev/null >/dev/null 2>&1 || status=$?
+[ "$status" = 1 ]
+
+# Against a real server, if the tester names one.  PMAIL_TEST_SERVER is
+# host[:port] of an IMAPS server, and PMAIL_TEST_USER / PMAIL_PASSWORD the
+# account.  Set PMAIL_TEST_CAFILE if the server's certificate authority is not
+# in /usr/local/ssl/cert.pem.
+if [ -n "$PMAIL_TEST_SERVER" ]; then
+    host=`echo "$PMAIL_TEST_SERVER" | sed 's/:.*//'`
+    port=`echo "$PMAIL_TEST_SERVER" | sed -n 's/^[^:]*://p'`
+    set -- -w 60 -h "$host" -u "$PMAIL_TEST_USER"
+    if [ -n "$port" ]; then
+        set -- "$@" -p "$port"
+    fi
+    if [ -n "$PMAIL_TEST_CAFILE" ]; then
+        set -- "$@" -C "$PMAIL_TEST_CAFILE"
+    fi
+    "$PMAIL" "$@" imap-folders | grep INBOX >/dev/null
+fi
