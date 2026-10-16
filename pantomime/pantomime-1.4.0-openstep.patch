@@ -3726,25 +3726,20 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/com
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/stdint.h b/Framework/Pantomime/compat/stdint.h
 --- a/Framework/Pantomime/compat/stdint.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/compat/stdint.h	2026-10-16 00:50:44.840123661 +0000
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,15 @@
 +/* OPENSTEP has no <stdint.h>; this is the part of it that Pantomime needs. */
 +#ifndef CW_COMPAT_STDINT_H
 +#define CW_COMPAT_STDINT_H
 +
 +#include <sys/types.h>
 +
-+typedef signed char int8_t;
-+typedef short int16_t;
-+typedef int int32_t;
-+typedef long long int64_t;
-+typedef u_char uint8_t;
-+typedef u_short uint16_t;
-+typedef u_int uint32_t;
-+typedef unsigned long long uint64_t;
++/* int8_t .. int64_t are already in <sys/types.h> */
++typedef u_int8_t uint8_t;
++typedef u_int16_t uint16_t;
++typedef u_int32_t uint32_t;
++typedef u_int64_t uint64_t;
 +typedef long intptr_t;
 +typedef unsigned long uintptr_t;
-+typedef long long intmax_t;
-+typedef unsigned long long uintmax_t;
 +
 +#endif
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/io.h b/Framework/Pantomime/io.h
