@@ -115,6 +115,7 @@ parts that matter, and works the same on every platform:
     60 second connect timeout.
   * IMAP mailbox names are encoded and decoded with a new modified UTF-7
     (RFC 3501, 5.1.3) routine; the old one needed UTF-7 support in NSString.
+  * Regular expressions use the new `CWRegexEngine` (see below).
   * The `Date:` header of a message is formatted by hand, in English, with the
     time zone offset.
 
@@ -127,8 +128,11 @@ go through libiconv.
 
 Not done, and not planned in this package: OAuth 2, IPv6, IMAP IDLE.
 
-Pantomime uses POSIX `regcomp()` for threading subjects; `pmail-selftest` checks that
-it works on your system.
+OPENSTEP's C library has no POSIX `regcomp()`, which Pantomime uses for thread
+subjects and for searching local folders, so the patch adds `CWRegexEngine`, a
+small extended-regular-expression matcher (overall leftmost-longest match; no
+sub-matches or back references).  It was checked against the C library's
+`regexec()` on over a million random pattern and string pairs.
 
 Testing
 -------

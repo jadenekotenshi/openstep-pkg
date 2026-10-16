@@ -1896,7 +1896,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWM
  #import <Pantomime/CWPart.h>
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMessage.m b/Framework/Pantomime/CWMessage.m
 --- a/Framework/Pantomime/CWMessage.m	2021-08-02 21:36:40.000000000 +0000
-+++ b/Framework/Pantomime/CWMessage.m	2026-10-16 01:25:59.111550171 +0000
++++ b/Framework/Pantomime/CWMessage.m	2026-10-16 02:00:25.513726722 +0000
 @@ -74,6 +74,47 @@
  //
  //
@@ -1945,6 +1945,27 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWM
  @implementation CWMessage
  
  //
+@@ -92,15 +133,15 @@
+       NSString *subjLeader = [NSString stringWithFormat:@"((%@)*%@)| ", subjBlob, subjReFwd];
+  
+       atLeastOneSpaceRegex = [[CWRegEx alloc] initWithPattern: @"[[:space:]]+"
+-					      flags: REG_EXTENDED|REG_ICASE];
++					      flags: CWRE_EXTENDED|CWRE_ICASE];
+       suffixSubjTrailerRegex = [[CWRegEx alloc] initWithPattern: [NSString stringWithFormat:@"(%@)*$", subjTrailer]
+-						flags: REG_EXTENDED|REG_ICASE];
++						flags: CWRE_EXTENDED|CWRE_ICASE];
+       prefixSubjLeaderRegex = [[CWRegEx alloc] initWithPattern: [NSString stringWithFormat:@"^(%@)", subjLeader]
+-					       flags: REG_EXTENDED|REG_ICASE];
++					       flags: CWRE_EXTENDED|CWRE_ICASE];
+       prefixSubjBlobRegex = [[CWRegEx alloc] initWithPattern: [NSString stringWithFormat:@"^(%@)", subjBlob]
+-					     flags: REG_EXTENDED|REG_ICASE];
++					     flags: CWRE_EXTENDED|CWRE_ICASE];
+       prefixSubjFwdHdrAndSuffixSubjFwdTrlRegex = [[CWRegEx alloc] initWithPattern: [NSString stringWithFormat:@"^(%@)(.*)(%@)$", subjFwdHdr, subjFwdTrl]
+-								  flags: REG_EXTENDED|REG_ICASE];
++								  flags: CWRE_EXTENDED|CWRE_ICASE];
+ 
+       [CWMessage setVersion: currentMessageVersion];
+     }
 @@ -1052,50 +1093,18 @@
  - (NSData *) dataValue
  {
@@ -2099,16 +2120,1087 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWP
  #import <Foundation/NSDictionary.h>
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRegEx.h b/Framework/Pantomime/CWRegEx.h
 --- a/Framework/Pantomime/CWRegEx.h	2021-08-02 21:36:40.000000000 +0000
-+++ b/Framework/Pantomime/CWRegEx.h	2026-10-16 01:25:59.112918323 +0000
-@@ -23,6 +23,8 @@
++++ b/Framework/Pantomime/CWRegEx.h	2026-10-16 02:00:25.512962728 +0000
+@@ -23,28 +23,32 @@
  #ifndef _Pantomime_H_CWRegEx
  #define _Pantomime_H_CWRegEx
  
 +#include <Pantomime/CWCompat.h>
 +
  #include <sys/types.h>
- #include <regex.h>
+-#include <regex.h>
++#include <Pantomime/CWRegexEngine.h>
  
+ #import <Foundation/NSObject.h>
+ #import <Foundation/NSString.h>
+ 
+ /*!
+   @class CWRegEx
+-  @abstract Provides a simple object-oriented wrapper around POSIX regex.
+-  @discussion This class provides a simple and efficient interface around
+-              POSIX regex, which are available on most UNIX (or like) systems.
++  @abstract Provides a simple object-oriented wrapper around POSIX extended regular expressions.
++  @discussion This class provides a simple interface to POSIX extended
++              regular expressions, matched by the small engine in
++              CWRegexEngine.h (OPENSTEP's C library has no regcomp()).
++              The flags are CWRE_EXTENDED and CWRE_ICASE.
+ */
+ @interface CWRegEx : NSObject
+ {
+   @private
+-    regex_t _re;
++    cwre_t _re;
+ }
+ 
+ /*!
+   @method initWithPattern:
+   @discussion This method invokes initWithPattern: flags: with
+-              the default REG_EXTENDED flag.
++              the default CWRE_EXTENDED flag.
+   @param thePattern The regular expression to use.
+   @result An instance of CWRegEx, nil in case of an error.
+ */
+@@ -55,8 +59,7 @@
+   @discussion This method is used to initialize a CWRegEx instance
+               using the specified pattern and flags.
+   @param thePattern The regular expression to use.
+-  @param theFlags The flags to use. See regcomp(3) for a description
+-                  of the available flags.
++  @param theFlags The flags to use. CWRE_EXTENDED and CWRE_ICASE.
+   @result An instance of CWRegEx, nil in case of an error.
+ */
+ - (id) initWithPattern: (NSString *) thePattern
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRegEx.m b/Framework/Pantomime/CWRegEx.m
+--- a/Framework/Pantomime/CWRegEx.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWRegEx.m	2026-10-16 02:00:31.769410864 +0000
+@@ -46,7 +46,7 @@
+ //
+ - (id) initWithPattern: (NSString *) thePattern
+ {
+-  return [self initWithPattern: thePattern  flags: REG_EXTENDED];
++  return [self initWithPattern: thePattern  flags: CWRE_EXTENDED];
+ }
+ 
+ 
+@@ -56,18 +56,10 @@
+ - (id) initWithPattern: (NSString *) thePattern
+ 		 flags: (int) theFlags
+ {
+-  int status;
+-  char *error;
+-  
+   if ((self = [super init]))
+     {
+-      status = regcomp(&_re, [thePattern cString], theFlags);
+-      if (status != 0)
++      if (cwre_comp(&_re, [thePattern UTF8String], theFlags) != 0)
+         {
+-	  error = malloc(255*sizeof(char));
+-	  regerror(status, &_re, error, 255);
+-	  free(error);
+-	  
+ 	  AUTORELEASE(self);
+ 	  self = nil;
+         }
+@@ -101,7 +93,7 @@
+ //
+ - (void)dealloc
+ {
+-  regfree(&_re);
++  cwre_free(&_re);
+   [super dealloc];
+ }
+ 
+@@ -114,42 +106,35 @@
+   NSMutableArray *aMutableArray;
+     
+   int offset, status;
+-  char *s, *error;
+-  regmatch_t rm[1];
++  char *s;
++  cwre_match_t rm;
+   
+   s = (char*)[theString lossyCString];
+   aMutableArray = [[NSMutableArray alloc] init];
+   
+-  status = regexec(&_re, s, 1, rm, 0);
++  status = cwre_exec(&_re, s, &rm, 0);
+   offset = 0;
+   
+   while (status == 0)
+     {
+       NSValue *aValue;
+       
+-      aValue = [NSValue valueWithRange: NSMakeRange(offset + rm[0].rm_so,  rm[0].rm_eo - rm[0].rm_so)];
++      aValue = [NSValue valueWithRange: NSMakeRange(offset + rm.rm_so,  rm.rm_eo - rm.rm_so)];
+       
+       [aMutableArray addObject: aValue];
+       
+-      offset += rm[0].rm_eo;
++      offset += rm.rm_eo;
+       
+-      if (rm[0].rm_eo - rm[0].rm_so == 0)
++      if (rm.rm_eo - rm.rm_so == 0)
+         {
+ 	  status = 1;
+         }
+       else
+         {
+-	  status = regexec(&_re, s + offset, 1, rm, REG_NOTBOL);
++	  status = cwre_exec(&_re, s + offset, &rm, CWRE_NOTBOL);
+         }
+     }
+   
+-  if (status != REG_NOMATCH)
+-    {
+-      error = malloc(255*sizeof(char));
+-      regerror(status, &_re, error, 255);
+-      free(error);
+-    }
+-  
+   return AUTORELEASE(aMutableArray);
+ }
+ 
+@@ -165,11 +150,11 @@
+   CWRegEx *regex;
+   NSArray *result;
+   
+-  flags = REG_EXTENDED;
++  flags = CWRE_EXTENDED;
+   
+   if (!theBOOL)
+     {
+-      flags |= REG_ICASE;
++      flags |= CWRE_ICASE;
+     }
+   
+   if ((regex = [CWRegEx regexWithPattern: thePattern  flags: flags]) == nil)
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRegexEngine.c b/Framework/Pantomime/CWRegexEngine.c
+--- a/Framework/Pantomime/CWRegexEngine.c	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/CWRegexEngine.c	2026-10-16 01:59:47.011395961 +0000
+@@ -0,0 +1,873 @@
++/*
++**  CWRegexEngine.c
++**
++**  See CWRegexEngine.h.  The pattern is parsed to a tree, compiled to a small
++**  program for a non-deterministic machine, and run from each start position
++**  keeping the set of live states, which gives the longest match without
++**  backtracking.
++*/
++
++#include <Pantomime/CWRegexEngine.h>
++
++#include <ctype.h>
++#include <stdlib.h>
++#include <string.h>
++
++#define MAX_PROG 20000
++#define MAX_REPEAT 255
++
++enum { N_EMPTY, N_CHAR, N_ANY, N_SET, N_BOL, N_EOL, N_CAT, N_ALT, N_STAR, N_PLUS, N_QUEST, N_REP };
++enum { I_CHAR, I_ANY, I_SET, I_BOL, I_EOL, I_SPLIT, I_JMP, I_MATCH };
++
++typedef struct
++{
++  int type;
++  int a, b;
++  int lo, hi;
++} node_t;
++
++typedef struct
++{
++  int op;
++  int x, y;
++} inst_t;
++
++typedef struct
++{
++  inst_t *code;
++  int n;
++  unsigned char (*sets)[32];
++  int icase;
++} prog_t;
++
++typedef struct
++{
++  const char *s;
++  int pos;
++  int depth;
++  int err;
++  int icase;
++  node_t *nodes;
++  int nnodes, cnodes;
++  unsigned char (*sets)[32];
++  int nsets, csets;
++} parser_t;
++
++#define SETBIT(set, c) ((set)[(c) >> 3] |= (unsigned char)(1 << ((c) & 7)))
++#define HASBIT(set, c) ((set)[(c) >> 3] & (1 << ((c) & 7)))
++
++static int new_node(parser_t *p, int type, int a, int b)
++{
++  if (p->nnodes == p->cnodes)
++    {
++      node_t *n;
++
++      p->cnodes = p->cnodes ? p->cnodes * 2 : 64;
++      n = (node_t *)realloc(p->nodes, p->cnodes * sizeof(node_t));
++      if (!n)
++	{
++	  p->err = CWRE_ESPACE;
++	  return 0;
++	}
++      p->nodes = n;
++    }
++
++  p->nodes[p->nnodes].type = type;
++  p->nodes[p->nnodes].a = a;
++  p->nodes[p->nnodes].b = b;
++  p->nodes[p->nnodes].lo = 0;
++  p->nodes[p->nnodes].hi = 0;
++  return p->nnodes++;
++}
++
++static int class_has(const char *name, int len, int c)
++{
++  if (len == 5 && !strncmp(name, "alpha", 5)) return isalpha(c);
++  if (len == 5 && !strncmp(name, "digit", 5)) return isdigit(c);
++  if (len == 5 && !strncmp(name, "alnum", 5)) return isalnum(c);
++  if (len == 5 && !strncmp(name, "upper", 5)) return isupper(c);
++  if (len == 5 && !strncmp(name, "lower", 5)) return islower(c);
++  if (len == 5 && !strncmp(name, "space", 5)) return isspace(c);
++  if (len == 5 && !strncmp(name, "blank", 5)) return c == ' ' || c == '\t';
++  if (len == 5 && !strncmp(name, "punct", 5)) return ispunct(c);
++  if (len == 5 && !strncmp(name, "print", 5)) return isprint(c);
++  if (len == 5 && !strncmp(name, "graph", 5)) return isgraph(c);
++  if (len == 5 && !strncmp(name, "cntrl", 5)) return iscntrl(c);
++  if (len == 6 && !strncmp(name, "xdigit", 6)) return isxdigit(c);
++  return -1;
++}
++
++static int parse_alt(parser_t *p);
++
++/* [ already consumed */
++static int parse_set(parser_t *p)
++{
++  unsigned char set[32];
++  int negate, first, c, lo, i, idx;
++
++  memset(set, 0, sizeof(set));
++  negate = 0;
++  first = 1;
++
++  if (p->s[p->pos] == '^')
++    {
++      negate = 1;
++      p->pos++;
++    }
++
++  for (;;)
++    {
++      c = (unsigned char)p->s[p->pos];
++
++      if (c == 0)
++	{
++	  p->err = CWRE_BADPAT;
++	  return 0;
++	}
++
++      if (c == ']' && !first)
++	{
++	  p->pos++;
++	  break;
++	}
++
++      first = 0;
++
++      if (c == '[' && p->s[p->pos + 1] == ':')
++	{
++	  const char *name;
++	  int len, ok;
++
++	  name = p->s + p->pos + 2;
++	  len = 0;
++
++	  while (name[len] && !(name[len] == ':' && name[len + 1] == ']'))
++	    {
++	      len++;
++	    }
++
++	  if (!name[len] || class_has(name, len, 'a') < 0)
++	    {
++	      p->err = CWRE_BADPAT;
++	      return 0;
++	    }
++
++	  for (i = 0; i < 256; i++)
++	    {
++	      ok = class_has(name, len, i);
++	      if (ok > 0)
++		{
++		  SETBIT(set, i);
++		}
++	    }
++
++	  p->pos += 2 + len + 2;
++	  continue;
++	}
++
++      if (c == '[' && (p->s[p->pos + 1] == '.' || p->s[p->pos + 1] == '='))
++	{
++	  p->err = CWRE_BADPAT;
++	  return 0;
++	}
++
++      p->pos++;
++      lo = c;
++
++      if (p->s[p->pos] == '-' && p->s[p->pos + 1] != ']' && p->s[p->pos + 1] != 0)
++	{
++	  int hi;
++
++	  hi = (unsigned char)p->s[p->pos + 1];
++	  p->pos += 2;
++
++	  if (hi < lo)
++	    {
++	      p->err = CWRE_BADPAT;
++	      return 0;
++	    }
++
++	  for (i = lo; i <= hi; i++)
++	    {
++	      SETBIT(set, i);
++	    }
++	}
++      else
++	{
++	  SETBIT(set, lo);
++	}
++    }
++
++  if (p->icase)
++    {
++      for (i = 0; i < 256; i++)
++	{
++	  if (HASBIT(set, i))
++	    {
++	      if (isupper(i))
++		{
++		  SETBIT(set, tolower(i));
++		}
++	      else if (islower(i))
++		{
++		  SETBIT(set, toupper(i));
++		}
++	    }
++	}
++    }
++
++  if (negate)
++    {
++      for (i = 0; i < 32; i++)
++	{
++	  set[i] = (unsigned char)~set[i];
++	}
++    }
++
++  if (p->nsets == p->csets)
++    {
++      unsigned char (*n)[32];
++
++      p->csets = p->csets ? p->csets * 2 : 8;
++      n = (unsigned char (*)[32])realloc(p->sets, p->csets * 32);
++      if (!n)
++	{
++	  p->err = CWRE_ESPACE;
++	  return 0;
++	}
++      p->sets = n;
++    }
++
++  idx = p->nsets++;
++  memcpy(p->sets[idx], set, 32);
++  return new_node(p, N_SET, idx, 0);
++}
++
++static int parse_atom(parser_t *p)
++{
++  int c;
++
++  c = (unsigned char)p->s[p->pos++];
++
++  switch (c)
++    {
++    case '(':
++      {
++	int a;
++
++	p->depth++;
++	a = parse_alt(p);
++
++	if (p->err)
++	  {
++	    return 0;
++	  }
++
++	if (p->s[p->pos] != ')')
++	  {
++	    p->err = CWRE_BADPAT;
++	    return 0;
++	  }
++
++	p->pos++;
++	p->depth--;
++	return a;
++      }
++    case '[':
++      return parse_set(p);
++    case '.':
++      return new_node(p, N_ANY, 0, 0);
++    case '^':
++      return new_node(p, N_BOL, 0, 0);
++    case '$':
++      return new_node(p, N_EOL, 0, 0);
++    case '\\':
++      c = (unsigned char)p->s[p->pos];
++
++      if (c == 0)
++	{
++	  p->err = CWRE_BADPAT;
++	  return 0;
++	}
++
++      p->pos++;
++      return new_node(p, N_CHAR, c, 0);
++    default:
++      return new_node(p, N_CHAR, c, 0);
++    }
++}
++
++/* At p->pos is a '{': parse {m}, {m,} or {m,n}; leave pos alone if it is not a bound. */
++static int parse_bound(parser_t *p, int *lo, int *hi)
++{
++  const char *s;
++  int i, v;
++
++  s = p->s + p->pos + 1;
++  i = 0;
++  v = 0;
++
++  if (!isdigit((unsigned char)s[0]))
++    {
++      return 0;
++    }
++
++  while (isdigit((unsigned char)s[i]))
++    {
++      v = v * 10 + (s[i] - '0');
++      if (v > MAX_REPEAT)
++	{
++	  p->err = CWRE_BADPAT;
++	  return 0;
++	}
++      i++;
++    }
++
++  *lo = v;
++  *hi = v;
++
++  if (s[i] == ',')
++    {
++      i++;
++
++      if (s[i] == '}')
++	{
++	  *hi = -1;
++	}
++      else
++	{
++	  v = 0;
++
++	  if (!isdigit((unsigned char)s[i]))
++	    {
++	      return 0;
++	    }
++
++	  while (isdigit((unsigned char)s[i]))
++	    {
++	      v = v * 10 + (s[i] - '0');
++	      if (v > MAX_REPEAT)
++		{
++		  p->err = CWRE_BADPAT;
++		  return 0;
++		}
++	      i++;
++	    }
++
++	  *hi = v;
++	}
++    }
++
++  if (s[i] != '}')
++    {
++      return 0;
++    }
++
++  if (*hi != -1 && *hi < *lo)
++    {
++      p->err = CWRE_BADPAT;
++      return 0;
++    }
++
++  p->pos += 1 + i + 1;
++  return 1;
++}
++
++static int parse_repeat(parser_t *p)
++{
++  int a, c, lo, hi, r;
++
++  a = parse_atom(p);
++
++  while (!p->err)
++    {
++      c = p->s[p->pos];
++
++      if (c == '*')
++	{
++	  p->pos++;
++	  a = new_node(p, N_STAR, a, 0);
++	}
++      else if (c == '+')
++	{
++	  p->pos++;
++	  a = new_node(p, N_PLUS, a, 0);
++	}
++      else if (c == '?')
++	{
++	  p->pos++;
++	  a = new_node(p, N_QUEST, a, 0);
++	}
++      else if (c == '{' && parse_bound(p, &lo, &hi))
++	{
++	  r = new_node(p, N_REP, a, 0);
++	  if (!p->err)
++	    {
++	      p->nodes[r].lo = lo;
++	      p->nodes[r].hi = hi;
++	    }
++	  a = r;
++	}
++      else
++	{
++	  break;
++	}
++    }
++
++  return a;
++}
++
++static int parse_cat(parser_t *p)
++{
++  int result, c, r, first;
++
++  result = new_node(p, N_EMPTY, 0, 0);
++  first = 1;
++
++  for (;;)
++    {
++      c = p->s[p->pos];
++
++      if (p->err || c == 0 || c == '|' || (c == ')' && p->depth > 0))
++	{
++	  break;
++	}
++
++      r = parse_repeat(p);
++
++      if (p->err)
++	{
++	  break;
++	}
++
++      result = (first ? r : new_node(p, N_CAT, result, r));
++      first = 0;
++    }
++
++  return result;
++}
++
++static int parse_alt(parser_t *p)
++{
++  int left, right;
++
++  left = parse_cat(p);
++
++  while (!p->err && p->s[p->pos] == '|')
++    {
++      p->pos++;
++      right = parse_cat(p);
++      left = new_node(p, N_ALT, left, right);
++    }
++
++  return left;
++}
++
++/* ---- code generation ---- */
++
++typedef struct
++{
++  inst_t *code;
++  int n, cap;
++  int err;
++} gen_t;
++
++static int emit(gen_t *g, int op, int x, int y)
++{
++  if (g->err)
++    {
++      return 0;
++    }
++
++  if (g->n >= MAX_PROG)
++    {
++      g->err = CWRE_ESPACE;
++      return 0;
++    }
++
++  if (g->n == g->cap)
++    {
++      inst_t *n;
++
++      g->cap = g->cap ? g->cap * 2 : 64;
++      n = (inst_t *)realloc(g->code, g->cap * sizeof(inst_t));
++      if (!n)
++	{
++	  g->err = CWRE_ESPACE;
++	  return 0;
++	}
++      g->code = n;
++    }
++
++  g->code[g->n].op = op;
++  g->code[g->n].x = x;
++  g->code[g->n].y = y;
++  return g->n++;
++}
++
++static void gen(gen_t *g, const node_t *nodes, int i)
++{
++  const node_t *nd;
++  int l1, l2, k, count, split;
++  int ends[MAX_REPEAT + 1];
++
++  if (g->err)
++    {
++      return;
++    }
++
++  nd = &nodes[i];
++
++  switch (nd->type)
++    {
++    case N_EMPTY:
++      break;
++    case N_CHAR:
++      emit(g, I_CHAR, nd->a, 0);
++      break;
++    case N_ANY:
++      emit(g, I_ANY, 0, 0);
++      break;
++    case N_SET:
++      emit(g, I_SET, nd->a, 0);
++      break;
++    case N_BOL:
++      emit(g, I_BOL, 0, 0);
++      break;
++    case N_EOL:
++      emit(g, I_EOL, 0, 0);
++      break;
++    case N_CAT:
++      gen(g, nodes, nd->a);
++      gen(g, nodes, nd->b);
++      break;
++    case N_ALT:
++      split = emit(g, I_SPLIT, 0, 0);
++      l1 = g->n;
++      gen(g, nodes, nd->a);
++      l2 = emit(g, I_JMP, 0, 0);
++      if (!g->err)
++	{
++	  g->code[split].x = l1;
++	  g->code[split].y = g->n;
++	}
++      gen(g, nodes, nd->b);
++      if (!g->err)
++	{
++	  g->code[l2].x = g->n;
++	}
++      break;
++    case N_STAR:
++      split = emit(g, I_SPLIT, 0, 0);
++      l1 = g->n;
++      gen(g, nodes, nd->a);
++      l2 = emit(g, I_JMP, 0, 0);
++      if (!g->err)
++	{
++	  g->code[l2].x = split;
++	  g->code[split].x = l1;
++	  g->code[split].y = g->n;
++	}
++      break;
++    case N_PLUS:
++      l1 = g->n;
++      gen(g, nodes, nd->a);
++      split = emit(g, I_SPLIT, 0, 0);
++      if (!g->err)
++	{
++	  g->code[split].x = l1;
++	  g->code[split].y = g->n;
++	}
++      break;
++    case N_QUEST:
++      split = emit(g, I_SPLIT, 0, 0);
++      l1 = g->n;
++      gen(g, nodes, nd->a);
++      if (!g->err)
++	{
++	  g->code[split].x = l1;
++	  g->code[split].y = g->n;
++	}
++      break;
++    case N_REP:
++      for (k = 0; k < nd->lo; k++)
++	{
++	  gen(g, nodes, nd->a);
++	}
++
++      if (nd->hi == -1)
++	{
++	  split = emit(g, I_SPLIT, 0, 0);
++	  l1 = g->n;
++	  gen(g, nodes, nd->a);
++	  l2 = emit(g, I_JMP, 0, 0);
++	  if (!g->err)
++	    {
++	      g->code[l2].x = split;
++	      g->code[split].x = l1;
++	      g->code[split].y = g->n;
++	    }
++	}
++      else
++	{
++	  count = nd->hi - nd->lo;
++
++	  for (k = 0; k < count; k++)
++	    {
++	      split = emit(g, I_SPLIT, 0, 0);
++	      ends[k] = split;
++	      if (!g->err)
++		{
++		  g->code[split].x = g->n;
++		}
++	      gen(g, nodes, nd->a);
++	    }
++
++	  for (k = 0; k < count && !g->err; k++)
++	    {
++	      g->code[ends[k]].y = g->n;
++	    }
++	}
++      break;
++    }
++}
++
++int cwre_comp(cwre_t *theRegex, const char *thePattern, int theFlags)
++{
++  parser_t p;
++  gen_t g;
++  prog_t *prog;
++  int root, err;
++
++  theRegex->prog = NULL;
++
++  memset(&p, 0, sizeof(p));
++  p.s = thePattern;
++  p.icase = (theFlags & CWRE_ICASE) != 0;
++
++  root = parse_alt(&p);
++
++  if (!p.err && p.s[p.pos] != 0)
++    {
++      p.err = CWRE_BADPAT;
++    }
++
++  memset(&g, 0, sizeof(g));
++
++  if (!p.err)
++    {
++      gen(&g, p.nodes, root);
++      emit(&g, I_MATCH, 0, 0);
++    }
++
++  err = p.err ? p.err : g.err;
++
++  if (err)
++    {
++      free(p.nodes);
++      free(p.sets);
++      free(g.code);
++      return err;
++    }
++
++  prog = (prog_t *)malloc(sizeof(prog_t));
++
++  if (!prog)
++    {
++      free(p.nodes);
++      free(p.sets);
++      free(g.code);
++      return CWRE_ESPACE;
++    }
++
++  prog->code = g.code;
++  prog->n = g.n;
++  prog->sets = p.sets;
++  prog->icase = p.icase;
++  free(p.nodes);
++  theRegex->prog = prog;
++  return 0;
++}
++
++void cwre_free(cwre_t *theRegex)
++{
++  prog_t *prog;
++
++  prog = (prog_t *)theRegex->prog;
++
++  if (prog)
++    {
++      free(prog->code);
++      free(prog->sets);
++      free(prog);
++      theRegex->prog = NULL;
++    }
++}
++
++/* ---- matching ---- */
++
++typedef struct
++{
++  int *pcs;
++  int n;
++} list_t;
++
++/* Add pc and everything reachable from it without consuming input. */
++static void add_thread(const prog_t *prog, list_t *l, int *mark, int gen_id, int *stack,
++		       int pc, const char *s, int pos, int notbol)
++{
++  int sp, p;
++
++  sp = 0;
++  stack[sp++] = pc;
++
++  while (sp > 0)
++    {
++      p = stack[--sp];
++
++      if (mark[p] == gen_id)
++	{
++	  continue;
++	}
++
++      mark[p] = gen_id;
++
++      switch (prog->code[p].op)
++	{
++	case I_JMP:
++	  stack[sp++] = prog->code[p].x;
++	  break;
++	case I_SPLIT:
++	  stack[sp++] = prog->code[p].y;
++	  stack[sp++] = prog->code[p].x;
++	  break;
++	case I_BOL:
++	  if (pos == 0 && !notbol)
++	    {
++	      stack[sp++] = p + 1;
++	    }
++	  break;
++	case I_EOL:
++	  if (s[pos] == 0)
++	    {
++	      stack[sp++] = p + 1;
++	    }
++	  break;
++	default:
++	  l->pcs[l->n++] = p;
++	  break;
++	}
++    }
++}
++
++int cwre_exec(const cwre_t *theRegex, const char *theString, cwre_match_t *theMatch, int theFlags)
++{
++  const prog_t *prog;
++  int *mem, *mark, *stack;
++  list_t a, b, *clist, *nlist, *t;
++  int start, sp, i, best, gen_id, n, notbol, len;
++
++  prog = (const prog_t *)theRegex->prog;
++  n = prog->n;
++  notbol = (theFlags & CWRE_NOTBOL) != 0;
++  len = (int)strlen(theString);
++
++  mem = (int *)malloc(sizeof(int) * (n * 5 + 4));
++
++  if (!mem)
++    {
++      return CWRE_NOMATCH;
++    }
++
++  a.pcs = mem;
++  b.pcs = mem + n;
++  mark = mem + 2 * n;
++  stack = mem + 3 * n;		/* 2n + 4 entries */
++
++  for (i = 0; i < n; i++)
++    {
++      mark[i] = -1;
++    }
++
++  gen_id = 0;
++
++  for (start = 0; start <= len; start++)
++    {
++      clist = &a;
++      nlist = &b;
++      clist->n = 0;
++      best = -1;
++
++      add_thread(prog, clist, mark, ++gen_id, stack, 0, theString, start, notbol);
++
++      for (sp = start; ; sp++)
++	{
++	  int c;
++
++	  for (i = 0; i < clist->n; i++)
++	    {
++	      if (prog->code[clist->pcs[i]].op == I_MATCH)
++		{
++		  best = sp;
++		  break;
++		}
++	    }
++
++	  c = (unsigned char)theString[sp];
++
++	  if (c == 0 || clist->n == 0)
++	    {
++	      break;
++	    }
++
++	  nlist->n = 0;
++	  gen_id++;
++
++	  for (i = 0; i < clist->n; i++)
++	    {
++	      const inst_t *in;
++	      int ok;
++
++	      in = &prog->code[clist->pcs[i]];
++
++	      switch (in->op)
++		{
++		case I_CHAR:
++		  ok = (in->x == c) ||
++		    (prog->icase && tolower(in->x) == tolower(c));
++		  break;
++		case I_ANY:
++		  ok = 1;
++		  break;
++		case I_SET:
++		  ok = HASBIT(prog->sets[in->x], c) != 0;
++		  break;
++		default:
++		  ok = 0;
++		  break;
++		}
++
++	      if (ok)
++		{
++		  add_thread(prog, nlist, mark, gen_id, stack, clist->pcs[i] + 1,
++			     theString, sp + 1, notbol);
++		}
++	    }
++
++	  t = clist;
++	  clist = nlist;
++	  nlist = t;
++	}
++
++      if (best >= 0)
++	{
++	  theMatch->rm_so = start;
++	  theMatch->rm_eo = best;
++	  free(mem);
++	  return 0;
++	}
++    }
++
++  free(mem);
++  return CWRE_NOMATCH;
++}
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRegexEngine.h b/Framework/Pantomime/CWRegexEngine.h
+--- a/Framework/Pantomime/CWRegexEngine.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/CWRegexEngine.h	2026-10-16 01:59:47.007258823 +0000
+@@ -0,0 +1,45 @@
++/*
++**  CWRegexEngine.h
++**
++**  A small POSIX extended regular expression matcher, for systems whose C
++**  library has no regcomp() (OPENSTEP's has only the old re_comp()).  It
++**  finds the overall leftmost-longest match, like regexec() with one match
++**  slot; there are no sub-matches or back references.  Supported: literals,
++**  ., [...] with ranges and [:classes:], ( ), |, *, +, ?, {m,n}, ^, $, \c,
++**  and case folding.  Bytes only; no locales.
++**
++**  Distributed under the same terms as Pantomime (LGPL 2.1 or later).
++*/
++
++#ifndef _Pantomime_H_CWRegexEngine
++#define _Pantomime_H_CWRegexEngine
++
++#define CWRE_EXTENDED 1		/* the only syntax; accepted for completeness */
++#define CWRE_ICASE    2
++
++#define CWRE_NOTBOL   1		/* flag for cwre_exec: ^ does not match at the start */
++
++#define CWRE_NOMATCH  1		/* cwre_exec found nothing */
++#define CWRE_BADPAT   2		/* cwre_comp: bad pattern */
++#define CWRE_ESPACE   3		/* cwre_comp: pattern too big, or out of memory */
++
++typedef struct
++{
++  void *prog;
++} cwre_t;
++
++typedef struct
++{
++  int rm_so;
++  int rm_eo;
++} cwre_match_t;
++
++/* Returns 0, or CWRE_BADPAT / CWRE_ESPACE. */
++int cwre_comp(cwre_t *theRegex, const char *thePattern, int theFlags);
++
++/* Returns 0 and fills in *theMatch, or CWRE_NOMATCH. */
++int cwre_exec(const cwre_t *theRegex, const char *theString, cwre_match_t *theMatch, int theFlags);
++
++void cwre_free(cwre_t *theRegex);
++
++#endif
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRunLoopWatcher.h b/Framework/Pantomime/CWRunLoopWatcher.h
 --- a/Framework/Pantomime/CWRunLoopWatcher.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/CWRunLoopWatcher.h	2026-10-16 01:25:59.113015547 +0000
@@ -3300,8 +4392,8 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWW
  @interface CWWINDOWS_1254 : CWCharset
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Makefile.cw b/Framework/Pantomime/Makefile.cw
 --- a/Framework/Pantomime/Makefile.cw	1970-01-01 00:00:00.000000000 +0000
-+++ b/Framework/Pantomime/Makefile.cw	2026-10-16 01:25:59.115918541 +0000
-@@ -0,0 +1,106 @@
++++ b/Framework/Pantomime/Makefile.cw	2026-10-16 02:00:25.514283879 +0000
+@@ -0,0 +1,110 @@
 +# Plain makefile for building Pantomime as a static library, without GNUstep
 +# make.  Used by the OPENSTEP package and for testing on other systems.
 +#
@@ -3365,6 +4457,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Mak
 +	CWParser.m \
 +	CWPart.m \
 +	CWRegEx.m \
++	CWRegexEngine.c \
 +	CWRunLoopWatcher.m \
 +	CWSMTP.m \
 +	CWSendmail.m \
@@ -3384,7 +4477,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Mak
 +	NSString+Extensions.m \
 +	io.m
 +
-+OBJS = $(SRCS:.m=.o) $(EXTRA_OBJS)
++OBJS = $(patsubst %.c,%.o,$(SRCS:.m=.o)) $(EXTRA_OBJS)
 +
 +all: libPantomime.a
 +
@@ -3399,10 +4492,13 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Mak
 +	cp *.h include/Pantomime/
 +	touch include/Pantomime/stamp
 +
-+.SUFFIXES: .m .o
++.SUFFIXES: .m .c .o
 +$(OBJS): include/Pantomime/stamp
 +
 +.m.o:
++	$(CC) $(OBJCFLAGS) $(CPPFLAGS) -Iinclude -c $< -o $@
++
++.c.o:
 +	$(CC) $(OBJCFLAGS) $(CPPFLAGS) -Iinclude -c $< -o $@
 +
 +clean:
