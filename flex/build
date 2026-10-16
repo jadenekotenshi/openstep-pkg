@@ -21,6 +21,23 @@ patch -p1 < "$PATCHFILE"
 run_configure --disable-nls --prefix=/usr/local
 /bin/sed 's/$(LN_S) -f/$(LN_S)/' Makefile > Makefile.pkg
 /bin/mv Makefile.pkg Makefile
+
+# The stock cc's cc1obj segfaults on the big generated scan.c at -O2 on the
+# 68k.  Compile that one file with whatever optimization it survives; make
+# then finds scan.o up to date and builds the rest as usual.
+if [ "$PKG_ARCH" = m68k ]; then
+    scan_done=
+    for scan_flags in "-g -O1" "-O1" "-g -O0" "-O0"; do
+        rm -f scan.o
+        if gnumake scan.o CFLAGS="$scan_flags"; then
+            scan_done=yes
+            echo "==> flex: scan.c compiled with $scan_flags"
+            break
+        fi
+    done
+    [ -n "$scan_done" ] || { echo "flex: scan.c will not compile at any optimization level" >&2; exit 1; }
+fi
+
 gnumake
 touch doc/flex.1
 gnumake install DESTDIR="$DESTDIR"
