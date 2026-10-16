@@ -1,0 +1,5 @@
+{
+    NSExecutable = OpenMail;
+    NSRole = Application;
+    NSAppVersion = "0.1";
+}
