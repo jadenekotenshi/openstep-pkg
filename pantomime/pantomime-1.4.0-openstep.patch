@@ -6602,7 +6602,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
  /*!
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSString+Extensions.h b/Framework/Pantomime/NSString+Extensions.h
 --- a/Framework/Pantomime/NSString+Extensions.h	2021-08-02 21:36:40.000000000 +0000
-+++ b/Framework/Pantomime/NSString+Extensions.h	2026-10-16 01:25:59.116474536 +0000
++++ b/Framework/Pantomime/NSString+Extensions.h	2026-10-16 02:09:34.668764935 +0000
 @@ -24,6 +24,8 @@
  #ifndef _Pantomime_H_NSString_Extensions
  #define _Pantomime_H_NSString_Extensions
@@ -6612,10 +6612,27 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
  #import <Foundation/NSString.h>
  #import <Foundation/NSData.h>
  
+@@ -39,7 +41,7 @@
+ */
+ @interface NSString (PantomimeStringExtensions)
+ 
+-#ifdef MACOSX
++#if defined(MACOSX) || defined(CW_OPENSTEP)
+ /*!
+   @method stringByTrimmingWhiteSpaces
+   @discussion This method is used to trim the leading and trailing
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSString+Extensions.m b/Framework/Pantomime/NSString+Extensions.m
 --- a/Framework/Pantomime/NSString+Extensions.m	2022-11-05 20:02:00.000000000 +0000
-+++ b/Framework/Pantomime/NSString+Extensions.m	2026-10-16 01:25:59.116644844 +0000
-@@ -41,6 +41,8 @@
++++ b/Framework/Pantomime/NSString+Extensions.m	2026-10-16 02:09:43.700930712 +0000
+@@ -29,6 +29,7 @@
+ #import <Pantomime/CWPart.h>
+ #import <Pantomime/NSData+Extensions.h>
+ 
++#import <Foundation/NSCharacterSet.h>
+ #import <Foundation/NSBundle.h>
+ 
+ //
+@@ -41,6 +42,8 @@
  #endif
  
  #include <ctype.h>
@@ -6624,7 +6641,36 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
  
  #ifdef HAVE_ICONV
  #include <iconv.h>
-@@ -226,7 +228,10 @@
+@@ -68,6 +71,28 @@
+   
+   return AUTORELEASE(aMutableString);
+ }
++#elif defined(CW_OPENSTEP)
++- (NSString *) stringByTrimmingWhiteSpaces
++{
++  NSCharacterSet *aSet;
++  NSUInteger start, end;
++
++  aSet = [NSCharacterSet whitespaceAndNewlineCharacterSet];
++  start = 0;
++  end = [self length];
++
++  while (start < end && [aSet characterIsMember: [self characterAtIndex: start]])
++    {
++      start++;
++    }
++
++  while (end > start && [aSet characterIsMember: [self characterAtIndex: end - 1]])
++    {
++      end--;
++    }
++
++  return [self substringWithRange: NSMakeRange(start, end - start)];
++}
+ #endif
+ 
+ 
+@@ -226,7 +251,10 @@
      {@""              ,NSISOLatin1StringEncoding      ,NO},  // To prevent a lame bug in Ximian Evolution
      {@"iso8859_1"     ,NSISOLatin1StringEncoding      ,NO},  // To prevent a lame bug in Openwave WebEngine
      {@"iso-8859-2"    ,NSISOLatin2StringEncoding      ,NO},
@@ -6636,7 +6682,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
      {@"iso-8859-3"   ,NSISOLatin3StringEncoding                 ,NO},
      {@"iso-8859-4"   ,NSISOLatin4StringEncoding                 ,NO},
      {@"iso-8859-5"   ,NSISOCyrillicStringEncoding               ,NO},
-@@ -475,9 +480,8 @@
+@@ -475,9 +503,8 @@
  
        // If we haven't used all our allocated buffer, we do not need shrink it.
        // We just pass the reduced length to NSData and tell it not to free it
@@ -6648,7 +6694,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
  				      encoding: NSUTF8StringEncoding];
  
        iconv_close(conv);
-@@ -589,114 +593,79 @@
+@@ -589,114 +616,79 @@
  //
  - (NSString *) modifiedUTF7String
  {
@@ -6700,13 +6746,13 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
 +	  char out[2];
 +
 +	  [aMutableString appendString: @"&"];
-+
-+	  bits = 0;
-+	  nbits = 0;
  
 -	  j = i+1;
 -	  // We got a non-ASCII character, let's get the substring and encode it using UTF-7.
 -	  while (j < len && !IS_PRINTABLE([self characterAtIndex: j]))
++	  bits = 0;
++	  nbits = 0;
++
 +	  for (j = i; j < len; j++)
  	    {
 -	      j++;
@@ -6812,7 +6858,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSS
  }
  
  //
-@@ -704,69 +673,80 @@
+@@ -704,69 +696,80 @@
  //
  - (NSString *) stringFromModifiedUTF7
  {
