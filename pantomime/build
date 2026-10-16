@@ -1,0 +1,70 @@
+#!/bin/sh
+
+set -e
+
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC=/bin/cc
+PATCHFILE="pantomime-$VERSION-openstep.patch"
+
+export DESTDIR PATH
+. "$PKG_BUILD_HELPERS"
+
+pkg_apply_patch "$PATCHFILE"
+
+# The stock cc (an Objective-C compiler, with the Foundation framework).
+# Pantomime's own sources only need the system headers, OpenSSL for TLS and
+# libiconv for the character sets Foundation cannot convert.
+OBJCFLAGS="$PKG_SYSCC_ARCH_FLAGS -O -pipe -DCW_OPENSTEP -DHAVE_ICONV -I./compat -I$PREFIX/include"
+LIBS="-L$PREFIX/lib -lssl -lcrypto -liconv"
+
+TOP=`pwd`
+
+cd Framework/Pantomime
+gnumake -f Makefile.cw CC="$CC" OBJCFLAGS="$OBJCFLAGS" libPantomime.a
+
+cd "$TOP"
+# -ObjC makes the linker take every member of the archive that has classes or
+# categories in it; most of Pantomime is categories.
+for tool in pmail cwtest; do
+    $CC $OBJCFLAGS -IFramework/Pantomime/include -c $tool.m -o $tool.o
+    $CC $PKG_SYSCC_ARCH_FLAGS -ObjC -o $tool $tool.o Framework/Pantomime/libPantomime.a \
+        $LIBS -framework Foundation
+done
+
+# Run the self test now so a problem shows up in the build log; the package's
+# own test (pkg test pantomime) runs it again after the install.
+./cwtest || echo "WARNING: the Pantomime self test failed (see above)"
+
+mkdirs() {
+    mkdirs_path=
+    for mkdirs_part in `echo "$1" | sed 's#/# #g'`; do
+        mkdirs_path="$mkdirs_path/$mkdirs_part"
+        test -d "$mkdirs_path" || mkdir "$mkdirs_path"
+    done
+}
+
+mkdirs "$DESTDIR$PREFIX/bin"
+mkdirs "$DESTDIR$PREFIX/lib"
+mkdirs "$DESTDIR$PREFIX/include/Pantomime"
+mkdirs "$DESTDIR$PREFIX/include/Pantomime-compat/Foundation"
+mkdirs "$DESTDIR$PREFIX/share/doc/pantomime"
+
+cp pmail "$DESTDIR$PREFIX/bin/pmail"
+cp cwtest "$DESTDIR$PREFIX/bin/pmail-selftest"
+cp Framework/Pantomime/libPantomime.a "$DESTDIR$PREFIX/lib/libPantomime.a"
+/bin/ranlib "$DESTDIR$PREFIX/lib/libPantomime.a"
+cp Framework/Pantomime/include/Pantomime/*.h "$DESTDIR$PREFIX/include/Pantomime/"
+rm -f "$DESTDIR$PREFIX/include/Pantomime/stamp"
+
+# What a program using Pantomime needs on its include path (-I) to see the
+# Foundation OPENSTEP lacks: <stdint.h>, NSNull and a few headers that
+# OPENSTEP keeps in NSDate.h.
+cp Framework/Pantomime/compat/stdint.h "$DESTDIR$PREFIX/include/Pantomime-compat/stdint.h"
+cp Framework/Pantomime/compat/Foundation/*.h "$DESTDIR$PREFIX/include/Pantomime-compat/Foundation/"
+
+cp README.pmail "$DESTDIR$PREFIX/share/doc/pantomime/README.pmail"
+cp README "$DESTDIR$PREFIX/share/doc/pantomime/README.pantomime"
+cp Documentation/LICENSE "$DESTDIR$PREFIX/share/doc/pantomime/LICENSE"

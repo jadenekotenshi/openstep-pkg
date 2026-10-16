@@ -1,0 +1,5 @@
+https://deb.debian.org/debian/pool/main/p/pantomime/pantomime_1.4.0+dfsg.orig.tar.xz
+pantomime-1.4.0-openstep.patch Pantomime-1.4.0
+pmail.m Pantomime-1.4.0
+cwtest.m Pantomime-1.4.0
+README.pmail Pantomime-1.4.0

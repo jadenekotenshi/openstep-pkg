@@ -1,0 +1,3775 @@
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCacheManager.h b/Framework/Pantomime/CWCacheManager.h
+--- a/Framework/Pantomime/CWCacheManager.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWCacheManager.h	2026-10-16 00:48:52.618036580 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWCacheManager
+ #define _Pantomime_H_CWCacheManager
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSCoder.h>
+ #import <Foundation/NSString.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCharset.h b/Framework/Pantomime/CWCharset.h
+--- a/Framework/Pantomime/CWCharset.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWCharset.h	2026-10-16 00:48:52.618805862 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWCharset
+ #define _Pantomime_H_CWCharset
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSObject.h>
+ #import <Foundation/NSString.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.h b/Framework/Pantomime/CWCompat.h
+--- a/Framework/Pantomime/CWCompat.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/CWCompat.h	2026-10-16 00:51:37.472003495 +0000
+@@ -0,0 +1,98 @@
++/*
++**  CWCompat.h
++**
++**  What Pantomime needs from a newer Foundation than OPENSTEP 4.2's.  Only
++**  active when CW_OPENSTEP is defined; the implementation is in CWCompat.m.
++**
++**  Distributed under the same terms as Pantomime (LGPL 2.1 or later).
++*/
++
++#ifndef _Pantomime_H_CWCompat
++#define _Pantomime_H_CWCompat
++
++#ifdef CW_OPENSTEP
++
++#include <sys/types.h>
++#include <limits.h>
++#include <math.h>
++#include <stdarg.h>
++#include <stdint.h>
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++
++#import <Foundation/NSObject.h>
++#import <Foundation/NSString.h>
++#import <Foundation/NSData.h>
++#import <Foundation/NSValue.h>
++#import <Foundation/NSRange.h>
++#import <Foundation/NSProcessInfo.h>
++#import <Foundation/NSDate.h>
++
++#define object_getClass(o) ([(o) class])
++
++// Not in the OPENSTEP math library.
++#define round(x) floor((x) + 0.5)
++#define lround(x) ((long)floor((x) + 0.5))
++
++typedef int NSInteger;
++typedef unsigned int NSUInteger;
++#define NSUIntegerMax UINT_MAX
++#define NSIntegerMax INT_MAX
++#define NSIntegerMin INT_MIN
++#ifndef CW_HAVE_SOCKLEN_T
++typedef int socklen_t;
++#endif
++
++@interface NSNull : NSObject
+++ (NSNull *) null;
++@end
++
++@interface NSString (PantomimeOPENSTEP)
++- (const char *) UTF8String;
+++ (id) stringWithUTF8String: (const char *) theBytes;
++- (NSString *) stringByReplacingPercentEscapesUsingEncoding: (NSStringEncoding) theEncoding;
++@end
++
++@interface NSString (PantomimeOPENSTEPBytes)
++- (id) initWithBytes: (const void *) theBytes
++	      length: (unsigned int) theLength
++	    encoding: (NSStringEncoding) theEncoding;
++@end
++
++@interface NSData (PantomimeOPENSTEP)
+++ (id) dataWithBytesNoCopy: (void *) theBytes
++		    length: (unsigned int) theLength
++	      freeWhenDone: (BOOL) theBOOL;
++@end
++
++@interface NSMutableData (PantomimeOPENSTEP)
++- (void) replaceBytesInRange: (NSRange) theRange
++		   withBytes: (const void *) theBytes
++		      length: (unsigned int) theLength;
++@end
++
++@interface NSMutableString (PantomimeOPENSTEP)
++- (unsigned int) replaceOccurrencesOfString: (NSString *) theTarget
++				 withString: (NSString *) theReplacement
++				    options: (unsigned int) theOptions
++				      range: (NSRange) theRange;
++@end
++
++@interface NSValue (PantomimeOPENSTEP)
+++ (NSValue *) valueWithRange: (NSRange) theRange;
++- (NSRange) rangeValue;
++@end
++
++@interface NSObject (PantomimeOPENSTEP)
++- (id) valueForKey: (NSString *) theKey;
++- (id) subclassResponsibility: (SEL) theSelector;
++@end
++
++@interface NSProcessInfo (PantomimeOPENSTEP)
++- (int) processIdentifier;
++@end
++
++#endif // CW_OPENSTEP
++
++#endif // _Pantomime_H_CWCompat
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.m b/Framework/Pantomime/CWCompat.m
+--- a/Framework/Pantomime/CWCompat.m	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/CWCompat.m	2026-10-16 00:50:44.835628355 +0000
+@@ -0,0 +1,282 @@
++/*
++**  CWCompat.m
++**
++**  See CWCompat.h.
++*/
++
++#import <Pantomime/CWCompat.h>
++
++#ifdef CW_OPENSTEP
++
++#import <Foundation/NSData.h>
++#import <Foundation/NSException.h>
++#import <Foundation/NSObjCRuntime.h>
++
++#include <ctype.h>
++#include <string.h>
++#include <unistd.h>
++
++
++@implementation NSNull
++
++static NSNull *null_instance = nil;
++
+++ (NSNull *) null
++{
++  if (!null_instance)
++    {
++      null_instance = [[NSNull alloc] init];
++    }
++  return null_instance;
++}
++
++- (NSString *) description
++{
++  return @"<null>";
++}
++
++@end
++
++
++@implementation NSString (PantomimeOPENSTEP)
++
++- (const char *) UTF8String
++{
++  NSMutableData *aData;
++  NSData *bytes;
++
++  bytes = [self dataUsingEncoding: NSUTF8StringEncoding  allowLossyConversion: YES];
++  aData = [NSMutableData dataWithData: bytes];
++  [aData appendBytes: "" length: 1];
++
++  return (const char *)[aData bytes];
++}
++
+++ (id) stringWithUTF8String: (const char *) theBytes
++{
++  NSString *aString;
++
++  if (!theBytes)
++    {
++      return nil;
++    }
++
++  aString = [[NSString alloc] initWithData: [NSData dataWithBytes: theBytes  length: strlen(theBytes)]
++			      encoding: NSUTF8StringEncoding];
++  return [aString autorelease];
++}
++
++//
++// Decodes %XX sequences.  The bytes are then read in the given encoding.
++//
++- (NSString *) stringByReplacingPercentEscapesUsingEncoding: (NSStringEncoding) theEncoding
++{
++  NSMutableData *aMutableData;
++  NSData *aData;
++  NSString *aString;
++  const unsigned char *bytes;
++  unsigned int i, len;
++
++  aData = [self dataUsingEncoding: NSASCIIStringEncoding  allowLossyConversion: YES];
++  bytes = (const unsigned char *)[aData bytes];
++  len = [aData length];
++
++  aMutableData = [NSMutableData dataWithCapacity: len];
++
++  for (i = 0; i < len; i++)
++    {
++      unsigned char c;
++
++      c = bytes[i];
++
++      if (c == '%' && i + 2 < len && isxdigit(bytes[i+1]) && isxdigit(bytes[i+2]))
++	{
++	  int hi, lo;
++
++	  hi = bytes[i+1];
++	  lo = bytes[i+2];
++	  hi = (hi <= '9' ? hi - '0' : (hi | 0x20) - 'a' + 10);
++	  lo = (lo <= '9' ? lo - '0' : (lo | 0x20) - 'a' + 10);
++	  c = (unsigned char)(hi * 16 + lo);
++	  i += 2;
++	}
++
++      [aMutableData appendBytes: &c  length: 1];
++    }
++
++  aString = [[NSString alloc] initWithData: aMutableData  encoding: theEncoding];
++  return [aString autorelease];
++}
++
++@end
++
++
++@implementation NSString (PantomimeOPENSTEPBytes)
++
++- (id) initWithBytes: (const void *) theBytes
++	      length: (unsigned int) theLength
++	    encoding: (NSStringEncoding) theEncoding
++{
++  return [self initWithData: [NSData dataWithBytes: theBytes  length: theLength]
++	       encoding: theEncoding];
++}
++
++@end
++
++
++@implementation NSData (PantomimeOPENSTEP)
++
++//
++// With NO the caller keeps the buffer, so the data has to be a copy.
++//
+++ (id) dataWithBytesNoCopy: (void *) theBytes
++		    length: (unsigned int) theLength
++	      freeWhenDone: (BOOL) theBOOL
++{
++  if (theBOOL)
++    {
++      return [self dataWithBytesNoCopy: theBytes  length: theLength];
++    }
++
++  return [self dataWithBytes: theBytes  length: theLength];
++}
++
++@end
++
++
++@implementation NSMutableData (PantomimeOPENSTEP)
++
++- (void) replaceBytesInRange: (NSRange) theRange
++		   withBytes: (const void *) theBytes
++		      length: (unsigned int) theLength
++{
++  char *replacement, *tail;
++  unsigned int total, tailLength;
++
++  if (theLength == theRange.length)
++    {
++      if (theLength > 0)
++	{
++	  [self replaceBytesInRange: theRange  withBytes: theBytes];
++	}
++      return;
++    }
++
++  total = [self length];
++  tailLength = total - NSMaxRange(theRange);
++
++  // The new bytes may be part of this data, so copy them and the tail first.
++  replacement = (char *)malloc(theLength + 1);
++  tail = (char *)malloc(tailLength + 1);
++
++  if (theLength > 0)
++    {
++      memcpy(replacement, theBytes, theLength);
++    }
++
++  if (tailLength > 0)
++    {
++      memcpy(tail, (char *)[self bytes] + NSMaxRange(theRange), tailLength);
++    }
++
++  [self setLength: theRange.location + theLength + tailLength];
++
++  if (theLength > 0)
++    {
++      memcpy((char *)[self mutableBytes] + theRange.location, replacement, theLength);
++    }
++
++  if (tailLength > 0)
++    {
++      memcpy((char *)[self mutableBytes] + theRange.location + theLength, tail, tailLength);
++    }
++
++  free(replacement);
++  free(tail);
++}
++
++@end
++
++
++@implementation NSMutableString (PantomimeOPENSTEP)
++
++- (unsigned int) replaceOccurrencesOfString: (NSString *) theTarget
++				 withString: (NSString *) theReplacement
++				    options: (unsigned int) theOptions
++				      range: (NSRange) theRange
++{
++  NSRange r;
++  unsigned int count, end;
++
++  count = 0;
++  end = theRange.location + theRange.length;
++
++  while (theRange.length > 0)
++    {
++      r = [self rangeOfString: theTarget  options: theOptions  range: theRange];
++
++      if (r.length == 0)
++	{
++	  break;
++	}
++
++      [self replaceCharactersInRange: r  withString: theReplacement];
++      count++;
++
++      end = end - r.length + [theReplacement length];
++      theRange.location = r.location + [theReplacement length];
++      theRange.length = (end > theRange.location ? end - theRange.location : 0);
++    }
++
++  return count;
++}
++
++@end
++
++
++@implementation NSValue (PantomimeOPENSTEP)
++
+++ (NSValue *) valueWithRange: (NSRange) theRange
++{
++  return [NSValue valueWithBytes: &theRange  objCType: @encode(NSRange)];
++}
++
++- (NSRange) rangeValue
++{
++  NSRange aRange;
++
++  [self getValue: &aRange];
++  return aRange;
++}
++
++@end
++
++
++@implementation NSObject (PantomimeOPENSTEP)
++
++- (id) valueForKey: (NSString *) theKey
++{
++  return [self performSelector: NSSelectorFromString(theKey)];
++}
++
++- (id) subclassResponsibility: (SEL) theSelector
++{
++  [NSException raise: NSGenericException
++	       format: @"subclass %s should override %s", [NSStringFromClass([self class]) cString],
++	       [NSStringFromSelector(theSelector) cString]];
++  return nil;
++}
++
++@end
++
++
++@implementation NSProcessInfo (PantomimeOPENSTEP)
++
++- (int) processIdentifier
++{
++  return (int)getpid();
++}
++
++@end
++
++#endif // CW_OPENSTEP
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWConnection.h b/Framework/Pantomime/CWConnection.h
+--- a/Framework/Pantomime/CWConnection.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWConnection.h	2026-10-16 00:48:52.619105113 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWConnection
+ #define _Pantomime_H_CWConnection
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <sys/types.h>
+ 
+ #import <Foundation/NSData.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWConstants.h b/Framework/Pantomime/CWConstants.h
+--- a/Framework/Pantomime/CWConstants.h	2023-01-17 09:56:16.000000000 +0000
++++ b/Framework/Pantomime/CWConstants.h	2026-10-16 00:49:09.889216838 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWConstants
+ #define _Pantomime_H_CWConstants
+ 
++#include <Pantomime/CWCompat.h>
++
+ #ifdef GNUSTEP
+ #include <GNUstepBase/NSDebug+GNUstepBase.h>
+ #endif
+@@ -36,7 +38,7 @@
+ //
+ // Useful macros that we must define ourself on OS X.
+ //
+-#ifdef MACOSX 
++#if defined(MACOSX) || defined(CW_OPENSTEP)
+ #define RETAIN(object)          [object retain]
+ #define RELEASE(object)         [object release]
+ #define AUTORELEASE(object)     [object autorelease]
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWContainer.h b/Framework/Pantomime/CWContainer.h
+--- a/Framework/Pantomime/CWContainer.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWContainer.h	2026-10-16 00:48:52.619684360 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWContainer
+ #define _Pantomime_H_CWContainer
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSEnumerator.h>
+ #import <Foundation/NSObject.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWDNSManager.h b/Framework/Pantomime/CWDNSManager.h
+--- a/Framework/Pantomime/CWDNSManager.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWDNSManager.h	2026-10-16 00:48:52.619878369 +0000
+@@ -24,28 +24,15 @@
+ #ifndef _Pantomime_H_CWDNSManager
+ #define _Pantomime_H_CWDNSManager
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWConnection.h>
+ 
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSDictionary.h>
+ #import <Foundation/NSNotification.h>
+ #import <Foundation/NSObject.h>
+-#import <Foundation/NSRunLoop.h>
+-#import <Foundation/NSTimer.h>
+-
+-#ifdef MACOSX
+-#import <Foundation/NSMapTable.h>
+-#include <CoreFoundation/CoreFoundation.h>
+-#endif
+-
+-#if defined(__APPLE__) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_4)
+-#ifndef NSUInteger
+-#define NSUInteger unsigned int
+-#endif
+-#ifndef NSInteger
+-#define NSInteger int
+-#endif
+-#endif
++#import <Foundation/NSValue.h>
+ 
+ /*!
+   @const PantomimeDNSResolutionCompleted
+@@ -61,33 +48,20 @@
+ */
+ extern NSString* PantomimeDNSResolutionFailed;
+ 
+-#ifdef MACOSX
+-typedef enum {ET_RDESC, ET_WDESC, ET_EDESC} RunLoopEventType;
+ /*!
+   @class CWDNSManager
+   @discussion This class is used in Pantomime to perform DNS resolution.
+-              Currently, it does not do asynchronous lookups but implements
+-	      a simple cache to speedup repetitive requets.
++              This version of the class asks the system resolver
++	      (gethostbyname) for IPv4 addresses and caches the answers.
++	      Lookups always block, even when requested in the background:
++	      in that case the result is delivered through the
++	      PantomimeDNSResolutionCompleted / PantomimeDNSResolutionFailed
++	      notifications before the call returns.
+ */
+ @interface CWDNSManager : NSObject
+-#else
+-@interface CWDNSManager : NSObject <RunLoopEvents>
+-#endif
+ {
+   @private
+-    NSMutableArray *_servers, *_queue;
+     NSMutableDictionary *_cache;
+-    NSTimer *_timer;
+-
+-#ifdef MACOSX
+-    CFRunLoopSourceRef _runLoopSource;
+-    CFSocketContext *_context;
+-    CFSocketRef _cf_socket;
+-#endif
+-
+-    unsigned short _packet_id;
+-    BOOL _is_asynchronous;
+-    NSInteger _socket;
+ }
+ 
+ /*!
+@@ -95,10 +69,11 @@
+   @discussion This method is used to obtain an array of IP
+               addresses from a fully qualified domain name.
+   @param theName The fully qualified domain name.
+-  @param theBOOL If YES, the call is non-blocking and returns nil.
+-                 Otherwise, the call is block and returns an
+-		 array of addresses, if any.
+-  @result The array of addresses encoded as NSData instances.
++  @param theBOOL If YES, the result is delivered by notification
++                 and nil is returned. Otherwise an array of
++		 addresses, if any, is returned.
++  @result The array of addresses, each an NSNumber holding the
++          IPv4 address in network byte order.
+ */
+ - (NSArray *) addressesForName: (NSString *) theName
+                     background: (BOOL) theBOOL;
+@@ -110,13 +85,6 @@
+ */
+ + (id) singleInstance;
+ 
+-#ifdef MACOSX
+-- (void) receivedEvent: (void *) theData
+-                  type: (RunLoopEventType) theType
+-                 extra: (void *) theExtra
+-               forMode: (NSString *) theMode;
+-#endif
+-
+ @end
+ 
+ #endif // _Pantomime_H_CWDNSManager
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWDNSManager.m b/Framework/Pantomime/CWDNSManager.m
+--- a/Framework/Pantomime/CWDNSManager.m	2023-01-17 09:56:16.000000000 +0000
++++ b/Framework/Pantomime/CWDNSManager.m	2026-10-16 00:38:22.143563097 +0000
+@@ -24,158 +24,16 @@
+ #import <Pantomime/CWDNSManager.h>
+ 
+ #import <Pantomime/CWConstants.h>
+-#import <Pantomime/NSData+Extensions.h>
+ 
+-#import <Foundation/NSCharacterSet.h>
+-#import <Foundation/NSValue.h>
+-#import <Foundation/NSScanner.h>
+-
+-#ifdef __MINGW32__
+-#include <winsock2.h>
+-
+-#elif defined (__NetBSD__)
+ #include <sys/types.h>
+-#include <netinet/in.h>
+-#include <arpa/nameser.h>
+-#include <resolv.h>
+-//#include <res_update.h>
+-#include <arpa/inet.h>
+-#include <netdb.h>
+-#if __NetBSD_Version__ >= 300000000
+-#define HAS_RES_NINIT 1
+-#endif
+-
+-#else
+-#include <sys/types.h>      // For u_char on Mac OS X
+ #include <sys/socket.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
+ #include <netdb.h>
+-#include <resolv.h>
+-#endif
+-
+-#include <unistd.h>
+-
+-#define MAX_PACKET_SIZE 512
+-#define MAX_TIMEOUT 2
+-
+-
++#include <string.h>
+ 
+ static CWDNSManager *singleInstance = nil;
+ 
+-typedef struct _dns_packet_header
+-{
+-  unsigned short packet_id;
+-  unsigned short flags;
+-  unsigned short qdcount;
+-  unsigned short ancount;
+-  unsigned short nscount;
+-  unsigned short arcount;
+-} dns_packet_header;
+-
+-typedef struct _dns_packet_question
+-{
+-  unsigned short qtype;
+-  unsigned short qclass;
+-} dns_packet_question;
+-
+-typedef struct _dns_resource_record
+-{
+-  unsigned short type;
+-  unsigned short class;
+-  unsigned int ttl;
+-  unsigned short rdlength;
+-} dns_resource_record;
+-
+-#ifdef MACOSX
+-void dns_socket_callback(CFSocketRef s, CFSocketCallBackType type, CFDataRef address, const void* data, void* info);
+-
+-void dns_socket_callback(CFSocketRef s, CFSocketCallBackType type, CFDataRef address, const void* data, void* info)
+-{
+-  if (type&kCFSocketReadCallBack)
+-    {
+-      [(CWDNSManager *)info receivedEvent: (void*)CFSocketGetNative(s)
+-		       type: ET_RDESC
+-		       extra: 0
+-		       forMode: nil];
+-    }
+-}
+-#endif
+-
+-//
+-//
+-//
+-@interface CWDNSRequest : NSObject
+-{
+-  @protected
+-    NSMutableArray *servers;
+-    NSData *name;
+-
+-  @public
+-    unsigned short packet_id, count;
+-}
+-
+-- (id) initWithName: (NSString *) theName;
+-- (NSMutableArray *) servers;
+-- (void) setServers: (NSMutableArray *)serverArray;
+-- (NSData *) name;
+-
+-@end
+-
+-@implementation CWDNSRequest
+-
+-- (id) initWithName: (NSString *) theName
+-{
+-  self = [super init];
+-  if (self)
+-    {
+-      servers = [[NSMutableArray alloc] init];
+-      name = RETAIN([theName dataUsingEncoding: NSASCIIStringEncoding]);
+-      count = 0;
+-    }
+-  return self;
+-}
+-
+-- (NSMutableArray *) servers
+-{
+-  return servers;
+-}
+-
+-- (void) setServers: (NSMutableArray *)serverArray
+-{
+-  ASSIGN(self->servers, serverArray);
+-}
+-
+-- (NSData *) name
+-{
+-  return name;
+-}
+-
+-- (void) dealloc
+-{
+-  RELEASE(servers);
+-  RELEASE(name);
+-  [super dealloc];
+-}
+-
+-@end
+-
+-//
+-//
+-//
+-@interface CWDNSManager (Private)
+-
+-- (void) _parseHostsFile;
+-- (void) _parseResolvFile;
+-- (void) _processResponse;
+-- (void) _sendRequest: (CWDNSRequest *) theRequest;
+-- (void) _tick: (id) sender;
+-
+-@end
+-
+-//
+-//
+-//
+ @implementation CWDNSManager
+ 
+ - (id) init
+@@ -184,597 +42,95 @@
+   if (self)
+     {
+       _cache = [[NSMutableDictionary alloc] init];
+-      _servers = [[NSMutableArray alloc] init];
+-      _queue = [[NSMutableArray alloc] init];
+-      _is_asynchronous = NO;
+-
+-#ifdef MACOSX
+-  _runLoopSource = nil;
+-  _context = nil;
+-  _cf_socket = nil;
+-#endif
+-
+-  [self _parseResolvFile];
+-  [self _parseHostsFile];
+-
+-  if ([_servers count] && (_socket = socket(PF_INET, SOCK_DGRAM, 0)) >= 0)
+-    {
+-      _is_asynchronous = YES;
+-      _packet_id = 1;
+-      
+-#ifdef MACOSX
+-      _context = (CFSocketContext *)malloc(sizeof(CFSocketContext));
+-      memset(_context, 0, sizeof(CFSocketContext));
+-      _context->info = self;
+-      
+-      _cf_socket = CFSocketCreateWithNative(NULL, _socket, kCFSocketReadCallBack|kCFSocketWriteCallBack, dns_socket_callback, _context);
+-      CFSocketDisableCallBacks(_cf_socket, kCFSocketReadCallBack|kCFSocketWriteCallBack);
+-      
+-      if (!_cf_socket)
+-	{
+-	  _is_asynchronous = NO;
+-	  return self;
+-	}
+-      
+-      _runLoopSource = CFSocketCreateRunLoopSource(NULL, _cf_socket, 1);
+-      
+-      if (!_runLoopSource)
+-	{
+-	  CFSocketInvalidate(_cf_socket);
+-	  _is_asynchronous = NO;
+-	  return self;
+-	}
+-      
+-      CFRunLoopAddSource(CFRunLoopGetCurrent(), _runLoopSource, kCFRunLoopCommonModes);
+-#else
+-      [[NSRunLoop currentRunLoop] addEvent: (void *)_socket
+-#ifdef __MINGW32__
+-				  type: ET_HANDLE
+-#else
+-				  type: ET_RDESC
+-#endif
+-				  watcher: self
+-				  forMode: NSDefaultRunLoopMode];
+-#endif
+-
+-      _timer = [NSTimer scheduledTimerWithTimeInterval: 1.0
+-			target: self
+-			selector: @selector(_tick:)
+-			userInfo: nil
+-			repeats: YES];
+-      RETAIN(_timer);
+-      [_timer fire];
+-    }
+     }
+   return self;
+ }
+ 
+-//
+-//
+-//
+ - (void) dealloc
+ {
+-  [_timer invalidate];
+-  RELEASE(_timer);
+-
+-#ifdef MACOSX
+-  if (CFRunLoopSourceIsValid(_runLoopSource))
+-    {
+-      CFRunLoopSourceInvalidate(_runLoopSource);
+-      CFRelease(_runLoopSource);
+-    }
+-
+-  if (CFSocketIsValid(_cf_socket))
+-    {
+-      CFSocketInvalidate(_cf_socket);
+-    }
+-
+-  CFRelease(_cf_socket);
+-  free(_context);
+-#endif
+-
+   RELEASE(_cache);
+-  RELEASE(_servers);
+-  RELEASE(_queue);
+   [super dealloc];
+ }
+ 
+-//
+-//
+-//
+-- (NSArray *) addressesForName: (NSString *) theName  background: (BOOL) theBOOL
+-{
+-  id o;
+-
+-  NSDebugLog(@"DNSManager - Looking up address: %@, background? %u", theName, theBOOL);
+-  o = [_cache objectForKey: theName];
+-  
+-  if (theBOOL)
+-    {
+-      if (o)
+-	{
+-	  POST_NOTIFICATION(PantomimeDNSResolutionCompleted, self, ([NSDictionary dictionaryWithObjectsAndKeys: theName, @"Name", [o objectAtIndex: 0], @"Address", nil]));
+-	}
+-      else
+-	{
+-	  CWDNSRequest *aRequest;
+-	  NSMutableArray *serversCopy;
+-
+-	  serversCopy = [[NSMutableArray alloc] initWithArray: _servers];
+-	  aRequest = AUTORELEASE([[CWDNSRequest alloc] initWithName: theName]);
+-	  aRequest->packet_id = _packet_id++;
+-	  [aRequest setServers: serversCopy];
+-	  [serversCopy release];
+-	  aRequest->count = 0;
+-
+-	  if ([_servers count])
+-	    {
+-	      [self _sendRequest: aRequest];
+-	    }
+-	}
+-
+-      return nil;
+-    }
+-
+-  if (!o)
+-    {
+-      struct hostent *host_info;
+-
+-      //
+-      // We don't compare with _servers as it might have more
+-      // magic to obtain IP addresses from DNS names.
+-      //
+-      host_info = gethostbyname([theName cString]);
+-      
+-      if (host_info)
+-	{
+-	  unsigned i;
+-
+-	  o = [NSMutableArray array];
+-          i = 0;
+-	  while (host_info->h_addr_list[i] != NULL)
+-	    {
+-              uint8_t c0, c1, c2, c3;
+-              char *buf;
+-              uint32_t r;
+-		  
+-              buf = host_info->h_addr_list[i];
+-              c0 = (uint8_t)*(buf);
+-              c1 = (uint8_t)*(buf+1);
+-              c2 = (uint8_t)*(buf+2);
+-              c3 = (uint8_t)*(buf+3);
+-		  
+-              r = ntohl((uint32_t)((c0<<24)|(c1<<16)|(c2<<8)|c3));
+-
+-              [o addObject: [NSNumber numberWithUnsignedInt: r]];
+-
+-              i++;
+-	    }
+-	  
+-	  // We only cache if we have at least one address for the DNS name.
+-	  if ([o count])
+-	    {
+-	      [_cache setObject: o  forKey: theName];
+-	    }
+-	}
+-      else
+-	{
+-	  o = nil;
+-	}
+-    }
+-  
+-  return o;
+-}
+-
+-//
+-//
+-//
+-- (void) receivedEvent: (void *) theData
+-                  type: (RunLoopEventType) theType
+-                 extra: (void *) theExtra
+-               forMode: (NSString *) theMode
+-{
+-  switch (theType)
+-    {
+-#ifdef __MINGW32__
+-    case ET_HANDLE:
+-    case ET_TRIGGER:
+-#else
+-    case ET_RDESC:
+-#endif
+-      [self _processResponse];
+-      break;
+-
+-    default:
+-      break;
+-    }
+-}
+-
+-//
+-//
+-//
+ + (id) singleInstance
+ {
+   if (!singleInstance)
+     {
+       singleInstance = [[CWDNSManager alloc] init];
+     }
+-
+   return singleInstance;
+ }
+ 
+-@end
+-
+-@implementation CWDNSManager (Private)
+-
+-//
+-// See man 5 hosts for all details
+-// on the format of the /etc/hosts file.
+-//
+-- (void) _parseHostsFile
+-{
+-  NSData *aData;
+-
+-  aData = [NSData dataWithContentsOfFile: @"/etc/hosts"];
+-  
+-  if (aData)
+-    {
+-      NSArray *allLines;
+-      NSString *aString;
+-      BOOL b;
+-      NSUInteger i;
+-      
+-      allLines = [aData componentsSeparatedByCString: "\n"];
+-      
+-      for (i = 0; i < [allLines count]; i++)
+-	{
+-	  aData = [allLines objectAtIndex: i];
+-
+-	  if ([aData hasCPrefix: "#"]) continue;
+-      
+-	  aString = [[NSString alloc] initWithData: aData  encoding: NSASCIIStringEncoding];
+-	  b = YES;
+-
+-	  if (aString)
+-	    {
+-	      NSString *aWord;
+-	      NSString *theIP;
+-	      NSScanner *aScanner;
+-
+-	      aScanner = [NSScanner scannerWithString: aString];
+-	      theIP = nil;
+-	      
+-	      [aScanner scanCharactersFromSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]  intoString: NULL];
+-	      
+-	      while ([aScanner scanUpToCharactersFromSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]  intoString: &aWord] == YES)
+-		{
+-		  if (b)
+-		    {
+-		      theIP = aWord;
+-		      b = NO;
+-		      continue;
+-		    }
+-
+-		  [_cache setObject: [NSArray arrayWithObject: [NSNumber numberWithUnsignedInt: inet_addr([theIP UTF8String])]]  forKey: aWord];
+-		  [aScanner scanCharactersFromSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]  intoString: NULL];
+-
+-		}
+-
+-	      RELEASE(aString);
+-	    }
+-	}
+-    }
+-}
+-
+ //
+-// See man 5 resolv.conf for all details
+-// on the format of the /etc/resolv.conf  file.
++// Resolve the name now and return an array of NSNumber (network byte order
++// IPv4 addresses), or nil.
+ //
+-- (void) _parseResolvFile
++- (NSArray *) _resolve: (NSString *) theName
+ {
++  NSMutableArray *addresses;
++  NSArray *cached;
++  struct hostent *h;
++  unsigned long ip;
++  unsigned int a;
+   int i;
+-#ifdef HAS_RES_NINIT
+-  struct __res_state cw_res;
+-#else
+-#define cw_res _res
+-#endif
+-
+-#ifdef HAS_RES_NINIT
+-  memset(&cw_res, 0, sizeof(cw_res));
+-
+-  if (res_ninit(&cw_res) == -1)
+-      return;
+-#else
+-  if (res_init() == -1)
+-      return; 
+-#endif
+-
+-  if ((cw_res.options & RES_INIT) == 0)
+-    return;
+-
+-  for (i = 0 ; i < cw_res.nscount; i++ )
+-  {
+-    [_servers addObject: [NSNumber numberWithUnsignedInt: cw_res.nsaddr_list[i].sin_addr.s_addr]];
+-  }
+-
+-#ifdef HAS_RES_NINIT
+-  res_ndestroy(&cw_res);
+-#endif
+-}
+-
+-
+-//
+-//
+-//
+-- (void) _processResponse
+-{
+-  CWDNSRequest *aRequest;
+-  NSString *aString;
+-  NSNumber *aNumber;
+-
+-  dns_resource_record *resource_record;
+-  dns_packet_header *header;
+-
+-  char *buf, qr, ra, rcode, *start;
+-  unsigned short flags, i, type;
+-  uint8_t c0, c1, c2, c3;
+-  uint32_t r;
+-
+-  start = buf = (char *)malloc(MAX_PACKET_SIZE);
+ 
+-  if (recvfrom(_socket, buf, MAX_PACKET_SIZE, 0, NULL, NULL) == -1)
++  cached = [_cache objectForKey: theName];
++  if (cached)
+     {
+-      free(buf);
+-      return;
++      return cached;
+     }
+ 
+-  // We build our packet header. We should get (~118 bytes in total):
+-  //
+-  // - packet identifier
+-  // - flags (0x8180)
+-  // - qdcount
+-  // - ancount
+-  // - nscount
+-  // - arcount
+-  header = (dns_packet_header *)buf;  
+-
+-  // We get the right DNSRequest object from the queue
+-  // based on our packet ID.
+-  aRequest = nil;
+-
+-  for (i = 0; i < [_queue count]; i++)
++  // A dotted quad needs no lookup.
++  ip = inet_addr([theName UTF8String]);
++  if (ip != (unsigned long)-1 && ip != 0xffffffffUL)
+     {
+-      aRequest = [_queue objectAtIndex: i];
+-      if (aRequest->packet_id == ntohs(header->packet_id)) break;
++      a = (unsigned int)ip;
++      cached = [NSArray arrayWithObject: [NSNumber numberWithUnsignedInt: a]];
++      [_cache setObject: cached  forKey: theName];
++      return cached;
+     }
+ 
+-  if (!aRequest)
+-    {
+-      free(buf);
+-      return;
+-    }
+-
+-  flags = ntohs(header->flags);  
+-  
+-  qr = (char)((flags & 0x8000) >> 15);
+-  
+-  // We check if we got a response from the server. If not,
+-  // we try the next server, if any.
+-  if (!qr) return;
+-
+-  ra = (char)((flags & 0x0080) >> 7);
+-
+-  // We check if recursive queries are supported by
+-  // the server. If not, we try the next server, if any.
+-  if (!ra) return;
+-
+-  rcode = (char)((flags & 0x000F) >> 0);
+-
+-  // We check if we got any errors...
+-  // 2 - server failure
+-  // 3 - domain does not exist
+-  // 5 - the server refused to serve our query
+-  if (rcode)
+-    {
+-      return;
+-    }
+-  
+-  // We check if we got a response from the server. If not,
+-  // we try the next server, if any.
+-  if (!htons(header->ancount)) return;
+-
+-  buf += sizeof(dns_packet_header);
+-
+-  //
+-  // We skip over the Question section.
+-  //
+-  while (*buf)
++  h = gethostbyname([theName UTF8String]);
++  if (!h || h->h_addrtype != AF_INET || h->h_length != 4 || !h->h_addr_list || !h->h_addr_list[0])
+     {
+-      buf += (int)(*buf)+1;
++      return nil;
+     }
+ 
+-  buf += sizeof(dns_packet_question)+1;
+-  
+-
+-  //
+-  // We now read the Answer section of our packet
+-  //
+-  //                                  1  1  1  1  1  1
+-  //    0  1  2  3  4  5  6  7  8  9  0  1  2  3  4  5
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+-  //  |                                               |
+-  //  /                                               /
+-  //  /                      NAME                     /
+-  //  |                                               |
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+-  //  |                      TYPE                     |
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+-  //  |                     CLASS                     |
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+-  //  |                      TTL                      |
+-  //  |                                               |
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+-  //  |                   RDLENGTH                    |
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--|
+-  //  /                     RDATA                     /
+-  //  /                                               /
+-  //  +--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+--+
+-  type = 0;
+-
+-  while (type != 1)
++  addresses = [NSMutableArray array];
++  for (i = 0; h->h_addr_list[i]; i++)
+     {
+-      if (!((*buf) & 0xC0))
+-	{      
+-	  while (*buf)  
+-	    {
+-	      buf+=(int)(*buf)+1;
+-	    }
+-	  
+-	  buf-=1;
+-	}
+-      
+-      resource_record = (dns_resource_record *)(buf+=2); 
+-      type = ntohs(resource_record->type);
+-      buf += (sizeof(dns_resource_record)-2)+ntohs(resource_record->rdlength);
++      memcpy(&a, h->h_addr_list[i], 4);
++      [addresses addObject: [NSNumber numberWithUnsignedInt: a]];
+     }
+-  
+-  buf -= ntohs(resource_record->rdlength);
+-  c0 = (uint8_t)*(buf);
+-  c1 = (uint8_t)*(buf+1);
+-  c2 = (uint8_t)*(buf+2);
+-  c3 = (uint8_t)*(buf+3);
+-  
+-  r = ntohl((uint32_t)((c0<<24)|(c1<<16)|(c2<<8)|c3));
+-
+-  aString = AUTORELEASE([[NSString alloc] initWithData: [aRequest name]  encoding: NSASCIIStringEncoding]);
+-  aNumber = [NSNumber numberWithUnsignedInt: r];
+-
+-  POST_NOTIFICATION(PantomimeDNSResolutionCompleted, self, ([NSDictionary dictionaryWithObjectsAndKeys: aString, @"Name", aNumber, @"Address", nil]));
+ 
+-  [_cache setObject: [NSArray arrayWithObject: aNumber]  forKey: aString];
+-
+-  // We remove our request from the queue
+-  [_queue removeObject: aRequest];
+-
+-  free(start);
++  [_cache setObject: addresses  forKey: theName];
++  return addresses;
+ }
+ 
+-//
+-//
+-//
+-- (void) _sendRequest: (CWDNSRequest *) theRequest
++- (NSArray *) addressesForName: (NSString *) theName  background: (BOOL) theBOOL
+ {
+-  NSArray *subdomains;
++  NSArray *addresses;
++
++  addresses = [self _resolve: theName];
+ 
+-  struct sockaddr_in peer_address;
+-  dns_packet_question *question;
+-  dns_packet_header *header;
+-  unsigned i;
+-  size_t len;
+-  char *packet, *start;
+-
+-  peer_address.sin_family = PF_INET;
+-  peer_address.sin_port = htons(53);
+-
+-  peer_address.sin_addr.s_addr = [[[theRequest servers] objectAtIndex: 0] unsignedIntValue];
+-  start = packet = (char *)malloc(MAX_PACKET_SIZE);
+-
+-  // We build our packet header. We have to set:
+-  //  
+-  // - packet identifier
+-  // - flags, we have something like this to fill:
+-  //   |QR|   Opcode  |AA|TC|RD|RA|   Z    |   RCODE   |
+-  //    0      0000    0  0  1  0     000      0000
+-  // - qdcount: 1 entry in the question section.
+-  // - ancount: 0 resource record in the answer section
+-  // - nscount: 0 name server resource record in the authority records section
+-  // - arcount: 0 resource record in the additional records section
+-  //
+-  //NSLog(@"(0x0100:\t%d to %d\n1:\t\t%d to %d\n", 0x0100, htons(0x0100), 1, htons(1));
+-  header = (dns_packet_header *)packet;
+-  header->packet_id = htons(theRequest->packet_id);
+-  header->flags = htons(0x0100);    
+-  header->qdcount = htons(1);
+-  header->ancount = header->nscount = header->arcount = 0;
+-
+-  // We build our packet question.
+-  packet += sizeof(dns_packet_header);
+-
+-  // QNAME
+-  // a domain name represented as a sequence of labels, where
+-  // each label consists of a length octet followed by that
+-  // number of octets.  The domain name terminates with the
+-  // zero length octet for the null label of the root.  Note
+-  // that this field may be an odd number of octets; no
+-  // padding is used.
+-  //
+-  subdomains = [[theRequest name] componentsSeparatedByCString: "."];
+-  
+-  for (i = 0; i < [subdomains count]; i++)
++  if (!theBOOL)
+     {
+-      *packet = len = [[subdomains objectAtIndex: i] length];
+-      memcpy(++packet, [[subdomains objectAtIndex: i] bytes], len);
+-      packet += len;
++      return addresses;
+     }
+ 
+-  *(packet++) = '\0'; 
+-  question = (dns_packet_question *)packet;
+-  question->qtype = htons(1);  // Type A: 1 a host address
+-  question->qclass = htons(1); // IN: 1 the Internet
+-  packet += sizeof(dns_packet_question);
+-  
+-  len = packet-(char *)header;
+-
+-  // We queue our DNS request
+-  if (![_queue containsObject: theRequest]) [_queue addObject: theRequest];
+-  
+-  // We send our packet. If we failed to send it, we don't care since
+-  // we'll try to send it to an other server shortly after.
+-  sendto(_socket, start, len, 0, (struct sockaddr *)&peer_address, sizeof(struct sockaddr));
+-  
+-  free(start);
+-}
+-
+-//
+-//
+-//
+-- (void) _tick: (id) sender
+-{
+-  NSUInteger c;
+-
+-  if ((c = [_queue count]))
++  if (addresses)
+     {
+-      CWDNSRequest *aRequest;
+-
+-      while (c--)
+-	{
+-	  aRequest = [_queue objectAtIndex: c];
+-	  
+-	  if (aRequest->count == MAX_TIMEOUT)
+-	    {
+-	      if ([[aRequest servers] count] > 1)
+-		{
+-		  [[aRequest servers] removeObjectAtIndex: 0];
+-		  aRequest->count = 0;
+-		  
+-		  [self _sendRequest: aRequest];
+-		}
+-	      else
+-		{
+-		  NSDictionary *aDictionary;
+-
+-		  aDictionary = [NSDictionary dictionaryWithObject: AUTORELEASE([[NSString alloc] initWithData: [aRequest name] encoding: NSASCIIStringEncoding])
+-					      forKey: @"Name"];
+-		  POST_NOTIFICATION(PantomimeDNSResolutionFailed, self, aDictionary);
+-
+-		  [_queue removeObject: aRequest];
+-		}
+-	    }
+-
+-	  aRequest->count++;
+-	}
++      POST_NOTIFICATION(PantomimeDNSResolutionCompleted, self,
++			([NSDictionary dictionaryWithObjectsAndKeys: theName, @"Name",
++				       [addresses objectAtIndex: 0], @"Address", nil]));
++    }
++  else
++    {
++      POST_NOTIFICATION(PantomimeDNSResolutionFailed, self,
++			[NSDictionary dictionaryWithObject: theName  forKey: @"Name"]);
+     }
++
++  return nil;
+ }
+ 
+ @end
+-
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWFlags.h b/Framework/Pantomime/CWFlags.h
+--- a/Framework/Pantomime/CWFlags.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWFlags.h	2026-10-16 00:48:52.620048509 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWFlags
+ #define _Pantomime_H_CWFlags
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSCoder.h>
+ #import <Foundation/NSObject.h>
+ #import <Foundation/NSString.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWFolder.h b/Framework/Pantomime/CWFolder.h
+--- a/Framework/Pantomime/CWFolder.h	2022-11-05 20:02:00.000000000 +0000
++++ b/Framework/Pantomime/CWFolder.h	2026-10-16 00:48:52.620330626 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWFolder
+ #define _Pantomime_H_CWFolder
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSDictionary.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWFolderInformation.h b/Framework/Pantomime/CWFolderInformation.h
+--- a/Framework/Pantomime/CWFolderInformation.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWFolderInformation.h	2026-10-16 00:48:52.620534042 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWFolderInformation
+ #define _Pantomime_H_CWFolderInformation
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSObject.h>
+ #import <Pantomime/CWConstants.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPCacheManager.h b/Framework/Pantomime/CWIMAPCacheManager.h
+--- a/Framework/Pantomime/CWIMAPCacheManager.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWIMAPCacheManager.h	2026-10-16 00:48:52.620673278 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWIMAPCacheManager
+ #define _Pantomime_H_CWIMAPCacheManager
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSMapTable.h>
+ 
+ #include <Pantomime/CWCacheManager.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPFolder.h b/Framework/Pantomime/CWIMAPFolder.h
+--- a/Framework/Pantomime/CWIMAPFolder.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWIMAPFolder.h	2026-10-16 00:48:52.620818068 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWIMAPFolder
+ #define _Pantomime_H_CWIMAPFolder
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWFolder.h>
+ 
+ #import <Foundation/NSArray.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPMessage.h b/Framework/Pantomime/CWIMAPMessage.h
+--- a/Framework/Pantomime/CWIMAPMessage.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWIMAPMessage.h	2026-10-16 00:48:52.620969929 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWIMAPMessage
+ #define _Pantomime_H_CWIMAPMessage
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSCoder.h>
+ 
+ #import <Pantomime/CWMessage.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPMessage.m b/Framework/Pantomime/CWIMAPMessage.m
+--- a/Framework/Pantomime/CWIMAPMessage.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWIMAPMessage.m	2026-10-16 00:51:45.782018957 +0000
+@@ -32,7 +32,7 @@
+ #import <Foundation/NSException.h>
+ #import <Foundation/NSValue.h>
+ 
+-#if defined(__APPLE__) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_4)
++#if (defined(__APPLE__) && (MAC_OS_X_VERSION_MAX_ALLOWED <= MAC_OS_X_VERSION_10_4)) || defined(CW_OPENSTEP)
+ @interface NSNumber (TigerExtensions)
+ + (NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
+ - (NSUInteger)unsignedIntegerValue;
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPStore.h b/Framework/Pantomime/CWIMAPStore.h
+--- a/Framework/Pantomime/CWIMAPStore.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWIMAPStore.h	2026-10-16 00:48:52.621143085 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWIMAPStore
+ #define _Pantomime_H_CWIMAPStore
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWConnection.h>
+ #include <Pantomime/CWConstants.h>
+ #include <Pantomime/CWService.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPStore.m b/Framework/Pantomime/CWIMAPStore.m
+--- a/Framework/Pantomime/CWIMAPStore.m	2022-11-05 20:02:00.000000000 +0000
++++ b/Framework/Pantomime/CWIMAPStore.m	2026-10-16 00:39:12.369080748 +0000
+@@ -2906,7 +2906,10 @@
+ //
+ - (void) _parseSTARTTLS
+ {
+-  [(CWTCPConnection *)_connection startSSL];
++  if (![self startSSLOnConnection])
++    {
++      return;
++    }
+   POST_NOTIFICATION(PantomimeServiceInitialized, self, nil);
+   PERFORM_SELECTOR_1(_delegate, @selector(serviceInitialized:),  PantomimeServiceInitialized);
+ }
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_1.h b/Framework/Pantomime/CWISO8859_1.h
+--- a/Framework/Pantomime/CWISO8859_1.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_1.h	2026-10-16 00:48:52.621300321 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_1
+ #define _Pantomime_H_CWISO8859_1
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_1 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_10.h b/Framework/Pantomime/CWISO8859_10.h
+--- a/Framework/Pantomime/CWISO8859_10.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_10.h	2026-10-16 00:48:52.621461411 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_10
+ #define _Pantomime_H_CWISO8859_10
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_10 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_11.h b/Framework/Pantomime/CWISO8859_11.h
+--- a/Framework/Pantomime/CWISO8859_11.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_11.h	2026-10-16 00:48:52.621618896 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_11
+ #define _Pantomime_H_CWISO8859_11
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_11 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_13.h b/Framework/Pantomime/CWISO8859_13.h
+--- a/Framework/Pantomime/CWISO8859_13.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_13.h	2026-10-16 00:48:52.621756304 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_13
+ #define _Pantomime_H_CWISO8859_13
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_13 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_14.h b/Framework/Pantomime/CWISO8859_14.h
+--- a/Framework/Pantomime/CWISO8859_14.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_14.h	2026-10-16 00:48:52.621942856 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_14
+ #define _Pantomime_H_CWISO8859_14
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_14 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_15.h b/Framework/Pantomime/CWISO8859_15.h
+--- a/Framework/Pantomime/CWISO8859_15.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_15.h	2026-10-16 00:48:52.622115984 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_15
+ #define _Pantomime_H_CWISO8859_15
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_15 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_2.h b/Framework/Pantomime/CWISO8859_2.h
+--- a/Framework/Pantomime/CWISO8859_2.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_2.h	2026-10-16 00:48:52.622284794 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_2
+ #define _Pantomime_H_CWISO8859_2
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_2 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_3.h b/Framework/Pantomime/CWISO8859_3.h
+--- a/Framework/Pantomime/CWISO8859_3.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_3.h	2026-10-16 00:48:52.622464346 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_3
+ #define _Pantomime_H_CWISO8859_3
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_3 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_4.h b/Framework/Pantomime/CWISO8859_4.h
+--- a/Framework/Pantomime/CWISO8859_4.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_4.h	2026-10-16 00:48:52.622635907 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_4
+ #define _Pantomime_H_CWISO8859_4
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_4 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_5.h b/Framework/Pantomime/CWISO8859_5.h
+--- a/Framework/Pantomime/CWISO8859_5.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_5.h	2026-10-16 00:48:52.622784757 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_5
+ #define _Pantomime_H_CWISO8859_5
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_5 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_6.h b/Framework/Pantomime/CWISO8859_6.h
+--- a/Framework/Pantomime/CWISO8859_6.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_6.h	2026-10-16 00:48:52.622940312 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_6
+ #define _Pantomime_H_CWISO8859_6
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_6 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_7.h b/Framework/Pantomime/CWISO8859_7.h
+--- a/Framework/Pantomime/CWISO8859_7.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_7.h	2026-10-16 00:48:52.623107815 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_7
+ #define _Pantomime_H_CWISO8859_7
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_7 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_8.h b/Framework/Pantomime/CWISO8859_8.h
+--- a/Framework/Pantomime/CWISO8859_8.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_8.h	2026-10-16 00:48:52.623258243 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_8
+ #define _Pantomime_H_CWISO8859_8
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_8 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_9.h b/Framework/Pantomime/CWISO8859_9.h
+--- a/Framework/Pantomime/CWISO8859_9.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWISO8859_9.h	2026-10-16 00:48:52.623408188 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWISO8859_9
+ #define _Pantomime_H_CWISO8859_9
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWISO8859_9 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWInternetAddress.h b/Framework/Pantomime/CWInternetAddress.h
+--- a/Framework/Pantomime/CWInternetAddress.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWInternetAddress.h	2026-10-16 00:48:52.623559719 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWInternetAddress
+ #define _Pantomime_H_CWInternetAddress
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSCoder.h>
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWKOI8_R.h b/Framework/Pantomime/CWKOI8_R.h
+--- a/Framework/Pantomime/CWKOI8_R.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWKOI8_R.h	2026-10-16 00:48:52.623699692 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWKOI8_R
+ #define _Pantomime_H_CWKOI8_R
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWKOI8_R : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWKOI8_U.h b/Framework/Pantomime/CWKOI8_U.h
+--- a/Framework/Pantomime/CWKOI8_U.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWKOI8_U.h	2026-10-16 00:48:52.623833854 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWKOI8_U
+ #define _Pantomime_H_CWKOI8_U
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWKOI8_U : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalCacheManager.h b/Framework/Pantomime/CWLocalCacheManager.h
+--- a/Framework/Pantomime/CWLocalCacheManager.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWLocalCacheManager.h	2026-10-16 00:48:52.623968118 +0000
+@@ -25,6 +25,8 @@
+ #ifndef _Pantomime_H_CWLocalCacheManager
+ #define _Pantomime_H_CWLocalCacheManager
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCacheManager.h>
+ 
+ @class CWFolder;
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalFolder+maildir.h b/Framework/Pantomime/CWLocalFolder+maildir.h
+--- a/Framework/Pantomime/CWLocalFolder+maildir.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWLocalFolder+maildir.h	2026-10-16 00:48:52.624137471 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWLocalFolder_maildir
+ #define _Pantomime_H_CWLocalFolder_maildir
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWLocalFolder.h>
+ 
+ @interface CWLocalFolder (maildir)
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalFolder+mbox.h b/Framework/Pantomime/CWLocalFolder+mbox.h
+--- a/Framework/Pantomime/CWLocalFolder+mbox.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWLocalFolder+mbox.h	2026-10-16 00:48:52.624296798 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWLocalFolder_mbox
+ #define _Pantomime_H_CWLocalFolder_mbox
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWLocalFolder.h>
+ 
+ @interface CWLocalFolder (mbox)
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalFolder.h b/Framework/Pantomime/CWLocalFolder.h
+--- a/Framework/Pantomime/CWLocalFolder.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWLocalFolder.h	2026-10-16 00:48:52.624478796 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWLocalFolder
+ #define _Pantomime_H_CWLocalFolder
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Pantomime/CWConstants.h>
+ #import <Pantomime/CWFolder.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalMessage.h b/Framework/Pantomime/CWLocalMessage.h
+--- a/Framework/Pantomime/CWLocalMessage.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWLocalMessage.h	2026-10-16 00:48:52.624634844 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWLocalMessage
+ #define _Pantomime_H_CWLocalMessage
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWMessage.h>
+ 
+ #import <Foundation/NSCoder.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalStore.h b/Framework/Pantomime/CWLocalStore.h
+--- a/Framework/Pantomime/CWLocalStore.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWLocalStore.h	2026-10-16 00:48:52.624781491 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWLocalStore
+ #define _Pantomime_H_CWLocalStore
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWStore.h>
+ 
+ #import <Foundation/NSArray.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMD5.h b/Framework/Pantomime/CWMD5.h
+--- a/Framework/Pantomime/CWMD5.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWMD5.h	2026-10-16 00:48:52.624917257 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWMD5
+ #define _Pantomime_H_CWMD5
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSObject.h>
+ #import <Foundation/NSString.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMIMEMultipart.h b/Framework/Pantomime/CWMIMEMultipart.h
+--- a/Framework/Pantomime/CWMIMEMultipart.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWMIMEMultipart.h	2026-10-16 00:48:52.625051125 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWMIMEMultipart
+ #define _Pantomime_H_CWMIMEMultipart
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSObject.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMIMEUtility.h b/Framework/Pantomime/CWMIMEUtility.h
+--- a/Framework/Pantomime/CWMIMEUtility.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWMIMEUtility.h	2026-10-16 00:48:52.625225863 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWMIMEUtility
+ #define _Pantomime_H_CWMIMEUtility
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMessage.h b/Framework/Pantomime/CWMessage.h
+--- a/Framework/Pantomime/CWMessage.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWMessage.h	2026-10-16 00:48:52.625418260 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWMessage
+ #define _Pantomime_H_CWMessage
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Pantomime/CWConstants.h>
+ #import <Pantomime/CWCacheManager.h>
+ #import <Pantomime/CWPart.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMessage.m b/Framework/Pantomime/CWMessage.m
+--- a/Framework/Pantomime/CWMessage.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWMessage.m	2026-10-16 00:50:29.294356639 +0000
+@@ -74,6 +74,47 @@
+ //
+ //
+ //
++//
++// The current date and time as an RFC 2822 date, such as
++// "Tue, 06 Oct 2026 10:00:00 -0600", in English whatever the locale.
++//
++static NSString *cw_rfc2822_date(void)
++{
++  static const char *days[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
++  static const char *months[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
++				 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
++  struct tm l, g, *t;
++  time_t now;
++  char buf[64];
++  int offset;
++
++  now = time(NULL);
++  t = localtime(&now);
++  l = *t;
++  t = gmtime(&now);
++  g = *t;
++
++  offset = (l.tm_hour - g.tm_hour) * 60 + (l.tm_min - g.tm_min);
++
++  if (l.tm_year != g.tm_year)
++    {
++      offset += (l.tm_year > g.tm_year ? 24*60 : -24*60);
++    }
++  else if (l.tm_yday != g.tm_yday)
++    {
++      offset += (l.tm_yday > g.tm_yday ? 24*60 : -24*60);
++    }
++
++  sprintf(buf, "%s, %02d %s %04d %02d:%02d:%02d %c%02d%02d",
++	  days[l.tm_wday], l.tm_mday, months[l.tm_mon], l.tm_year + 1900,
++	  l.tm_hour, l.tm_min, l.tm_sec,
++	  (offset < 0 ? '-' : '+'), (offset < 0 ? -offset : offset) / 60,
++	  (offset < 0 ? -offset : offset) % 60);
++
++  return [NSString stringWithCString: buf];
++}
++
++
+ @implementation CWMessage
+ 
+ //
+@@ -1052,50 +1093,18 @@
+ - (NSData *) dataValue
+ {
+   NSMutableData *aMutableData;
+-  NSDictionary *aLocale;
+-
+   NSEnumerator *allHeaderKeyEnumerator;
+   NSString *aKey;
+ 
+-  NSCalendarDate *aCalendarDate;
+   NSData *aData;
+ 
+ 
+-  // We get our locale in English
+-#ifndef MACOSX
+-  aLocale = [NSDictionary dictionaryWithContentsOfFile: [[NSBundle bundleForLibrary: @"gnustep-base"]
+-							  pathForResource: @"English"
+-							  ofType: nil
+-							  inDirectory: @"Languages"]];
+-#else
+-  aLocale = [NSDictionary dictionaryWithContentsOfFile: [[NSBundle bundleForClass: [NSObject class]]
+-							  pathForResource: @"English"
+-							  ofType: nil
+-							  inDirectory: @"Languages"] ];
+-#endif
+-  
+   // We initialize our mutable data object holding the raw data of the
+   // new message.
+   aMutableData = [[NSMutableData alloc] init];
+   
+-#ifndef MACOSX
+-  if ([[NSUserDefaults standardUserDefaults] objectForKey: @"Local Time Zone"])
+-    {
+-      aCalendarDate = [[NSDate date] dateWithCalendarFormat: @"%a, %d %b %Y %H:%M:%S %z"
+-				     timeZone: [NSTimeZone systemTimeZone]];
+-    }
+-  else
+-    {
+-      tzset();
+-      aCalendarDate = [[NSDate date] dateWithCalendarFormat: @"%a, %d %b %Y %H:%M:%S %z"
+-				     timeZone: [NSTimeZone timeZoneWithAbbreviation: 
+-							     [NSString stringWithCString: tzname[1]]]];
+-    }
+-#else
+-  aCalendarDate = [[NSDate date] dateWithCalendarFormat: @"%a, %d %b %Y %H:%M:%S %z"
+-				 timeZone: [NSTimeZone systemTimeZone]];
+-#endif
+-  [aMutableData appendCFormat: @"Date: %@%s", [aCalendarDate descriptionWithLocale: aLocale], LF];
++  // The Date header is always in English and in the local time zone.
++  [aMutableData appendCFormat: @"Date: %@%s", cw_rfc2822_date(), LF];
+   
+   // We set the subject, if we have one!
+   if ([[[self subject] stringByTrimmingWhiteSpaces] length] > 0)
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3CacheManager.h b/Framework/Pantomime/CWPOP3CacheManager.h
+--- a/Framework/Pantomime/CWPOP3CacheManager.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWPOP3CacheManager.h	2026-10-16 00:48:52.625572028 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWPOP3CacheManager
+ #define _Pantomime_H_CWPOP3CacheManager
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSMapTable.h>
+ 
+ #include <Pantomime/CWCacheManager.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3CacheObject.h b/Framework/Pantomime/CWPOP3CacheObject.h
+--- a/Framework/Pantomime/CWPOP3CacheObject.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWPOP3CacheObject.h	2026-10-16 00:48:52.625709725 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWPOP3CacheObject
+ #define _Pantomime_H_CWPOP3CacheObject
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSCalendarDate.h>
+ #import <Foundation/NSCoder.h>
+ #import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Folder.h b/Framework/Pantomime/CWPOP3Folder.h
+--- a/Framework/Pantomime/CWPOP3Folder.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWPOP3Folder.h	2026-10-16 00:48:52.625847331 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWPOP3Folder
+ #define _Pantomime_H_CWPOP3Folder
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Pantomime/CWFolder.h>
+ 
+ #import <Foundation/NSDictionary.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Message.h b/Framework/Pantomime/CWPOP3Message.h
+--- a/Framework/Pantomime/CWPOP3Message.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWPOP3Message.h	2026-10-16 00:48:52.626000945 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWPOP3Message
+ #define _Pantomime_H_CWPOP3Message
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSCoder.h>
+ 
+ #include <Pantomime/CWMessage.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Store.h b/Framework/Pantomime/CWPOP3Store.h
+--- a/Framework/Pantomime/CWPOP3Store.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWPOP3Store.h	2026-10-16 00:48:52.626158572 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWPOP3Store
+ #define _Pantomime_H_CWPOP3Store
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWService.h>
+ #include <Pantomime/CWStore.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Store.m b/Framework/Pantomime/CWPOP3Store.m
+--- a/Framework/Pantomime/CWPOP3Store.m	2023-01-17 09:56:16.000000000 +0000
++++ b/Framework/Pantomime/CWPOP3Store.m	2026-10-16 00:39:12.369812608 +0000
+@@ -834,7 +834,10 @@
+ 
+   if ([aData hasCPrefix: "+OK"])
+     {
+-      [(CWTCPConnection *)_connection startSSL];
++      if (![self startSSLOnConnection])
++	{
++	  return;
++	}
+ 
+       POST_NOTIFICATION(PantomimeServiceInitialized, self, nil);
+       PERFORM_SELECTOR_1(_delegate, @selector(serviceInitialized:), PantomimeServiceInitialized);
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWParser.h b/Framework/Pantomime/CWParser.h
+--- a/Framework/Pantomime/CWParser.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWParser.h	2026-10-16 00:48:52.626315424 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWParser
+ #define _Pantomime_H_CWParser
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSObject.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPart.h b/Framework/Pantomime/CWPart.h
+--- a/Framework/Pantomime/CWPart.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWPart.h	2026-10-16 00:48:52.626489989 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWPart
+ #define _Pantomime_H_CWPart
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSCoder.h>
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSDictionary.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRegEx.h b/Framework/Pantomime/CWRegEx.h
+--- a/Framework/Pantomime/CWRegEx.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWRegEx.h	2026-10-16 00:48:52.626652785 +0000
+@@ -23,6 +23,8 @@
+ #ifndef _Pantomime_H_CWRegEx
+ #define _Pantomime_H_CWRegEx
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <sys/types.h>
+ #include <regex.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRunLoopWatcher.h b/Framework/Pantomime/CWRunLoopWatcher.h
+--- a/Framework/Pantomime/CWRunLoopWatcher.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/CWRunLoopWatcher.h	2026-10-16 00:48:52.626801338 +0000
+@@ -0,0 +1,45 @@
++/*
++**  CWRunLoopWatcher.h
++**
++**  Portable replacement for the GNUstep run loop extensions
++**  (-addEvent:type:watcher:forMode: and friends) that Pantomime relies on
++**  to be told when a socket is readable or writable.  It polls the
++**  registered descriptors with select() from a short repeating NSTimer, so
++**  it only needs plain Foundation and works with any NSRunLoop.
++**
++**  This file is part of the OPENSTEP port of Pantomime and is distributed
++**  under the same terms as Pantomime (LGPL 2.1 or later).
++*/
++
++#ifndef _Pantomime_H_CWRunLoopWatcher
++#define _Pantomime_H_CWRunLoopWatcher
++
++#include <Pantomime/CWCompat.h>
++
++#import <Foundation/NSObject.h>
++#import <Foundation/NSString.h>
++
++typedef enum {CWET_RDESC, CWET_WDESC, CWET_EDESC} CWRunLoopEventType;
++
++@protocol CWRunLoopEvents
++- (void) receivedEvent: (void *) theData
++                  type: (CWRunLoopEventType) theType
++                 extra: (void *) theExtra
++               forMode: (NSString *) theMode;
++@end
++
++@interface CWRunLoopWatcher : NSObject
++
+++ (void) addEvent: (void *) theData
++             type: (CWRunLoopEventType) theType
++          watcher: (id) theWatcher
++          forMode: (NSString *) theMode;
++
+++ (void) removeEvent: (void *) theData
++                type: (CWRunLoopEventType) theType
++             forMode: (NSString *) theMode
++                 all: (BOOL) removeAll;
++
++@end
++
++#endif // _Pantomime_H_CWRunLoopWatcher
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRunLoopWatcher.m b/Framework/Pantomime/CWRunLoopWatcher.m
+--- a/Framework/Pantomime/CWRunLoopWatcher.m	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/CWRunLoopWatcher.m	2026-10-16 00:38:03.652471123 +0000
+@@ -0,0 +1,265 @@
++/*
++**  CWRunLoopWatcher.m
++**
++**  See CWRunLoopWatcher.h.
++*/
++
++#import <Pantomime/CWRunLoopWatcher.h>
++
++#import <Foundation/NSArray.h>
++#import <Foundation/NSRunLoop.h>
++#import <Foundation/NSTimer.h>
++
++#include <errno.h>
++#include <fcntl.h>
++#include <string.h>
++#include <sys/types.h>
++#include <sys/time.h>
++#include <unistd.h>
++
++//
++// How often the descriptors are polled, in seconds.
++//
++#define POLL_INTERVAL 0.01
++
++@interface CWWatch : NSObject
++{
++  @public
++    int fd;
++    CWRunLoopEventType type;
++    id watcher;
++}
++@end
++
++@implementation CWWatch
++- (void) dealloc
++{
++  [watcher release];
++  [super dealloc];
++}
++@end
++
++static NSMutableArray *watches = nil;
++static NSMutableArray *timer_modes = nil;
++static NSTimer *poll_timer = nil;
++
++@interface CWRunLoopWatcher (Private)
+++ (void) _poll: (NSTimer *) theTimer;
+++ (void) _stopTimer;
++@end
++
++@implementation CWRunLoopWatcher
++
+++ (void) addEvent: (void *) theData
++             type: (CWRunLoopEventType) theType
++          watcher: (id) theWatcher
++          forMode: (NSString *) theMode
++{
++  CWWatch *aWatch;
++  int fd, i;
++
++  fd = (int)(long)theData;
++
++  if (fd < 0 || theType == CWET_EDESC)
++    {
++      return;
++    }
++
++  if (!watches)
++    {
++      watches = [[NSMutableArray alloc] init];
++      timer_modes = [[NSMutableArray alloc] init];
++    }
++
++  for (i = 0; i < [watches count]; i++)
++    {
++      aWatch = [watches objectAtIndex: i];
++
++      if (aWatch->fd == fd && aWatch->type == theType && aWatch->watcher == theWatcher)
++	{
++	  goto have_watch;
++	}
++    }
++
++  aWatch = [[CWWatch alloc] init];
++  aWatch->fd = fd;
++  aWatch->type = theType;
++  aWatch->watcher = [theWatcher retain];
++  [watches addObject: aWatch];
++  [aWatch release];
++
++ have_watch:
++  if (!poll_timer)
++    {
++      poll_timer = [[NSTimer timerWithTimeInterval: POLL_INTERVAL
++			     target: self
++			     selector: @selector(_poll:)
++			     userInfo: nil
++			     repeats: YES] retain];
++      [timer_modes removeAllObjects];
++    }
++
++  if (!theMode)
++    {
++      theMode = NSDefaultRunLoopMode;
++    }
++
++  if (![timer_modes containsObject: theMode])
++    {
++      [timer_modes addObject: theMode];
++      [[NSRunLoop currentRunLoop] addTimer: poll_timer  forMode: theMode];
++    }
++}
++
++
+++ (void) removeEvent: (void *) theData
++                type: (CWRunLoopEventType) theType
++             forMode: (NSString *) theMode
++                 all: (BOOL) removeAll
++{
++  int fd, i;
++
++  fd = (int)(long)theData;
++
++  for (i = [watches count] - 1; i >= 0; i--)
++    {
++      CWWatch *aWatch;
++
++      aWatch = [watches objectAtIndex: i];
++
++      if (aWatch->fd == fd && aWatch->type == theType)
++	{
++	  [watches removeObjectAtIndex: i];
++	}
++    }
++
++  if (![watches count])
++    {
++      [self _stopTimer];
++    }
++}
++
++@end
++
++
++@implementation CWRunLoopWatcher (Private)
++
+++ (void) _stopTimer
++{
++  if (poll_timer)
++    {
++      [poll_timer invalidate];
++      [poll_timer release];
++      poll_timer = nil;
++    }
++}
++
++//
++// Drop the watches whose descriptor is no longer valid.
++//
+++ (void) _prune
++{
++  int i;
++
++  for (i = [watches count] - 1; i >= 0; i--)
++    {
++      CWWatch *aWatch;
++
++      aWatch = [watches objectAtIndex: i];
++
++      if (fcntl(aWatch->fd, F_GETFL, 0) == -1)
++	{
++	  [watches removeObjectAtIndex: i];
++	}
++    }
++}
++
+++ (void) _poll: (NSTimer *) theTimer
++{
++  NSArray *snapshot;
++  fd_set rset, wset;
++  struct timeval tv;
++  int i, maxfd, r;
++
++  if (![watches count])
++    {
++      [self _stopTimer];
++      return;
++    }
++
++  FD_ZERO(&rset);
++  FD_ZERO(&wset);
++  maxfd = -1;
++
++  for (i = 0; i < [watches count]; i++)
++    {
++      CWWatch *aWatch;
++
++      aWatch = [watches objectAtIndex: i];
++
++      if (aWatch->fd >= FD_SETSIZE)
++	{
++	  continue;
++	}
++
++      FD_SET(aWatch->fd, aWatch->type == CWET_WDESC ? &wset : &rset);
++
++      if (aWatch->fd > maxfd)
++	{
++	  maxfd = aWatch->fd;
++	}
++    }
++
++  if (maxfd < 0)
++    {
++      return;
++    }
++
++  tv.tv_sec = 0;
++  tv.tv_usec = 0;
++
++  r = select(maxfd + 1, &rset, &wset, NULL, &tv);
++
++  if (r < 0)
++    {
++      if (errno == EBADF)
++	{
++	  [self _prune];
++	}
++      return;
++    }
++
++  if (r == 0)
++    {
++      return;
++    }
++
++  //
++  // The watchers can add and remove watches while handling an event,
++  // so we walk a snapshot and make sure each watch is still registered.
++  //
++  snapshot = [NSArray arrayWithArray: watches];
++
++  for (i = 0; i < [snapshot count]; i++)
++    {
++      CWWatch *aWatch;
++
++      aWatch = [snapshot objectAtIndex: i];
++
++      if (aWatch->fd >= FD_SETSIZE ||
++	  [watches indexOfObjectIdenticalTo: aWatch] == NSNotFound)
++	{
++	  continue;
++	}
++
++      if (FD_ISSET(aWatch->fd, aWatch->type == CWET_WDESC ? &wset : &rset))
++	{
++	  [aWatch->watcher receivedEvent: (void *)(long)aWatch->fd
++			   type: aWatch->type
++			   extra: 0
++			   forMode: nil];
++	}
++    }
++}
++
++@end
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWSMTP.h b/Framework/Pantomime/CWSMTP.h
+--- a/Framework/Pantomime/CWSMTP.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWSMTP.h	2026-10-16 00:48:52.626943009 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWSMTP
+ #define _Pantomime_H_CWSMTP
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWService.h>
+ #include <Pantomime/CWTransport.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWSMTP.m b/Framework/Pantomime/CWSMTP.m
+--- a/Framework/Pantomime/CWSMTP.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWSMTP.m	2026-10-16 00:39:12.370574650 +0000
+@@ -1031,7 +1031,10 @@
+   if ([aData hasCPrefix: "220"])
+     {          
+       // We first activate SSL.
+-      [(CWTCPConnection *)_connection startSSL];
++      if (![self startSSLOnConnection])
++	{
++	  return;
++	}
+ 
+       // We now forget about the initial negotiated state; see RFC2487 for more details,
+       [_supportedMechanisms removeAllObjects];
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWSendmail.h b/Framework/Pantomime/CWSendmail.h
+--- a/Framework/Pantomime/CWSendmail.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWSendmail.h	2026-10-16 00:48:52.627111213 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWSendmail
+ #define _Pantomime_H_CWSendmail
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWTransport.h>
+ 
+ #import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWService.h b/Framework/Pantomime/CWService.h
+--- a/Framework/Pantomime/CWService.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWService.h	2026-10-16 00:48:52.627282859 +0000
+@@ -22,8 +22,11 @@
+ #ifndef _Pantomime_H_CWService
+ #define _Pantomime_H_CWService
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Pantomime/CWConnection.h>
+ #import <Pantomime/CWConstants.h>
++#import <Pantomime/CWRunLoopWatcher.h>
+ 
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSObject.h>
+@@ -251,9 +254,6 @@
+ @end
+ 
+ 
+-#ifdef MACOSX
+-typedef enum {ET_RDESC, ET_WDESC, ET_EDESC} RunLoopEventType;
+-
+ /*!
+   @class CWService
+   @discussion This abstract class defines the basic behavior and implementation
+@@ -262,10 +262,7 @@
+ 	      need to instantiate the CWSMTP, CWPOP3Store or CWIMAPStore classes,
+ 	      which fully implement the abstract methods found in this class.
+ */
+-@interface CWService : NSObject
+-#else
+-@interface CWService : NSObject <RunLoopEvents>
+-#endif
++@interface CWService : NSObject <CWRunLoopEvents>
+ {
+   @protected
+     NSMutableArray *_supportedMechanisms;
+@@ -480,7 +477,7 @@
+   @param theMode The runloop modes.
+ */
+ - (void) receivedEvent: (void *) theData
+-                  type: (RunLoopEventType) theType
++                  type: (CWRunLoopEventType) theType
+                  extra: (void *) theExtra
+                forMode: (NSString *) theMode;
+ 
+@@ -583,6 +580,16 @@
+ - (void) startTLS;
+ 
+ /*!
++  @method startSSLOnConnection
++  @discussion Starts the TLS handshake on the established connection.  If
++              it fails (including a certificate that does not verify), the
++              connection is closed and PantomimeConnectionLost is posted;
++              the reason is available from the connection's -sslError.
++  @result YES if the connection is now encrypted.
++*/
++- (BOOL) startSSLOnConnection;
++
++/*!
+   @method lastCommand
+   @discussion This method is used to get the last command that
+               has been sent by CWService subclasses to the
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWService.m b/Framework/Pantomime/CWService.m
+--- a/Framework/Pantomime/CWService.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWService.m	2026-10-16 00:47:12.574949427 +0000
+@@ -24,6 +24,7 @@
+ #import <Pantomime/CWService.h>
+ 
+ #import <Pantomime/CWConstants.h>
++#import <Pantomime/CWRunLoopWatcher.h>
+ #import <Pantomime/CWTCPConnection.h>
+ #import <Pantomime/NSData+Extensions.h>
+ 
+@@ -79,14 +80,14 @@
+   if (type&kCFSocketWriteCallBack)
+     {
+       [(CWService *)info receivedEvent: (void*)CFSocketGetNative(s)
+-	  	  type: ET_WDESC
++	  	  type: CWET_WDESC
+ 		  extra: 0
+ 		  forMode: nil];
+     }
+   if (type&kCFSocketReadCallBack)
+     {
+       [(CWService *)info receivedEvent: (void*)CFSocketGetNative(s)
+-		  type: ET_RDESC
++		  type: CWET_RDESC
+ 		  extra: 0
+ 		  forMode: nil];
+     }
+@@ -94,11 +95,11 @@
+ 
+ @interface NSRunLoop (PantomimeRunLoopExtensions)
+ - (void) addEvent: (void *) data
+-             type: (RunLoopEventType) type
++             type: (CWRunLoopEventType) type
+           watcher: (id) watcher
+           forMode: (NSString *) mode;
+ - (void) removeEvent: (void *) data
+-                type: (RunLoopEventType) type
++                type: (CWRunLoopEventType) type
+ 	     forMode: (NSString *) mode
+ 		 all: (BOOL) removeAll; 
+ @end
+@@ -106,7 +107,7 @@
+ @implementation NSRunLoop (PantomimeRunLoopExtensions)
+ 
+ - (void) addEvent: (void *) data
+-             type: (RunLoopEventType) type
++             type: (CWRunLoopEventType) type
+           watcher: (id) watcher
+           forMode: (NSString *) mode
+ {
+@@ -127,10 +128,10 @@
+ 
+   switch (type)
+     {
+-    case ET_RDESC:
++    case CWET_RDESC:
+       CFSocketEnableCallBacks(socket, kCFSocketReadCallBack);
+       break;
+-    case ET_WDESC:
++    case CWET_WDESC:
+       CFSocketEnableCallBacks(socket, kCFSocketWriteCallBack);
+       break;
+     default:
+@@ -139,7 +140,7 @@
+ }
+ 
+ - (void) removeEvent: (void *) data
+-                type: (RunLoopEventType) type
++                type: (CWRunLoopEventType) type
+ 	     forMode: (NSString *) mode
+ 		 all: (BOOL) removeAll
+ {
+@@ -155,10 +156,10 @@
+ 
+   switch (type)
+     {
+-    case ET_RDESC:
++    case CWET_RDESC:
+       CFSocketDisableCallBacks(socket, kCFSocketReadCallBack);
+       break;
+-    case ET_WDESC:
++    case CWET_WDESC:
+       CFSocketDisableCallBacks(socket, kCFSocketWriteCallBack);
+       break;
+     default:
+@@ -558,8 +559,8 @@
+ 	  // If we are done writing, let's remove the watcher on our fd.
+ 	  for (i = 0; i < [_runLoopModes count]; i++)
+ 	    {
+-	      [[NSRunLoop currentRunLoop] removeEvent: (void *)[_connection fd]
+-					  type: ET_WDESC
++	      [CWRunLoopWatcher removeEvent: (void *)[_connection fd]
++					  type: CWET_WDESC
+ 					  forMode: [_runLoopModes objectAtIndex: i]
+ 					  all: YES];
+ 	    }
+@@ -575,8 +576,8 @@
+ #ifdef MACOSX
+ 	  for (i = 0; i < [_runLoopModes count]; i++)
+ 	    {
+-	      [[NSRunLoop currentRunLoop] addEvent: (void *)[_connection fd]
+-					  type: ET_WDESC
++	      [CWRunLoopWatcher addEvent: (void *)[_connection fd]
++					  type: CWET_WDESC
+ 					  watcher: self
+ 					  forMode: [_runLoopModes objectAtIndex: i]];
+ 	    }
+@@ -622,8 +623,8 @@
+ #ifndef __MINGW32__
+       for (i = 0; i < [_runLoopModes count]; i++)
+ 	{
+-	  [[NSRunLoop currentRunLoop] addEvent: (void *)[_connection fd]
+-				      type: ET_WDESC
++	  [CWRunLoopWatcher addEvent: (void *)[_connection fd]
++				      type: CWET_WDESC
+ 				      watcher: self
+ 				      forMode: [_runLoopModes objectAtIndex: i]];
+ 	}
+@@ -636,7 +637,7 @@
+ // RunLoopEvents protocol's implementations.
+ //
+ - (void) receivedEvent: (void *) theData
+-                  type: (RunLoopEventType) theType
++                  type: (CWRunLoopEventType) theType
+                  extra: (void *) theExtra
+                forMode: (NSString *) theMode
+ {
+@@ -650,16 +651,16 @@
+       [self updateWrite];
+       break;
+ #else
+-    case ET_RDESC:
++    case CWET_RDESC:
+       [self updateRead];
+       break;
+ 
+-    case ET_WDESC:
++    case CWET_WDESC:
+       [self updateWrite];
+       break;
+ 
+-    case ET_EDESC:
+-      //NSLog(@"GOT ET_EDESC! %d  current fd = %d", theData, [_connection fd]);
++    case CWET_EDESC:
++      //NSLog(@"GOT CWET_EDESC! %d  current fd = %d", theData, [_connection fd]);
+       break;
+ #endif
+ 
+@@ -683,7 +684,7 @@
+ //
+ //
+ - (NSDate *) timedOutEvent: (void *) theData
+-		      type: (RunLoopEventType) theType
++		      type: (CWRunLoopEventType) theType
+ 		   forMode: (NSString *) theMode
+ {
+   //NSLog(@"timed out event!");
+@@ -743,6 +744,25 @@
+   [self subclassResponsibility: _cmd];
+ }
+ 
++
++//
++//
++//
++- (BOOL) startSSLOnConnection
++{
++  if ([(CWTCPConnection *)_connection startSSL] == 0)
++    {
++      return YES;
++    }
++
++  [self _removeWatchers];
++  [_connection close];
++  POST_NOTIFICATION(PantomimeConnectionLost, self, nil);
++  PERFORM_SELECTOR_1(_delegate, @selector(connectionLost:), PantomimeConnectionLost);
++
++  return NO;
++}
++
+ - (unsigned int) lastCommand
+ {
+   return _lastCommand;
+@@ -812,20 +832,20 @@
+ 
+   for (i = 0; i < [_runLoopModes count]; i++)
+     {
+-      [[NSRunLoop currentRunLoop] addEvent: (void *)[_connection fd]
++      [CWRunLoopWatcher addEvent: (void *)[_connection fd]
+ #ifdef __MINGW32__
+ 				  type: ET_HANDLE
+ #else
+-                                  type: ET_RDESC
++                                  type: CWET_RDESC
+ #endif
+ 				  watcher: self
+ 				  forMode: [_runLoopModes objectAtIndex: i]];
+       
+-      [[NSRunLoop currentRunLoop] addEvent: (void *)[_connection fd]
++      [CWRunLoopWatcher addEvent: (void *)[_connection fd]
+ #ifdef __MINGW32__
+ 				  type: ET_TRIGGER
+ #else
+-                                  type: ET_EDESC
++                                  type: CWET_EDESC
+ #endif
+ 				  watcher: self
+ 				  forMode: [_runLoopModes objectAtIndex: i]];
+@@ -868,28 +888,28 @@
+   for (i = 0; i < [_runLoopModes count]; i++)
+     {
+ #ifdef __MINGW32__
+-      [[NSRunLoop currentRunLoop] removeEvent: (void *)[_connection fd]
++      [CWRunLoopWatcher removeEvent: (void *)[_connection fd]
+                                   type: ET_HANDLE
+                                   forMode: [_runLoopModes objectAtIndex: i]
+                                   all: YES];
+     
+-      [[NSRunLoop currentRunLoop] removeEvent: (void *)[_connection fd]
++      [CWRunLoopWatcher removeEvent: (void *)[_connection fd]
+                                   type: ET_TRIGGER
+                                   forMode: [_runLoopModes objectAtIndex: i]
+                                   all: YES];
+ #else
+-      [[NSRunLoop currentRunLoop] removeEvent: (void *)[_connection fd]
+-				  type: ET_RDESC
++      [CWRunLoopWatcher removeEvent: (void *)[_connection fd]
++				  type: CWET_RDESC
+ 				  forMode: [_runLoopModes objectAtIndex: i]
+ 				  all: YES];
+       
+-      [[NSRunLoop currentRunLoop] removeEvent: (void *)[_connection fd]
+-				  type: ET_WDESC
++      [CWRunLoopWatcher removeEvent: (void *)[_connection fd]
++				  type: CWET_WDESC
+ 				  forMode: [_runLoopModes objectAtIndex: i]
+ 				  all: YES];
+       
+-      [[NSRunLoop currentRunLoop] removeEvent: (void *)[_connection fd]
+-				  type: ET_EDESC
++      [CWRunLoopWatcher removeEvent: (void *)[_connection fd]
++				  type: CWET_EDESC
+ 				  forMode: [_runLoopModes objectAtIndex: i]
+ 				  all: YES];
+ #endif
+@@ -936,6 +956,20 @@
+       return;
+     }
+ 
++  //
++  // Don't wait for the timeout if the name could not be resolved or the
++  // connection was refused.
++  //
++  if ([(CWTCPConnection *)_connection hasFailed])
++    {
++      [_timer invalidate];
++      DESTROY(_timer);
++
++      POST_NOTIFICATION(PantomimeConnectionTimedOut, self, nil);
++      PERFORM_SELECTOR_1(_delegate, @selector(connectionTimedOut:), PantomimeConnectionTimedOut);
++      return;
++    }
++
+    _counter++;
+ }
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWStore.h b/Framework/Pantomime/CWStore.h
+--- a/Framework/Pantomime/CWStore.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWStore.h	2026-10-16 00:48:52.627438069 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_CWStore
+ #define _Pantomime_H_CWStore
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSEnumerator.h>
+ #import <Foundation/NSString.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWTCPConnection.h b/Framework/Pantomime/CWTCPConnection.h
+--- a/Framework/Pantomime/CWTCPConnection.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWTCPConnection.h	2026-10-16 00:48:52.627584433 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWTCPConnection
+ #define _Pantomime_H_CWTCPConnection
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWConnection.h>
+ 
+ #define id openssl_id
+@@ -57,9 +59,42 @@
+ 
+     SSL_CTX *_ctx;
+     SSL *_ssl;
++    NSString *_ssl_error;
++    BOOL _failed;
+ }
+ 
+ /*!
++  @method setCertificateVerification:
++  @discussion Sets whether the server certificate and host name are
++              verified when TLS is started.  The default is YES.
++              Turning it off makes the connection vulnerable to
++              interception.
++*/
+++ (void) setCertificateVerification: (BOOL) theBOOL;
++
++/*!
++  @method setCAFile:
++  @discussion Sets a PEM file of trusted certificate authorities.  The
++              default is OpenSSL's default location, which is
++              /usr/local/ssl/cert.pem on OPENSTEP.
++*/
+++ (void) setCAFile: (NSString *) thePath;
++
++/*!
++  @method sslError
++  @discussion Describes why the last call to -startSSL failed.
++*/
++- (NSString *) sslError;
++
++/*!
++  @method hasFailed
++  @discussion Returns YES if the connection attempt is known to have failed
++              (unresolvable name or a refused connection), as opposed to
++              still being in progress.
++*/
++- (BOOL) hasFailed;
++
++/*!
+   @method startSSL
+   @discussion This method is used to start the SSL handshaking
+               on an altready established TCP connection.
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWTCPConnection.m b/Framework/Pantomime/CWTCPConnection.m
+--- a/Framework/Pantomime/CWTCPConnection.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWTCPConnection.m	2026-10-16 00:47:12.574714995 +0000
+@@ -43,6 +43,9 @@
+ #include <netdb.h>
+ #endif
+ #include <sys/time.h>
++#include <arpa/inet.h>
++#include <openssl/err.h>
++#include <openssl/x509v3.h>
+ #include <sys/types.h>
+ #include <string.h>
+ #include <unistd.h>	// For read() and write() and close()
+@@ -71,6 +74,9 @@
+ //
+ //
+ //
++static BOOL verify_certificates = YES;
++static NSString *ca_file = nil;
++
+ @implementation CWTCPConnection
+ 
+ + (void) initialize
+@@ -79,6 +85,48 @@
+   SSL_load_error_strings();
+ }
+ 
+++ (void) setCertificateVerification: (BOOL) theBOOL
++{
++  verify_certificates = theBOOL;
++}
++
+++ (void) setCAFile: (NSString *) thePath
++{
++  ASSIGN(ca_file, thePath);
++}
++
++- (NSString *) sslError
++{
++  return _ssl_error;
++}
++
++- (BOOL) hasFailed
++{
++  int error;
++  socklen_t size;
++
++  if (_failed || _fd < 0)
++    {
++      return YES;
++    }
++
++  if (!_dns_resolution_completed)
++    {
++      return NO;
++    }
++
++  size = sizeof(error);
++  error = 0;
++
++  if (getsockopt(_fd, SOL_SOCKET, SO_ERROR, &error, &size) == 0 && error != 0)
++    {
++      _failed = YES;
++      return YES;
++    }
++
++  return NO;
++}
++
+ //
+ //
+ //
+@@ -205,6 +253,7 @@
+   //NSLog(@"TCPConnection: -dealloc");
+   [[NSNotificationCenter defaultCenter] removeObserver: self];
+   RELEASE(_name);
++  RELEASE(_ssl_error);
+ 
+   if (_ssl)
+     {
+@@ -282,7 +331,8 @@
+       
+       if (error != 0)
+ 	{
+-#warning handle right way in CWService tick if the port was incorrectly specified
++	  // Reading the error clears it, so remember it.
++	  _failed = YES;
+ 	  return NO;
+ 	}
+     }
+@@ -365,82 +415,164 @@
+ //
+ // 0  -> success
+ // -1 ->
+-// -2 -> handshake error
++// -2 -> handshake error (see -sslError)
+ //
+ - (int) startSSL
+ {
+-  int ret;
+-  
+-  // For now, we do not verify the certificates...
+-  _ctx = SSL_CTX_new(SSLv23_client_method());
+-  SSL_CTX_set_verify(_ctx, SSL_VERIFY_NONE, NULL);
+-  SSL_CTX_set_mode(_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE);
++  const char *host;
++  int ret, rc;
++  NSDate *limit;
++
++  DESTROY(_ssl_error);
++
++  _ctx = SSL_CTX_new(TLS_client_method());
++  if (!_ctx)
++    {
++      ASSIGN(_ssl_error, @"unable to create the TLS context");
++      return -1;
++    }
++
++  SSL_CTX_set_min_proto_version(_ctx, TLS1_2_VERSION);
++  SSL_CTX_set_options(_ctx, SSL_OP_NO_COMPRESSION);
++  SSL_CTX_set_mode(_ctx, SSL_MODE_ENABLE_PARTIAL_WRITE|SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
++
++  if (verify_certificates)
++    {
++      int loaded;
++
++      if (ca_file)
++	{
++	  loaded = SSL_CTX_load_verify_locations(_ctx, [ca_file UTF8String], NULL);
++	}
++      else
++	{
++	  loaded = SSL_CTX_set_default_verify_paths(_ctx);
++	}
++
++      if (!loaded)
++	{
++	  ASSIGN(_ssl_error, @"unable to load the trusted certificate authorities");
++	  SSL_CTX_free(_ctx);
++	  _ctx = NULL;
++	  return -1;
++	}
++
++      SSL_CTX_set_verify(_ctx, SSL_VERIFY_PEER, NULL);
++    }
++  else
++    {
++      SSL_CTX_set_verify(_ctx, SSL_VERIFY_NONE, NULL);
++    }
+ 
+-  // We then connect the SSL socket
+   _ssl = SSL_new(_ctx);
+   SSL_set_fd(_ssl, _fd);
+-  ret = SSL_connect(_ssl);
+ 
+-  if (ret != 1)
++  host = [_name UTF8String];
++
++  if (inet_addr(host) == (unsigned long)-1 || inet_addr(host) == 0xffffffffUL)
++    {
++      // A host name: send it as the SNI and check it against the certificate.
++      SSL_set_tlsext_host_name(_ssl, host);
++      if (verify_certificates)
++	{
++	  SSL_set1_host(_ssl, host);
++	}
++    }
++  else if (verify_certificates)
++    {
++      X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(_ssl), host);
++    }
++
++  //
++  // The socket is non-blocking: drive the handshake with select() until
++  // it completes, fails, or we run out of time.
++  //
++  ssl_handshaking = YES;
++  limit = [[NSDate alloc] initWithTimeIntervalSinceNow: DEFAULT_TIMEOUT];
++
++  for (;;)
+     {
+-      int rc;
++      struct timeval timeout;
++      fd_set set;
++      double remaining;
++
++      ERR_clear_error();
++      ret = SSL_connect(_ssl);
++
++      if (ret == 1)
++	{
++	  rc = SSL_ERROR_NONE;
++	  break;
++	}
+ 
+       rc = SSL_get_error(_ssl, ret);
+ 
+-      if ((rc != SSL_ERROR_WANT_READ) && (rc != SSL_ERROR_WANT_WRITE))
++      if (rc != SSL_ERROR_WANT_READ && rc != SSL_ERROR_WANT_WRITE)
+ 	{
+-	  // SSL handshake error...
+-	  //NSLog(@"SSL handshake error.");
+-	  return -2;
++	  break;
+ 	}
+-      else
++
++      remaining = [limit timeIntervalSinceNow];
++
++      if (remaining <= 0.0)
+ 	{
+-	  NSDate *limit;
++	  ASSIGN(_ssl_error, @"timed out during the TLS handshake");
++	  rc = SSL_ERROR_SYSCALL;
++	  goto failed;
++	}
++
++      FD_ZERO(&set);
++      FD_SET(_fd, &set);
++      timeout.tv_sec = (long)remaining;
++      timeout.tv_usec = (long)((remaining - (double)timeout.tv_sec) * 1000000.0);
++
++      select(_fd + 1,
++	     rc == SSL_ERROR_WANT_READ ? &set : NULL,
++	     rc == SSL_ERROR_WANT_WRITE ? &set : NULL,
++	     NULL, &timeout);
++    }
++
++  RELEASE(limit);
++  ssl_handshaking = NO;
++
++  if (rc != SSL_ERROR_NONE)
++    {
++      long verify;
++      unsigned long e;
++      char buf[256];
+ 
+-	  //NSLog(@"SSL handshaking... %d", rc);
+-	  ssl_handshaking = YES; 
+-	  limit = [[NSDate alloc] initWithTimeIntervalSinceNow: DEFAULT_TIMEOUT];
+-
+-	  while ((rc == SSL_ERROR_WANT_READ || rc == SSL_ERROR_WANT_WRITE)
+-		 && [limit timeIntervalSinceNow] > 0.0)
+-	    {
+-	      [[NSRunLoop currentRunLoop] runUntilDate: [NSDate dateWithTimeIntervalSinceNow: 0.1]];
+-	      ret = SSL_connect(_ssl);
+-	      //NSLog(@"ret = %d", ret);
+-	      if (ret != 1)
+-		{
+-		  //int e = errno;
+-		  rc = SSL_get_error(_ssl, ret);
+-		  //NSLog(@"%s  errno = %s", ERR_error_string(rc, NULL), strerror(e));
+-		}
+-	      else
+-		{
+-		  rc = SSL_ERROR_NONE;
+-		}
+-	      
+-	      //NSLog(@"rc = %d", rc);
+-	    }
+-
+-	  RELEASE(limit);
+-
+-	  if (rc != SSL_ERROR_NONE)
+-	    {
+-	      //NSLog(@"ERROR DURING HANDSHAKING...");
+-	      //NSLog(@"unable to make SSL connection: %s", ERR_error_string(rc, NULL));
+-	      //ERR_print_errors_fp(stderr);
+-	      ssl_handshaking = NO;
+-	      SSL_free(_ssl);
+-	      _ssl = NULL;
+-	      return -2;
+-	    }
+-	  
+-	  // We are done with handshaking
+-	  ssl_handshaking = NO;
++      verify = SSL_get_verify_result(_ssl);
++      e = ERR_peek_last_error();
++
++      if (verify != X509_V_OK)
++	{
++	  ASSIGN(_ssl_error, ([NSString stringWithFormat: @"certificate verification failed: %s",
++					X509_verify_cert_error_string(verify)]));
++	}
++      else if (e)
++	{
++	  ERR_error_string_n(e, buf, sizeof(buf));
++	  ASSIGN(_ssl_error, ([NSString stringWithFormat: @"TLS handshake failed: %s", buf]));
++	}
++      else
++	{
++	  ASSIGN(_ssl_error, @"TLS handshake failed");
+ 	}
++
++      SSL_free(_ssl);
++      _ssl = NULL;
++      return -2;
+     }
+ 
+   // Everything went all right, let's tell our caller.
+   return 0;
++
++ failed:
++  RELEASE(limit);
++  ssl_handshaking = NO;
++  SSL_free(_ssl);
++  _ssl = NULL;
++  return -2;
+ }
+ 
+ @end
+@@ -481,6 +613,7 @@
+       else
+ 	{
+ 	  NSLog(@"Failed to connect asynchronously.");
++	  _failed = YES;
+ 	  safe_close(_fd);
+ 	}
+     } // if ( connect(...) )
+@@ -494,6 +627,7 @@
+   NSDebugLog(@"DNS resolution failed!");
+  
+   _dns_resolution_completed = YES;
++  _failed = YES;
+   safe_close(_fd);
+ 
+   [[NSNotificationCenter defaultCenter] removeObserver: self];
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWTransport.h b/Framework/Pantomime/CWTransport.h
+--- a/Framework/Pantomime/CWTransport.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWTransport.h	2026-10-16 00:48:52.627724520 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWTransport
+ #define _Pantomime_H_CWTransport
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSNotification.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWURLName.h b/Framework/Pantomime/CWURLName.h
+--- a/Framework/Pantomime/CWURLName.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWURLName.h	2026-10-16 00:48:52.627866387 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWURLName
+ #define _Pantomime_H_CWURLName
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSObject.h>
+ #import <Foundation/NSString.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWUUFile.h b/Framework/Pantomime/CWUUFile.h
+--- a/Framework/Pantomime/CWUUFile.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWUUFile.h	2026-10-16 00:48:52.628011254 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWUUFile
+ #define _Pantomime_H_CWUUFile
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSData.h>
+ #import <Foundation/NSDictionary.h>
+ #import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWVirtualFolder.h b/Framework/Pantomime/CWVirtualFolder.h
+--- a/Framework/Pantomime/CWVirtualFolder.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWVirtualFolder.h	2026-10-16 00:48:52.628169451 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWVirtualFolder
+ #define _Pantomime_H_CWVirtualFolder
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWFolder.h>
+ 
+ #import <Foundation/NSArray.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1250.h b/Framework/Pantomime/CWWINDOWS_1250.h
+--- a/Framework/Pantomime/CWWINDOWS_1250.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWWINDOWS_1250.h	2026-10-16 00:48:52.628313398 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWWINDOW_1250
+ #define _Pantomime_H_CWWINDOW_1250
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWWINDOWS_1250 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1251.h b/Framework/Pantomime/CWWINDOWS_1251.h
+--- a/Framework/Pantomime/CWWINDOWS_1251.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWWINDOWS_1251.h	2026-10-16 00:48:52.628444010 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWWINDOW_1251
+ #define _Pantomime_H_CWWINDOW_1251
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWWINDOWS_1251 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1252.h b/Framework/Pantomime/CWWINDOWS_1252.h
+--- a/Framework/Pantomime/CWWINDOWS_1252.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWWINDOWS_1252.h	2026-10-16 00:48:52.628574305 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWWINDOW_1252
+ #define _Pantomime_H_CWWINDOW_1252
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWWINDOWS_1252 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1253.h b/Framework/Pantomime/CWWINDOWS_1253.h
+--- a/Framework/Pantomime/CWWINDOWS_1253.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWWINDOWS_1253.h	2026-10-16 00:48:52.628706937 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWWINDOW_1253
+ #define _Pantomime_H_CWWINDOW_1253
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWWINDOWS_1253 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1254.h b/Framework/Pantomime/CWWINDOWS_1254.h
+--- a/Framework/Pantomime/CWWINDOWS_1254.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWWINDOWS_1254.h	2026-10-16 00:48:52.628836707 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_CWWINDOW_1254
+ #define _Pantomime_H_CWWINDOW_1254
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <Pantomime/CWCharset.h>
+ 
+ @interface CWWINDOWS_1254 : CWCharset
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Makefile.cw b/Framework/Pantomime/Makefile.cw
+--- a/Framework/Pantomime/Makefile.cw	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/Makefile.cw	2026-10-16 00:48:58.891198464 +0000
+@@ -0,0 +1,106 @@
++# Plain makefile for building Pantomime as a static library, without GNUstep
++# make.  Used by the OPENSTEP package and for testing on other systems.
++#
++#   make -f Makefile.cw CC=/bin/cc OBJCFLAGS="-O -ObjC" libPantomime.a
++#
++# Headers are staged in include/Pantomime so that <Pantomime/CWFoo.h> works.
++
++CC = cc
++AR = ar
++RANLIB = ranlib
++OBJCFLAGS = -O2
++CPPFLAGS =
++EXTRA_OBJS =
++
++SRCS = \
++	CWCacheManager.m \
++	CWCharset.m \
++	CWConstants.m \
++	CWCompat.m \
++	CWContainer.m \
++	CWDNSManager.m \
++	CWFlags.m \
++	CWFolder.m \
++	CWFolderInformation.m \
++	CWIMAPCacheManager.m \
++	CWIMAPFolder.m \
++	CWIMAPMessage.m \
++	CWIMAPStore.m \
++	CWISO8859_1.m \
++	CWISO8859_10.m \
++	CWISO8859_11.m \
++	CWISO8859_13.m \
++	CWISO8859_14.m \
++	CWISO8859_15.m \
++	CWISO8859_2.m \
++	CWISO8859_3.m \
++	CWISO8859_4.m \
++	CWISO8859_5.m \
++	CWISO8859_6.m \
++	CWISO8859_7.m \
++	CWISO8859_8.m \
++	CWISO8859_9.m \
++	CWInternetAddress.m \
++	CWKOI8_R.m \
++	CWKOI8_U.m \
++	CWLocalCacheManager.m \
++	CWLocalFolder+maildir.m \
++	CWLocalFolder+mbox.m \
++	CWLocalFolder.m \
++	CWLocalMessage.m \
++	CWLocalStore.m \
++	CWMD5.m \
++	CWMIMEMultipart.m \
++	CWMIMEUtility.m \
++	CWMessage.m \
++	CWPOP3CacheManager.m \
++	CWPOP3CacheObject.m \
++	CWPOP3Folder.m \
++	CWPOP3Message.m \
++	CWPOP3Store.m \
++	CWParser.m \
++	CWPart.m \
++	CWRegEx.m \
++	CWRunLoopWatcher.m \
++	CWSMTP.m \
++	CWSendmail.m \
++	CWService.m \
++	CWTCPConnection.m \
++	CWURLName.m \
++	CWUUFile.m \
++	CWVirtualFolder.m \
++	CWWINDOWS_1250.m \
++	CWWINDOWS_1251.m \
++	CWWINDOWS_1252.m \
++	CWWINDOWS_1253.m \
++	CWWINDOWS_1254.m \
++	NSData+Extensions.m \
++	NSFileManager+Extensions.m \
++	NSScanner+Extensions.m \
++	NSString+Extensions.m \
++	io.m
++
++OBJS = $(SRCS:.m=.o) $(EXTRA_OBJS)
++
++all: libPantomime.a
++
++libPantomime.a: $(OBJS)
++	rm -f $@
++	$(AR) cr $@ $(OBJS)
++	$(RANLIB) $@
++
++include/Pantomime/stamp: $(wildcard *.h)
++	test -d include || mkdir include
++	test -d include/Pantomime || mkdir include/Pantomime
++	cp *.h include/Pantomime/
++	touch include/Pantomime/stamp
++
++.SUFFIXES: .m .o
++$(OBJS): include/Pantomime/stamp
++
++.m.o:
++	$(CC) $(OBJCFLAGS) $(CPPFLAGS) -Iinclude -c $< -o $@
++
++clean:
++	rm -f $(OBJS) libPantomime.a
++	rm -rf include
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSData+Extensions.h b/Framework/Pantomime/NSData+Extensions.h
+--- a/Framework/Pantomime/NSData+Extensions.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/NSData+Extensions.h	2026-10-16 00:48:52.628992206 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_NSData_Extensions
+ #define _Pantomime_H_NSData_Extensions
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSObject.h>
+ #import <Foundation/NSArray.h>
+ #import <Foundation/NSData.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSFileManager+Extensions.h b/Framework/Pantomime/NSFileManager+Extensions.h
+--- a/Framework/Pantomime/NSFileManager+Extensions.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/NSFileManager+Extensions.h	2026-10-16 00:48:52.629160989 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_NSFileManager_Extensions
+ #define _Pantomime_H_NSFileManager_Extensions
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSFileManager.h>
+ 
+ @class NSString;
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSScanner+Extensions.h b/Framework/Pantomime/NSScanner+Extensions.h
+--- a/Framework/Pantomime/NSScanner+Extensions.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/NSScanner+Extensions.h	2026-10-16 00:48:52.629305421 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_NSScanner_Extensions
+ #define _Pantomime_H_NSScanner_Extensions
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSScanner.h>
+ 
+ /*!
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSString+Extensions.h b/Framework/Pantomime/NSString+Extensions.h
+--- a/Framework/Pantomime/NSString+Extensions.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/NSString+Extensions.h	2026-10-16 00:48:52.629455264 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_NSString_Extensions
+ #define _Pantomime_H_NSString_Extensions
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/NSString.h>
+ #import <Foundation/NSData.h>
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSString+Extensions.m b/Framework/Pantomime/NSString+Extensions.m
+--- a/Framework/Pantomime/NSString+Extensions.m	2022-11-05 20:02:00.000000000 +0000
++++ b/Framework/Pantomime/NSString+Extensions.m	2026-10-16 00:51:17.352194347 +0000
+@@ -41,6 +41,8 @@
+ #endif
+ 
+ #include <ctype.h>
++#include <errno.h>
++#include <stdlib.h>
+ 
+ #ifdef HAVE_ICONV
+ #include <iconv.h>
+@@ -226,7 +228,10 @@
+     {@""              ,NSISOLatin1StringEncoding      ,NO},  // To prevent a lame bug in Ximian Evolution
+     {@"iso8859_1"     ,NSISOLatin1StringEncoding      ,NO},  // To prevent a lame bug in Openwave WebEngine
+     {@"iso-8859-2"    ,NSISOLatin2StringEncoding      ,NO},
+-#ifndef MACOSX
++#if defined(CW_OPENSTEP)
++    // OPENSTEP's NSString can't do the other ISO 8859 parts, KOI8-R, Big5,
++    // GB 2312, UTF-7 or EUC-KR; -stringWithData:charset: hands them to iconv.
++#elif !defined(MACOSX)
+     {@"iso-8859-3"   ,NSISOLatin3StringEncoding                 ,NO},
+     {@"iso-8859-4"   ,NSISOLatin4StringEncoding                 ,NO},
+     {@"iso-8859-5"   ,NSISOCyrillicStringEncoding               ,NO},
+@@ -475,9 +480,8 @@
+ 
+       // If we haven't used all our allocated buffer, we do not need shrink it.
+       // We just pass the reduced length to NSData and tell it not to free it
+-      aString = [[NSString alloc] initWithData: [NSData dataWithBytesNoCopy: o_buff
+-								     length: total_length
+-							       freeWhenDone:NO]
++      aString = [[NSString alloc] initWithData: [NSData dataWithBytes: o_buff
++								     length: total_length]
+ 				      encoding: NSUTF8StringEncoding];
+ 
+       iconv_close(conv);
+@@ -589,114 +593,79 @@
+ //
+ - (NSString *) modifiedUTF7String
+ {
+-#ifndef MACOSX
+-  NSMutableData *aMutableData, *modifiedData;
+-  NSString *aString;
+-
+-  const char *b;
+-  BOOL escaped;
++  static const char b64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+,";
++  NSMutableString *aMutableString;
++  NSUInteger i, j, len;
+   unichar ch;
+-  NSUInteger i, len;
+ 
+   //
+-  // We UTF-7 encode _only_ the non-ASCII parts.
++  // This is the encoding of mailbox names in IMAP (RFC 3501, 5.1.3): printable
++  // ASCII stands for itself, "&" is written "&-", and any run of other characters
++  // is written "&" + UTF-16 (big endian) in base 64 with "," instead of "/" and
++  // no padding + "-".
+   //
+-  aMutableData = [[NSMutableData alloc] init];
+-  AUTORELEASE(aMutableData);
++  aMutableString = [NSMutableString string];
+   len = [self length];
+-  
++
+   for (i = 0; i < len; i++)
+     {
+       ch = [self characterAtIndex: i];
+-      
+-      if (IS_PRINTABLE(ch))
++
++      if (ch == '&')
+ 	{
+-	  [aMutableData appendCFormat: @"%c", ch];
++	  [aMutableString appendString: @"&-"];
++	}
++      else if (ch >= 0x20 && ch <= 0x7e)
++	{
++	  [aMutableString appendFormat: @"%c", (char)ch];
+ 	}
+       else
+ 	{
+-	  NSUInteger j;
++	  unsigned long bits;
++	  int nbits;
++	  char out[2];
++
++	  [aMutableString appendString: @"&"];
++
++	  bits = 0;
++	  nbits = 0;
+ 
+-	  j = i+1;
+-	  // We got a non-ASCII character, let's get the substring and encode it using UTF-7.
+-	  while (j < len && !IS_PRINTABLE([self characterAtIndex: j]))
++	  for (j = i; j < len; j++)
+ 	    {
+-	      j++;
+-	    }
+-	  
+-	  // Get the substring.
+-	  [aMutableData appendData: [[self substringWithRange: NSMakeRange(i,j-i)] dataUsingEncoding: NSUTF7StringEncoding]];
+-	  i = j-1;
+-	}
+-    }
++	      ch = [self characterAtIndex: j];
+ 
+-  b = [aMutableData bytes];
+-  len = [aMutableData length];
+-  escaped = NO;
++	      if (ch >= 0x20 && ch <= 0x7e)
++		{
++		  break;
++		}
+ 
+-  //
+-  // We replace:
+-  //
+-  // &   ->  &-
+-  // +   ->  &
+-  // +-  ->  +
+-  // /   ->  ,
+-  //
+-  // in order to produce our modified UTF-7 string.
+-  //
+-  modifiedData = [[NSMutableData alloc] init];
+-  AUTORELEASE(modifiedData);
++	      bits = (bits << 16) | ch;
++	      nbits += 16;
+ 
+-  for (i = 0; i < len; i++, b++)
+-    {
+-      if (!escaped && *b == '&')
+-	{
+-	  [modifiedData appendCString: "&-"];
+-	}
+-      else if (!escaped && *b == '+')
+-	{
+-	  if (*(b+1) == '-')
+-	    {
+-	      [modifiedData appendCString: "+"];
++	      while (nbits >= 6)
++		{
++		  out[0] = b64[(bits >> (nbits - 6)) & 0x3f];
++		  out[1] = 0;
++		  [aMutableString appendFormat: @"%s", out];
++		  nbits -= 6;
++		}
++
++	      bits &= (1UL << nbits) - 1;
+ 	    }
+-	  else
+-	    {
+-	      [modifiedData appendCString: "&"];
+ 
+-	      // We enter the escaped mode.
+-	      escaped = YES;
++	  if (nbits > 0)
++	    {
++	      out[0] = b64[(bits << (6 - nbits)) & 0x3f];
++	      out[1] = 0;
++	      [aMutableString appendFormat: @"%s", out];
+ 	    }
+-	}
+-      else if (escaped && *b == '/')
+-	{
+-	  [modifiedData appendCString: ","];
+-	}
+-      else if (escaped && *b == '-')
+-	{
+-	  [modifiedData appendCString: "-"];
+ 
+-	  // We leave the escaped mode.
+-	  escaped = NO;
+-	}
+-      else
+-	{
+-	  [modifiedData appendCFormat: @"%c", *b];
++	  [aMutableString appendString: @"-"];
++	  i = j - 1;
+ 	}
+     }
+-  
+-  // If we're still in the escaped mode we haven't added our trailing -,
+-  // let's add it right now.
+-  if (escaped)
+-    {
+-      [modifiedData appendCString: "-"];
+-    }
+-
+-  aString = AUTORELEASE([[NSString alloc] initWithData: modifiedData  encoding: NSASCIIStringEncoding]);
+ 
+-  return (aString != nil ? aString : self);
+-#else
+-  return self;
+-#endif
++  return aMutableString;
+ }
+ 
+ //
+@@ -704,69 +673,80 @@
+ //
+ - (NSString *) stringFromModifiedUTF7
+ {
+-#ifndef MACOSX
+   NSMutableData *aMutableData;
+-
+-  BOOL escaped;
+-  unichar ch;
+   NSUInteger i, len;
++  unichar ch;
+ 
+-  aMutableData = [[NSMutableData alloc] init];
+-  AUTORELEASE(aMutableData);
+-
++  aMutableData = [NSMutableData data];
+   len = [self length];
+-  escaped = NO;
+ 
+-  //
+-  // We replace:
+-  //
+-  // &   ->  +
+-  // &-  ->  &
+-  // ,   ->  /
+-  //
+-  // If we are in escaped mode. That is, between a &....-
+-  //
+   for (i = 0; i < len; i++)
+     {
+       ch = [self characterAtIndex: i];
+-      
+-      if (!escaped && ch == '&')
++
++      if (ch == '&')
+ 	{
+-	  if ( (i+1) < len && [self characterAtIndex: (i+1)] != '-' )
+-	    {
+-	      [aMutableData appendCString: "+"];
+-	      
+-	      // We enter the escaped mode.
+-	      escaped = YES;
+-	    }
+-	  else
++	  unsigned long bits;
++	  int nbits;
++
++	  if (i + 1 < len && [self characterAtIndex: i+1] == '-')
+ 	    {
+-	      // We replace &- by &
+-	      [aMutableData appendCString: "&"];
++	      unichar amp = '&';
++
++	      [aMutableData appendBytes: &amp  length: sizeof(unichar)];
+ 	      i++;
++	      continue;
+ 	    }
+-	}
+-      else if (escaped && ch == ',')
+-	{
+-	  [aMutableData appendCString: "/"];
+-	}
+-      else if (escaped && ch == '-')
+-	{
+-	  [aMutableData appendCString: "-"];
+ 
+-	  // We leave the escaped mode.
+-	  escaped = NO;
++	  bits = 0;
++	  nbits = 0;
++
++	  for (i = i + 1; i < len; i++)
++	    {
++	      int v;
++
++	      ch = [self characterAtIndex: i];
++
++	      if (ch == '-')
++		{
++		  break;
++		}
++
++	      if (ch >= 'A' && ch <= 'Z')
++		v = ch - 'A';
++	      else if (ch >= 'a' && ch <= 'z')
++		v = ch - 'a' + 26;
++	      else if (ch >= '0' && ch <= '9')
++		v = ch - '0' + 52;
++	      else if (ch == '+')
++		v = 62;
++	      else if (ch == ',')
++		v = 63;
++	      else
++		return nil;
++
++	      bits = (bits << 6) | v;
++	      nbits += 6;
++
++	      if (nbits >= 16)
++		{
++		  unichar u;
++
++		  u = (unichar)((bits >> (nbits - 16)) & 0xffff);
++		  [aMutableData appendBytes: &u  length: sizeof(unichar)];
++		  nbits -= 16;
++		  bits &= (1UL << nbits) - 1;
++		}
++	    }
+ 	}
+       else
+ 	{
+-	  [aMutableData appendCFormat: @"%c", ch];
++	  [aMutableData appendBytes: &ch  length: sizeof(unichar)];
+ 	}
+     }
+ 
+-  return AUTORELEASE([[NSString alloc] initWithData: aMutableData  encoding: NSUTF7StringEncoding]);
+-#else
+-  return nil;
+-#endif
++  return AUTORELEASE([[NSString alloc] initWithCharacters: (const unichar *)[aMutableData bytes]
++				       length: [aMutableData length] / sizeof(unichar)]);
+ }
+ 
+ 
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Pantomime.h b/Framework/Pantomime/Pantomime.h
+--- a/Framework/Pantomime/Pantomime.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/Pantomime.h	2026-10-16 00:48:52.629604128 +0000
+@@ -22,6 +22,8 @@
+ #ifndef _Pantomime_H_Pantomime
+ #define _Pantomime_H_Pantomime
+ 
++#include <Pantomime/CWCompat.h>
++
+ #import <Foundation/Foundation.h>
+ 
+ #include <Pantomime/CWCacheManager.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSCalendarDate.h b/Framework/Pantomime/compat/Foundation/NSCalendarDate.h
+--- a/Framework/Pantomime/compat/Foundation/NSCalendarDate.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/compat/Foundation/NSCalendarDate.h	2026-10-16 00:48:32.892531140 +0000
+@@ -0,0 +1,2 @@
++/* OPENSTEP 4.2 declares this in NSDate.h */
++#import <Foundation/NSDate.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSNull.h b/Framework/Pantomime/compat/Foundation/NSNull.h
+--- a/Framework/Pantomime/compat/Foundation/NSNull.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/compat/Foundation/NSNull.h	2026-10-16 00:48:32.896043279 +0000
+@@ -0,0 +1,2 @@
++/* OPENSTEP 4.2 has no NSNull; CWCompat.m supplies one. */
++#import <Pantomime/CWCompat.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSTimeZone.h b/Framework/Pantomime/compat/Foundation/NSTimeZone.h
+--- a/Framework/Pantomime/compat/Foundation/NSTimeZone.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/compat/Foundation/NSTimeZone.h	2026-10-16 00:48:32.892531140 +0000
+@@ -0,0 +1,2 @@
++/* OPENSTEP 4.2 declares this in NSDate.h */
++#import <Foundation/NSDate.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSURL.h b/Framework/Pantomime/compat/Foundation/NSURL.h
+--- a/Framework/Pantomime/compat/Foundation/NSURL.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/compat/Foundation/NSURL.h	2026-10-16 00:48:32.894056485 +0000
+@@ -0,0 +1,2 @@
++/* OPENSTEP 4.2 has no NSURL; Pantomime only imports the header. */
++#import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/stdint.h b/Framework/Pantomime/compat/stdint.h
+--- a/Framework/Pantomime/compat/stdint.h	1970-01-01 00:00:00.000000000 +0000
++++ b/Framework/Pantomime/compat/stdint.h	2026-10-16 00:50:44.840123661 +0000
+@@ -0,0 +1,20 @@
++/* OPENSTEP has no <stdint.h>; this is the part of it that Pantomime needs. */
++#ifndef CW_COMPAT_STDINT_H
++#define CW_COMPAT_STDINT_H
++
++#include <sys/types.h>
++
++typedef signed char int8_t;
++typedef short int16_t;
++typedef int int32_t;
++typedef long long int64_t;
++typedef u_char uint8_t;
++typedef u_short uint16_t;
++typedef u_int uint32_t;
++typedef unsigned long long uint64_t;
++typedef long intptr_t;
++typedef unsigned long uintptr_t;
++typedef long long intmax_t;
++typedef unsigned long long uintmax_t;
++
++#endif
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/io.h b/Framework/Pantomime/io.h
+--- a/Framework/Pantomime/io.h	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/io.h	2026-10-16 00:48:52.629747508 +0000
+@@ -24,6 +24,8 @@
+ #ifndef _Pantomime_H_io
+ #define _Pantomime_H_io
+ 
++#include <Pantomime/CWCompat.h>
++
+ #include <sys/types.h>
+ #include <stdint.h>
+ #include <arpa/inet.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/io.m b/Framework/Pantomime/io.m
+--- a/Framework/Pantomime/io.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/io.m	2026-10-16 00:50:44.835221631 +0000
+@@ -150,8 +150,8 @@
+   *count = r = (c0<<8)|c1;
+   m += 2;
+   
+-  // when used on a file buffer, it should outlive the NSData object itself
+-  return [NSData dataWithBytesNoCopy: m  length: r freeWhenDone:NO];  
++  // We copy the bytes, so the file buffer doesn't have to outlive the NSData object.
++  return [NSData dataWithBytes: m  length: r];  
+ }
+ 
+ 
