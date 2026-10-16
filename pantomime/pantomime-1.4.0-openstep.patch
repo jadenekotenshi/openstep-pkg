@@ -1,4 +1,4 @@
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWCacheManager.h b/Framework/Pantomime/CWCacheManager.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCacheManager.h b/Framework/Pantomime/CWCacheManager.h
 --- a/Framework/Pantomime/CWCacheManager.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWCacheManager.h	2026-10-16 01:25:59.104657071 +0000
 @@ -24,6 +24,8 @@
@@ -10,7 +10,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSArray.h>
  #import <Foundation/NSCoder.h>
  #import <Foundation/NSString.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWCharset.h b/Framework/Pantomime/CWCharset.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCharset.h b/Framework/Pantomime/CWCharset.h
 --- a/Framework/Pantomime/CWCharset.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWCharset.h	2026-10-16 01:25:59.104825690 +0000
 @@ -22,6 +22,8 @@
@@ -22,7 +22,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSObject.h>
  #import <Foundation/NSString.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWCompat.h b/Framework/Pantomime/CWCompat.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.h b/Framework/Pantomime/CWCompat.h
 --- a/Framework/Pantomime/CWCompat.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/CWCompat.h	2026-10-16 01:25:59.104931069 +0000
 @@ -0,0 +1,102 @@
@@ -128,10 +128,10 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +#endif // CW_OPENSTEP
 +
 +#endif // _Pantomime_H_CWCompat
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWCompat.m b/Framework/Pantomime/CWCompat.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.m b/Framework/Pantomime/CWCompat.m
 --- a/Framework/Pantomime/CWCompat.m	1970-01-01 00:00:00.000000000 +0000
-+++ b/Framework/Pantomime/CWCompat.m	2026-10-16 01:25:59.105022391 +0000
-@@ -0,0 +1,282 @@
++++ b/Framework/Pantomime/CWCompat.m	2026-10-16 01:31:54.920853290 +0000
+@@ -0,0 +1,294 @@
 +/*
 +**  CWCompat.m
 +**
@@ -149,6 +149,18 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +#include <ctype.h>
 +#include <string.h>
 +#include <unistd.h>
++
++
++void CWDebugLog(NSString *format, ...)
++{
++#ifdef DEBUG
++  va_list args;
++
++  va_start(args, format);
++  NSLogv(format, args);
++  va_end(args);
++#endif
++}
 +
 +
 +@implementation NSNull
@@ -414,7 +426,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +@end
 +
 +#endif // CW_OPENSTEP
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWConnection.h b/Framework/Pantomime/CWConnection.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWConnection.h b/Framework/Pantomime/CWConnection.h
 --- a/Framework/Pantomime/CWConnection.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWConnection.h	2026-10-16 01:25:59.105189053 +0000
 @@ -22,6 +22,8 @@
@@ -426,9 +438,9 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <sys/types.h>
  
  #import <Foundation/NSData.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWConstants.h b/Framework/Pantomime/CWConstants.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWConstants.h b/Framework/Pantomime/CWConstants.h
 --- a/Framework/Pantomime/CWConstants.h	2023-01-17 09:56:16.000000000 +0000
-+++ b/Framework/Pantomime/CWConstants.h	2026-10-16 01:25:59.105349760 +0000
++++ b/Framework/Pantomime/CWConstants.h	2026-10-16 01:31:54.920463686 +0000
 @@ -24,6 +24,8 @@
  #ifndef _Pantomime_H_CWConstants
  #define _Pantomime_H_CWConstants
@@ -447,7 +459,20 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #define RETAIN(object)          [object retain]
  #define RELEASE(object)         [object release]
  #define AUTORELEASE(object)     [object autorelease]
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWContainer.h b/Framework/Pantomime/CWContainer.h
+@@ -94,7 +96,11 @@
+ 
+ 
+ #ifndef NSDebugLog
+-#ifdef DEBUG
++#ifdef CW_OPENSTEP
++// The stock cc's preprocessor can't do a macro with a variable argument list.
++extern void CWDebugLog(NSString *format, ...);
++#define NSDebugLog CWDebugLog
++#elif defined(DEBUG)
+ #define NSDebugLog(format, args...) \
+ do { NSLog(format, ##args); } while(0)
+ #else
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWContainer.h b/Framework/Pantomime/CWContainer.h
 --- a/Framework/Pantomime/CWContainer.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWContainer.h	2026-10-16 01:25:59.105518740 +0000
 @@ -22,6 +22,8 @@
@@ -459,7 +484,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSEnumerator.h>
  #import <Foundation/NSObject.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWDNSManager.h b/Framework/Pantomime/CWDNSManager.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWDNSManager.h b/Framework/Pantomime/CWDNSManager.h
 --- a/Framework/Pantomime/CWDNSManager.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWDNSManager.h	2026-10-16 01:25:59.105672980 +0000
 @@ -24,28 +24,15 @@
@@ -564,7 +589,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  @end
  
  #endif // _Pantomime_H_CWDNSManager
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWDNSManager.m b/Framework/Pantomime/CWDNSManager.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWDNSManager.m b/Framework/Pantomime/CWDNSManager.m
 --- a/Framework/Pantomime/CWDNSManager.m	2023-01-17 09:56:16.000000000 +0000
 +++ b/Framework/Pantomime/CWDNSManager.m	2026-10-16 01:25:59.106010909 +0000
 @@ -24,158 +24,16 @@
@@ -1369,7 +1394,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  
  @end
 -
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWFlags.h b/Framework/Pantomime/CWFlags.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWFlags.h b/Framework/Pantomime/CWFlags.h
 --- a/Framework/Pantomime/CWFlags.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWFlags.h	2026-10-16 01:25:59.106321394 +0000
 @@ -22,6 +22,8 @@
@@ -1381,7 +1406,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSCoder.h>
  #import <Foundation/NSObject.h>
  #import <Foundation/NSString.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWFolder.h b/Framework/Pantomime/CWFolder.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWFolder.h b/Framework/Pantomime/CWFolder.h
 --- a/Framework/Pantomime/CWFolder.h	2022-11-05 20:02:00.000000000 +0000
 +++ b/Framework/Pantomime/CWFolder.h	2026-10-16 01:25:59.106496223 +0000
 @@ -24,6 +24,8 @@
@@ -1393,7 +1418,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSArray.h>
  #import <Foundation/NSData.h>
  #import <Foundation/NSDictionary.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWFolderInformation.h b/Framework/Pantomime/CWFolderInformation.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWFolderInformation.h b/Framework/Pantomime/CWFolderInformation.h
 --- a/Framework/Pantomime/CWFolderInformation.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWFolderInformation.h	2026-10-16 01:25:59.106657332 +0000
 @@ -24,6 +24,8 @@
@@ -1405,7 +1430,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSObject.h>
  #import <Pantomime/CWConstants.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPCacheManager.h b/Framework/Pantomime/CWIMAPCacheManager.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPCacheManager.h b/Framework/Pantomime/CWIMAPCacheManager.h
 --- a/Framework/Pantomime/CWIMAPCacheManager.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPCacheManager.h	2026-10-16 01:25:59.106789334 +0000
 @@ -24,6 +24,8 @@
@@ -1417,7 +1442,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSMapTable.h>
  
  #include <Pantomime/CWCacheManager.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPCacheManager.m b/Framework/Pantomime/CWIMAPCacheManager.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPCacheManager.m b/Framework/Pantomime/CWIMAPCacheManager.m
 --- a/Framework/Pantomime/CWIMAPCacheManager.m	2022-11-05 20:02:00.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPCacheManager.m	2026-10-16 01:28:20.465976467 +0000
 @@ -408,6 +408,7 @@
@@ -1437,7 +1462,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  
        if ([self messageWithUID: uid])
  	{
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPFolder.h b/Framework/Pantomime/CWIMAPFolder.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPFolder.h b/Framework/Pantomime/CWIMAPFolder.h
 --- a/Framework/Pantomime/CWIMAPFolder.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPFolder.h	2026-10-16 01:25:59.106923169 +0000
 @@ -22,6 +22,8 @@
@@ -1449,7 +1474,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWFolder.h>
  
  #import <Foundation/NSArray.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPMessage.h b/Framework/Pantomime/CWIMAPMessage.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPMessage.h b/Framework/Pantomime/CWIMAPMessage.h
 --- a/Framework/Pantomime/CWIMAPMessage.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPMessage.h	2026-10-16 01:25:59.107049730 +0000
 @@ -24,6 +24,8 @@
@@ -1461,7 +1486,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSCoder.h>
  
  #import <Pantomime/CWMessage.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPMessage.m b/Framework/Pantomime/CWIMAPMessage.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPMessage.m b/Framework/Pantomime/CWIMAPMessage.m
 --- a/Framework/Pantomime/CWIMAPMessage.m	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPMessage.m	2026-10-16 01:25:59.107178485 +0000
 @@ -32,7 +32,7 @@
@@ -1473,7 +1498,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  @interface NSNumber (TigerExtensions)
  + (NSNumber *)numberWithUnsignedInteger:(NSUInteger)value;
  - (NSUInteger)unsignedIntegerValue;
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPStore.h b/Framework/Pantomime/CWIMAPStore.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPStore.h b/Framework/Pantomime/CWIMAPStore.h
 --- a/Framework/Pantomime/CWIMAPStore.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPStore.h	2026-10-16 01:25:59.107319747 +0000
 @@ -22,6 +22,8 @@
@@ -1485,7 +1510,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWConnection.h>
  #include <Pantomime/CWConstants.h>
  #include <Pantomime/CWService.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWIMAPStore.m b/Framework/Pantomime/CWIMAPStore.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWIMAPStore.m b/Framework/Pantomime/CWIMAPStore.m
 --- a/Framework/Pantomime/CWIMAPStore.m	2022-11-05 20:02:00.000000000 +0000
 +++ b/Framework/Pantomime/CWIMAPStore.m	2026-10-16 01:25:59.107629327 +0000
 @@ -2906,7 +2906,10 @@
@@ -1500,7 +1525,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
    POST_NOTIFICATION(PantomimeServiceInitialized, self, nil);
    PERFORM_SELECTOR_1(_delegate, @selector(serviceInitialized:),  PantomimeServiceInitialized);
  }
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_1.h b/Framework/Pantomime/CWISO8859_1.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_1.h b/Framework/Pantomime/CWISO8859_1.h
 --- a/Framework/Pantomime/CWISO8859_1.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_1.h	2026-10-16 01:25:59.107926416 +0000
 @@ -22,6 +22,8 @@
@@ -1512,7 +1537,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_1 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_10.h b/Framework/Pantomime/CWISO8859_10.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_10.h b/Framework/Pantomime/CWISO8859_10.h
 --- a/Framework/Pantomime/CWISO8859_10.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_10.h	2026-10-16 01:25:59.108038556 +0000
 @@ -22,6 +22,8 @@
@@ -1524,7 +1549,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_10 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_11.h b/Framework/Pantomime/CWISO8859_11.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_11.h b/Framework/Pantomime/CWISO8859_11.h
 --- a/Framework/Pantomime/CWISO8859_11.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_11.h	2026-10-16 01:25:59.108212637 +0000
 @@ -22,6 +22,8 @@
@@ -1536,7 +1561,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_11 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_13.h b/Framework/Pantomime/CWISO8859_13.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_13.h b/Framework/Pantomime/CWISO8859_13.h
 --- a/Framework/Pantomime/CWISO8859_13.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_13.h	2026-10-16 01:25:59.108327455 +0000
 @@ -22,6 +22,8 @@
@@ -1548,7 +1573,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_13 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_14.h b/Framework/Pantomime/CWISO8859_14.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_14.h b/Framework/Pantomime/CWISO8859_14.h
 --- a/Framework/Pantomime/CWISO8859_14.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_14.h	2026-10-16 01:25:59.108454330 +0000
 @@ -22,6 +22,8 @@
@@ -1560,7 +1585,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_14 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_15.h b/Framework/Pantomime/CWISO8859_15.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_15.h b/Framework/Pantomime/CWISO8859_15.h
 --- a/Framework/Pantomime/CWISO8859_15.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_15.h	2026-10-16 01:25:59.108583949 +0000
 @@ -22,6 +22,8 @@
@@ -1572,7 +1597,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_15 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_2.h b/Framework/Pantomime/CWISO8859_2.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_2.h b/Framework/Pantomime/CWISO8859_2.h
 --- a/Framework/Pantomime/CWISO8859_2.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_2.h	2026-10-16 01:25:59.108698168 +0000
 @@ -22,6 +22,8 @@
@@ -1584,7 +1609,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_2 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_3.h b/Framework/Pantomime/CWISO8859_3.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_3.h b/Framework/Pantomime/CWISO8859_3.h
 --- a/Framework/Pantomime/CWISO8859_3.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_3.h	2026-10-16 01:25:59.108812002 +0000
 @@ -22,6 +22,8 @@
@@ -1596,7 +1621,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_3 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_4.h b/Framework/Pantomime/CWISO8859_4.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_4.h b/Framework/Pantomime/CWISO8859_4.h
 --- a/Framework/Pantomime/CWISO8859_4.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_4.h	2026-10-16 01:25:59.108929682 +0000
 @@ -22,6 +22,8 @@
@@ -1608,7 +1633,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_4 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_5.h b/Framework/Pantomime/CWISO8859_5.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_5.h b/Framework/Pantomime/CWISO8859_5.h
 --- a/Framework/Pantomime/CWISO8859_5.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_5.h	2026-10-16 01:25:59.109044798 +0000
 @@ -22,6 +22,8 @@
@@ -1620,7 +1645,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_5 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_6.h b/Framework/Pantomime/CWISO8859_6.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_6.h b/Framework/Pantomime/CWISO8859_6.h
 --- a/Framework/Pantomime/CWISO8859_6.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_6.h	2026-10-16 01:25:59.109155616 +0000
 @@ -22,6 +22,8 @@
@@ -1632,7 +1657,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_6 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_7.h b/Framework/Pantomime/CWISO8859_7.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_7.h b/Framework/Pantomime/CWISO8859_7.h
 --- a/Framework/Pantomime/CWISO8859_7.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_7.h	2026-10-16 01:25:59.109266584 +0000
 @@ -22,6 +22,8 @@
@@ -1644,7 +1669,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_7 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_8.h b/Framework/Pantomime/CWISO8859_8.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_8.h b/Framework/Pantomime/CWISO8859_8.h
 --- a/Framework/Pantomime/CWISO8859_8.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_8.h	2026-10-16 01:25:59.109378977 +0000
 @@ -22,6 +22,8 @@
@@ -1656,7 +1681,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_8 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWISO8859_9.h b/Framework/Pantomime/CWISO8859_9.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWISO8859_9.h b/Framework/Pantomime/CWISO8859_9.h
 --- a/Framework/Pantomime/CWISO8859_9.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWISO8859_9.h	2026-10-16 01:25:59.109513424 +0000
 @@ -22,6 +22,8 @@
@@ -1668,7 +1693,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWISO8859_9 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWInternetAddress.h b/Framework/Pantomime/CWInternetAddress.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWInternetAddress.h b/Framework/Pantomime/CWInternetAddress.h
 --- a/Framework/Pantomime/CWInternetAddress.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWInternetAddress.h	2026-10-16 01:25:59.109638282 +0000
 @@ -22,6 +22,8 @@
@@ -1680,7 +1705,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSCoder.h>
  #import <Foundation/NSData.h>
  #import <Foundation/NSObject.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWKOI8_R.h b/Framework/Pantomime/CWKOI8_R.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWKOI8_R.h b/Framework/Pantomime/CWKOI8_R.h
 --- a/Framework/Pantomime/CWKOI8_R.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWKOI8_R.h	2026-10-16 01:25:59.109762789 +0000
 @@ -22,6 +22,8 @@
@@ -1692,7 +1717,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWKOI8_R : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWKOI8_U.h b/Framework/Pantomime/CWKOI8_U.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWKOI8_U.h b/Framework/Pantomime/CWKOI8_U.h
 --- a/Framework/Pantomime/CWKOI8_U.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWKOI8_U.h	2026-10-16 01:25:59.109879165 +0000
 @@ -22,6 +22,8 @@
@@ -1704,7 +1729,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWKOI8_U : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWLocalCacheManager.h b/Framework/Pantomime/CWLocalCacheManager.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalCacheManager.h b/Framework/Pantomime/CWLocalCacheManager.h
 --- a/Framework/Pantomime/CWLocalCacheManager.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWLocalCacheManager.h	2026-10-16 01:25:59.109996469 +0000
 @@ -25,6 +25,8 @@
@@ -1716,7 +1741,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCacheManager.h>
  
  @class CWFolder;
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWLocalFolder+maildir.h b/Framework/Pantomime/CWLocalFolder+maildir.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalFolder+maildir.h b/Framework/Pantomime/CWLocalFolder+maildir.h
 --- a/Framework/Pantomime/CWLocalFolder+maildir.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWLocalFolder+maildir.h	2026-10-16 01:25:59.110113428 +0000
 @@ -22,6 +22,8 @@
@@ -1728,7 +1753,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWLocalFolder.h>
  
  @interface CWLocalFolder (maildir)
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWLocalFolder+mbox.h b/Framework/Pantomime/CWLocalFolder+mbox.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalFolder+mbox.h b/Framework/Pantomime/CWLocalFolder+mbox.h
 --- a/Framework/Pantomime/CWLocalFolder+mbox.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWLocalFolder+mbox.h	2026-10-16 01:25:59.110228277 +0000
 @@ -22,6 +22,8 @@
@@ -1740,7 +1765,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWLocalFolder.h>
  
  @interface CWLocalFolder (mbox)
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWLocalFolder.h b/Framework/Pantomime/CWLocalFolder.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalFolder.h b/Framework/Pantomime/CWLocalFolder.h
 --- a/Framework/Pantomime/CWLocalFolder.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWLocalFolder.h	2026-10-16 01:25:59.110529147 +0000
 @@ -22,6 +22,8 @@
@@ -1752,7 +1777,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Pantomime/CWConstants.h>
  #import <Pantomime/CWFolder.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWLocalMessage.h b/Framework/Pantomime/CWLocalMessage.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalMessage.h b/Framework/Pantomime/CWLocalMessage.h
 --- a/Framework/Pantomime/CWLocalMessage.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWLocalMessage.h	2026-10-16 01:25:59.110666871 +0000
 @@ -22,6 +22,8 @@
@@ -1764,7 +1789,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWMessage.h>
  
  #import <Foundation/NSCoder.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWLocalStore.h b/Framework/Pantomime/CWLocalStore.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWLocalStore.h b/Framework/Pantomime/CWLocalStore.h
 --- a/Framework/Pantomime/CWLocalStore.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWLocalStore.h	2026-10-16 01:25:59.110788684 +0000
 @@ -22,6 +22,8 @@
@@ -1776,7 +1801,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWStore.h>
  
  #import <Foundation/NSArray.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWMD5.h b/Framework/Pantomime/CWMD5.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMD5.h b/Framework/Pantomime/CWMD5.h
 --- a/Framework/Pantomime/CWMD5.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWMD5.h	2026-10-16 01:25:59.110912180 +0000
 @@ -22,6 +22,8 @@
@@ -1788,7 +1813,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSData.h>
  #import <Foundation/NSObject.h>
  #import <Foundation/NSString.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWMIMEMultipart.h b/Framework/Pantomime/CWMIMEMultipart.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMIMEMultipart.h b/Framework/Pantomime/CWMIMEMultipart.h
 --- a/Framework/Pantomime/CWMIMEMultipart.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWMIMEMultipart.h	2026-10-16 01:25:59.111030728 +0000
 @@ -24,6 +24,8 @@
@@ -1800,7 +1825,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSArray.h>
  #import <Foundation/NSObject.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWMIMEUtility.h b/Framework/Pantomime/CWMIMEUtility.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMIMEUtility.h b/Framework/Pantomime/CWMIMEUtility.h
 --- a/Framework/Pantomime/CWMIMEUtility.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWMIMEUtility.h	2026-10-16 01:25:59.111152440 +0000
 @@ -24,6 +24,8 @@
@@ -1812,7 +1837,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSArray.h>
  #import <Foundation/NSData.h>
  #import <Foundation/NSObject.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWMessage.h b/Framework/Pantomime/CWMessage.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMessage.h b/Framework/Pantomime/CWMessage.h
 --- a/Framework/Pantomime/CWMessage.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWMessage.h	2026-10-16 01:25:59.111295765 +0000
 @@ -24,6 +24,8 @@
@@ -1824,7 +1849,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Pantomime/CWConstants.h>
  #import <Pantomime/CWCacheManager.h>
  #import <Pantomime/CWPart.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWMessage.m b/Framework/Pantomime/CWMessage.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWMessage.m b/Framework/Pantomime/CWMessage.m
 --- a/Framework/Pantomime/CWMessage.m	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWMessage.m	2026-10-16 01:25:59.111550171 +0000
 @@ -74,6 +74,47 @@
@@ -1928,7 +1953,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
    
    // We set the subject, if we have one!
    if ([[[self subject] stringByTrimmingWhiteSpaces] length] > 0)
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPOP3CacheManager.h b/Framework/Pantomime/CWPOP3CacheManager.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3CacheManager.h b/Framework/Pantomime/CWPOP3CacheManager.h
 --- a/Framework/Pantomime/CWPOP3CacheManager.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWPOP3CacheManager.h	2026-10-16 01:25:59.111742967 +0000
 @@ -22,6 +22,8 @@
@@ -1940,7 +1965,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSMapTable.h>
  
  #include <Pantomime/CWCacheManager.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPOP3CacheObject.h b/Framework/Pantomime/CWPOP3CacheObject.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3CacheObject.h b/Framework/Pantomime/CWPOP3CacheObject.h
 --- a/Framework/Pantomime/CWPOP3CacheObject.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWPOP3CacheObject.h	2026-10-16 01:25:59.111892010 +0000
 @@ -22,6 +22,8 @@
@@ -1952,7 +1977,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSCalendarDate.h>
  #import <Foundation/NSCoder.h>
  #import <Foundation/NSObject.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPOP3Folder.h b/Framework/Pantomime/CWPOP3Folder.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Folder.h b/Framework/Pantomime/CWPOP3Folder.h
 --- a/Framework/Pantomime/CWPOP3Folder.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWPOP3Folder.h	2026-10-16 01:25:59.112013320 +0000
 @@ -22,6 +22,8 @@
@@ -1964,7 +1989,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Pantomime/CWFolder.h>
  
  #import <Foundation/NSDictionary.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPOP3Message.h b/Framework/Pantomime/CWPOP3Message.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Message.h b/Framework/Pantomime/CWPOP3Message.h
 --- a/Framework/Pantomime/CWPOP3Message.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWPOP3Message.h	2026-10-16 01:25:59.112177161 +0000
 @@ -22,6 +22,8 @@
@@ -1976,7 +2001,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSCoder.h>
  
  #include <Pantomime/CWMessage.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPOP3Store.h b/Framework/Pantomime/CWPOP3Store.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Store.h b/Framework/Pantomime/CWPOP3Store.h
 --- a/Framework/Pantomime/CWPOP3Store.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWPOP3Store.h	2026-10-16 01:25:59.112297269 +0000
 @@ -22,6 +22,8 @@
@@ -1988,7 +2013,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWService.h>
  #include <Pantomime/CWStore.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPOP3Store.m b/Framework/Pantomime/CWPOP3Store.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPOP3Store.m b/Framework/Pantomime/CWPOP3Store.m
 --- a/Framework/Pantomime/CWPOP3Store.m	2023-01-17 09:56:16.000000000 +0000
 +++ b/Framework/Pantomime/CWPOP3Store.m	2026-10-16 01:25:59.112461029 +0000
 @@ -834,7 +834,10 @@
@@ -2003,7 +2028,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  
        POST_NOTIFICATION(PantomimeServiceInitialized, self, nil);
        PERFORM_SELECTOR_1(_delegate, @selector(serviceInitialized:), PantomimeServiceInitialized);
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWParser.h b/Framework/Pantomime/CWParser.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWParser.h b/Framework/Pantomime/CWParser.h
 --- a/Framework/Pantomime/CWParser.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWParser.h	2026-10-16 01:25:59.112608989 +0000
 @@ -22,6 +22,8 @@
@@ -2015,7 +2040,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSData.h>
  #import <Foundation/NSObject.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWPart.h b/Framework/Pantomime/CWPart.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWPart.h b/Framework/Pantomime/CWPart.h
 --- a/Framework/Pantomime/CWPart.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWPart.h	2026-10-16 01:25:59.112776364 +0000
 @@ -24,6 +24,8 @@
@@ -2027,7 +2052,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSCoder.h>
  #import <Foundation/NSData.h>
  #import <Foundation/NSDictionary.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWRegEx.h b/Framework/Pantomime/CWRegEx.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRegEx.h b/Framework/Pantomime/CWRegEx.h
 --- a/Framework/Pantomime/CWRegEx.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWRegEx.h	2026-10-16 01:25:59.112918323 +0000
 @@ -23,6 +23,8 @@
@@ -2039,7 +2064,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <sys/types.h>
  #include <regex.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWRunLoopWatcher.h b/Framework/Pantomime/CWRunLoopWatcher.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRunLoopWatcher.h b/Framework/Pantomime/CWRunLoopWatcher.h
 --- a/Framework/Pantomime/CWRunLoopWatcher.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/CWRunLoopWatcher.h	2026-10-16 01:25:59.113015547 +0000
 @@ -0,0 +1,45 @@
@@ -2088,7 +2113,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +@end
 +
 +#endif // _Pantomime_H_CWRunLoopWatcher
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWRunLoopWatcher.m b/Framework/Pantomime/CWRunLoopWatcher.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWRunLoopWatcher.m b/Framework/Pantomime/CWRunLoopWatcher.m
 --- a/Framework/Pantomime/CWRunLoopWatcher.m	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/CWRunLoopWatcher.m	2026-10-16 01:25:59.113092747 +0000
 @@ -0,0 +1,265 @@
@@ -2357,7 +2382,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +}
 +
 +@end
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWSMTP.h b/Framework/Pantomime/CWSMTP.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWSMTP.h b/Framework/Pantomime/CWSMTP.h
 --- a/Framework/Pantomime/CWSMTP.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWSMTP.h	2026-10-16 01:25:59.113241086 +0000
 @@ -22,6 +22,8 @@
@@ -2369,7 +2394,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWService.h>
  #include <Pantomime/CWTransport.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWSMTP.m b/Framework/Pantomime/CWSMTP.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWSMTP.m b/Framework/Pantomime/CWSMTP.m
 --- a/Framework/Pantomime/CWSMTP.m	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWSMTP.m	2026-10-16 01:25:59.113424917 +0000
 @@ -1031,7 +1031,10 @@
@@ -2384,7 +2409,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  
        // We now forget about the initial negotiated state; see RFC2487 for more details,
        [_supportedMechanisms removeAllObjects];
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWSendmail.h b/Framework/Pantomime/CWSendmail.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWSendmail.h b/Framework/Pantomime/CWSendmail.h
 --- a/Framework/Pantomime/CWSendmail.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWSendmail.h	2026-10-16 01:25:59.113606347 +0000
 @@ -22,6 +22,8 @@
@@ -2396,7 +2421,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWTransport.h>
  
  #import <Foundation/NSObject.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWService.h b/Framework/Pantomime/CWService.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWService.h b/Framework/Pantomime/CWService.h
 --- a/Framework/Pantomime/CWService.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWService.h	2026-10-16 01:25:59.113751129 +0000
 @@ -22,8 +22,11 @@
@@ -2459,7 +2484,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
    @method lastCommand
    @discussion This method is used to get the last command that
                has been sent by CWService subclasses to the
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWService.m b/Framework/Pantomime/CWService.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWService.m b/Framework/Pantomime/CWService.m
 --- a/Framework/Pantomime/CWService.m	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWService.m	2026-10-16 01:25:59.113965647 +0000
 @@ -24,6 +24,7 @@
@@ -2726,7 +2751,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
     _counter++;
  }
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWStore.h b/Framework/Pantomime/CWStore.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWStore.h b/Framework/Pantomime/CWStore.h
 --- a/Framework/Pantomime/CWStore.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWStore.h	2026-10-16 01:25:59.114185469 +0000
 @@ -24,6 +24,8 @@
@@ -2738,7 +2763,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSEnumerator.h>
  #import <Foundation/NSString.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWTCPConnection.h b/Framework/Pantomime/CWTCPConnection.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWTCPConnection.h b/Framework/Pantomime/CWTCPConnection.h
 --- a/Framework/Pantomime/CWTCPConnection.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWTCPConnection.h	2026-10-16 01:25:59.114324487 +0000
 @@ -22,6 +22,8 @@
@@ -2793,7 +2818,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
    @method startSSL
    @discussion This method is used to start the SSL handshaking
                on an altready established TCP connection.
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWTCPConnection.m b/Framework/Pantomime/CWTCPConnection.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWTCPConnection.m b/Framework/Pantomime/CWTCPConnection.m
 --- a/Framework/Pantomime/CWTCPConnection.m	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWTCPConnection.m	2026-10-16 01:25:59.114500241 +0000
 @@ -43,6 +43,9 @@
@@ -3120,7 +3145,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
    safe_close(_fd);
  
    [[NSNotificationCenter defaultCenter] removeObserver: self];
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWTransport.h b/Framework/Pantomime/CWTransport.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWTransport.h b/Framework/Pantomime/CWTransport.h
 --- a/Framework/Pantomime/CWTransport.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWTransport.h	2026-10-16 01:25:59.114707712 +0000
 @@ -22,6 +22,8 @@
@@ -3132,7 +3157,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSArray.h>
  #import <Foundation/NSData.h>
  #import <Foundation/NSNotification.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWURLName.h b/Framework/Pantomime/CWURLName.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWURLName.h b/Framework/Pantomime/CWURLName.h
 --- a/Framework/Pantomime/CWURLName.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWURLName.h	2026-10-16 01:25:59.114836613 +0000
 @@ -22,6 +22,8 @@
@@ -3144,7 +3169,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSObject.h>
  #import <Foundation/NSString.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWUUFile.h b/Framework/Pantomime/CWUUFile.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWUUFile.h b/Framework/Pantomime/CWUUFile.h
 --- a/Framework/Pantomime/CWUUFile.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWUUFile.h	2026-10-16 01:25:59.115128349 +0000
 @@ -22,6 +22,8 @@
@@ -3156,7 +3181,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSData.h>
  #import <Foundation/NSDictionary.h>
  #import <Foundation/NSObject.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWVirtualFolder.h b/Framework/Pantomime/CWVirtualFolder.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWVirtualFolder.h b/Framework/Pantomime/CWVirtualFolder.h
 --- a/Framework/Pantomime/CWVirtualFolder.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWVirtualFolder.h	2026-10-16 01:25:59.115250608 +0000
 @@ -22,6 +22,8 @@
@@ -3168,7 +3193,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWFolder.h>
  
  #import <Foundation/NSArray.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWWINDOWS_1250.h b/Framework/Pantomime/CWWINDOWS_1250.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1250.h b/Framework/Pantomime/CWWINDOWS_1250.h
 --- a/Framework/Pantomime/CWWINDOWS_1250.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWWINDOWS_1250.h	2026-10-16 01:25:59.115365094 +0000
 @@ -22,6 +22,8 @@
@@ -3180,7 +3205,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWWINDOWS_1250 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWWINDOWS_1251.h b/Framework/Pantomime/CWWINDOWS_1251.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1251.h b/Framework/Pantomime/CWWINDOWS_1251.h
 --- a/Framework/Pantomime/CWWINDOWS_1251.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWWINDOWS_1251.h	2026-10-16 01:25:59.115487354 +0000
 @@ -22,6 +22,8 @@
@@ -3192,7 +3217,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWWINDOWS_1251 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWWINDOWS_1252.h b/Framework/Pantomime/CWWINDOWS_1252.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1252.h b/Framework/Pantomime/CWWINDOWS_1252.h
 --- a/Framework/Pantomime/CWWINDOWS_1252.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWWINDOWS_1252.h	2026-10-16 01:25:59.115599077 +0000
 @@ -22,6 +22,8 @@
@@ -3204,7 +3229,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWWINDOWS_1252 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWWINDOWS_1253.h b/Framework/Pantomime/CWWINDOWS_1253.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1253.h b/Framework/Pantomime/CWWINDOWS_1253.h
 --- a/Framework/Pantomime/CWWINDOWS_1253.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWWINDOWS_1253.h	2026-10-16 01:25:59.115709420 +0000
 @@ -22,6 +22,8 @@
@@ -3216,7 +3241,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWWINDOWS_1253 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/CWWINDOWS_1254.h b/Framework/Pantomime/CWWINDOWS_1254.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWWINDOWS_1254.h b/Framework/Pantomime/CWWINDOWS_1254.h
 --- a/Framework/Pantomime/CWWINDOWS_1254.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWWINDOWS_1254.h	2026-10-16 01:25:59.115822215 +0000
 @@ -22,6 +22,8 @@
@@ -3228,7 +3253,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <Pantomime/CWCharset.h>
  
  @interface CWWINDOWS_1254 : CWCharset
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/Makefile.cw b/Framework/Pantomime/Makefile.cw
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Makefile.cw b/Framework/Pantomime/Makefile.cw
 --- a/Framework/Pantomime/Makefile.cw	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/Makefile.cw	2026-10-16 01:25:59.115918541 +0000
 @@ -0,0 +1,106 @@
@@ -3338,7 +3363,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +clean:
 +	rm -f $(OBJS) libPantomime.a
 +	rm -rf include
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/NSData+Extensions.h b/Framework/Pantomime/NSData+Extensions.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSData+Extensions.h b/Framework/Pantomime/NSData+Extensions.h
 --- a/Framework/Pantomime/NSData+Extensions.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/NSData+Extensions.h	2026-10-16 01:25:59.116041976 +0000
 @@ -24,6 +24,8 @@
@@ -3350,7 +3375,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSObject.h>
  #import <Foundation/NSArray.h>
  #import <Foundation/NSData.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/NSFileManager+Extensions.h b/Framework/Pantomime/NSFileManager+Extensions.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSFileManager+Extensions.h b/Framework/Pantomime/NSFileManager+Extensions.h
 --- a/Framework/Pantomime/NSFileManager+Extensions.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/NSFileManager+Extensions.h	2026-10-16 01:25:59.116204300 +0000
 @@ -22,6 +22,8 @@
@@ -3362,7 +3387,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSFileManager.h>
  
  @class NSString;
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/NSScanner+Extensions.h b/Framework/Pantomime/NSScanner+Extensions.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSScanner+Extensions.h b/Framework/Pantomime/NSScanner+Extensions.h
 --- a/Framework/Pantomime/NSScanner+Extensions.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/NSScanner+Extensions.h	2026-10-16 01:25:59.116319534 +0000
 @@ -22,6 +22,8 @@
@@ -3374,7 +3399,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSScanner.h>
  
  /*!
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/NSString+Extensions.h b/Framework/Pantomime/NSString+Extensions.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSString+Extensions.h b/Framework/Pantomime/NSString+Extensions.h
 --- a/Framework/Pantomime/NSString+Extensions.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/NSString+Extensions.h	2026-10-16 01:25:59.116474536 +0000
 @@ -24,6 +24,8 @@
@@ -3386,7 +3411,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/NSString.h>
  #import <Foundation/NSData.h>
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/NSString+Extensions.m b/Framework/Pantomime/NSString+Extensions.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/NSString+Extensions.m b/Framework/Pantomime/NSString+Extensions.m
 --- a/Framework/Pantomime/NSString+Extensions.m	2022-11-05 20:02:00.000000000 +0000
 +++ b/Framework/Pantomime/NSString+Extensions.m	2026-10-16 01:25:59.116644844 +0000
 @@ -41,6 +41,8 @@
@@ -3711,7 +3736,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  }
  
  
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/Pantomime.h b/Framework/Pantomime/Pantomime.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/Pantomime.h b/Framework/Pantomime/Pantomime.h
 --- a/Framework/Pantomime/Pantomime.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/Pantomime.h	2026-10-16 01:25:59.116853412 +0000
 @@ -22,6 +22,8 @@
@@ -3723,31 +3748,31 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #import <Foundation/Foundation.h>
  
  #include <Pantomime/CWCacheManager.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/compat/Foundation/NSCalendarDate.h b/Framework/Pantomime/compat/Foundation/NSCalendarDate.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSCalendarDate.h b/Framework/Pantomime/compat/Foundation/NSCalendarDate.h
 --- a/Framework/Pantomime/compat/Foundation/NSCalendarDate.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/compat/Foundation/NSCalendarDate.h	2026-10-16 01:25:59.117035055 +0000
 @@ -0,0 +1,2 @@
 +/* OPENSTEP 4.2 declares this in NSDate.h */
 +#import <Foundation/NSDate.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/compat/Foundation/NSNull.h b/Framework/Pantomime/compat/Foundation/NSNull.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSNull.h b/Framework/Pantomime/compat/Foundation/NSNull.h
 --- a/Framework/Pantomime/compat/Foundation/NSNull.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/compat/Foundation/NSNull.h	2026-10-16 01:25:59.117079316 +0000
 @@ -0,0 +1,2 @@
 +/* OPENSTEP 4.2 has no NSNull; CWCompat.m supplies one. */
 +#import <Pantomime/CWCompat.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/compat/Foundation/NSTimeZone.h b/Framework/Pantomime/compat/Foundation/NSTimeZone.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSTimeZone.h b/Framework/Pantomime/compat/Foundation/NSTimeZone.h
 --- a/Framework/Pantomime/compat/Foundation/NSTimeZone.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/compat/Foundation/NSTimeZone.h	2026-10-16 01:25:59.117135228 +0000
 @@ -0,0 +1,2 @@
 +/* OPENSTEP 4.2 declares this in NSDate.h */
 +#import <Foundation/NSDate.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/compat/Foundation/NSURL.h b/Framework/Pantomime/compat/Foundation/NSURL.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/Foundation/NSURL.h b/Framework/Pantomime/compat/Foundation/NSURL.h
 --- a/Framework/Pantomime/compat/Foundation/NSURL.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/compat/Foundation/NSURL.h	2026-10-16 01:25:59.117190081 +0000
 @@ -0,0 +1,2 @@
 +/* OPENSTEP 4.2 has no NSURL; Pantomime only imports the header. */
 +#import <Foundation/NSObject.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/compat/stdint.h b/Framework/Pantomime/compat/stdint.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/stdint.h b/Framework/Pantomime/compat/stdint.h
 --- a/Framework/Pantomime/compat/stdint.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/compat/stdint.h	2026-10-16 01:25:59.117262856 +0000
 @@ -0,0 +1,15 @@
@@ -3766,7 +3791,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
 +typedef unsigned long uintptr_t;
 +
 +#endif
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/io.h b/Framework/Pantomime/io.h
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/io.h b/Framework/Pantomime/io.h
 --- a/Framework/Pantomime/io.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/io.h	2026-10-16 01:25:59.117370021 +0000
 @@ -24,6 +24,8 @@
@@ -3778,7 +3803,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/P
  #include <sys/types.h>
  #include <stdint.h>
  #include <arpa/inet.h>
-diff -ruN -x Pantomime.framework -x obj -x derived_src -x '*.orig' a/Framework/Pantomime/io.m b/Framework/Pantomime/io.m
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/io.m b/Framework/Pantomime/io.m
 --- a/Framework/Pantomime/io.m	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/io.m	2026-10-16 01:25:59.117534404 +0000
 @@ -150,8 +150,8 @@
