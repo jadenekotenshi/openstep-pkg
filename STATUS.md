@@ -107,6 +107,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | openssh | validated (10.6p1: sshd, ssh login by password and key, scp); `rc.sshd` boot script tested on Linux only | validated 10.6p1 (2026-10-09; builds and passes its tests, against the rebuilt libcrypto; needed `PICFLAG=` since the SPARC assembler cannot relocate the position-independent code that openbsd-compat is otherwise compiled as) |
 | openssl | validated | validated 1.1.1w (rebuilt 2026-10-09 with the unsigned memcmp via pkg_cmp_named, which fixed OID lookups by DER bytes: SHA1, AES, SHA-2, secp384r1 and others had failed; the broadened `pkg test` passes: OIDs, digests, EC keys, signatures, chains, AES). The original failure is fixed: a secp384r1 key now round-trips through `openssl ec -pubout`. curl and openssh rebuilt against it link and pass their tests. Still to check on SPARC: `oidtest` recompiled (an old binary carries the old static library) |
 | p7zip | validated | validated (2026-10-10) |
+| pantomime | — (new 2026-10-16; builds and passes its checks on Linux, not yet built on OPENSTEP) | — |
 | patch | validated | validated 2.6.1 (rebootstrap, 2026-10-08) |
 | pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) |
 | perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) |
