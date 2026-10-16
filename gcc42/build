@@ -118,6 +118,12 @@ patch -p1 < "$PATCHFILE"
 /usr/bin/find . -type f -exec /usr/bin/touch {} \;
 fi
 
+# The mtime reset above touched the stage-0 archive after its ranlib, and the
+# linker refuses an archive whose table of contents is older than the archive.
+if [ "$ARCH" = m68k ]; then
+    /bin/ranlib "$STAGE0_LIBGCC"
+fi
+
 test -d "$BUILDDIR" || mkdir "$BUILDDIR"
 cd "$BUILDDIR"
 
