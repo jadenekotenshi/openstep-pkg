@@ -24,8 +24,8 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
  
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.h b/Framework/Pantomime/CWCompat.h
 --- a/Framework/Pantomime/CWCompat.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/Framework/Pantomime/CWCompat.h	2026-10-16 01:34:17.388724308 +0000
-@@ -0,0 +1,113 @@
++++ b/Framework/Pantomime/CWCompat.h	2026-10-16 01:37:14.972716442 +0000
+@@ -0,0 +1,117 @@
 +/*
 +**  CWCompat.h
 +**
@@ -41,6 +41,13 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
 +#ifdef CW_OPENSTEP
 +
 +#include <sys/types.h>
++
++// OPENSSL's e_os2.h (included below through compat/stdint.h) declares socklen_t
++// itself, unless it is a macro.
++#ifndef CW_HAVE_SOCKLEN_T
++#define socklen_t int
++#endif
++
 +#include <limits.h>
 +#include <math.h>
 +#include <stdarg.h>
@@ -83,9 +90,6 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
 +#define NSUIntegerMax UINT_MAX
 +#define NSIntegerMax INT_MAX
 +#define NSIntegerMin INT_MIN
-+#ifndef CW_HAVE_SOCKLEN_T
-+typedef int socklen_t;
-+#endif
 +
 +@interface NSNull : NSObject
 ++ (NSNull *) null;
@@ -3785,19 +3789,19 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/com
 +#import <Foundation/NSObject.h>
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/compat/stdint.h b/Framework/Pantomime/compat/stdint.h
 --- a/Framework/Pantomime/compat/stdint.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/Framework/Pantomime/compat/stdint.h	2026-10-16 01:25:59.117262856 +0000
++++ b/Framework/Pantomime/compat/stdint.h	2026-10-16 01:37:14.982586546 +0000
 @@ -0,0 +1,15 @@
-+/* OPENSTEP has no <stdint.h>; this is the part of it that Pantomime needs. */
++/*
++   OPENSTEP has no <stdint.h>.  OpenSSL's e_os2.h, as patched for OPENSTEP,
++   defines uint8_t to uint64_t from <sys/types.h>, and it must be the only
++   place that does, because it is included wherever the TLS code is.
++ */
 +#ifndef CW_COMPAT_STDINT_H
 +#define CW_COMPAT_STDINT_H
 +
 +#include <sys/types.h>
++#include <openssl/e_os2.h>
 +
-+/* int8_t .. int64_t are already in <sys/types.h> */
-+typedef u_int8_t uint8_t;
-+typedef u_int16_t uint16_t;
-+typedef u_int32_t uint32_t;
-+typedef u_int64_t uint64_t;
 +typedef long intptr_t;
 +typedef unsigned long uintptr_t;
 +
