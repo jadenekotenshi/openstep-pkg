@@ -21,6 +21,7 @@ OBJCFLAGS="$PKG_SYSCC_ARCH_FLAGS -O -pipe -DCW_OPENSTEP -DHAVE_ICONV -I./compat 
 LIBS="-L$PREFIX/lib -lssl -lcrypto -liconv"
 
 TOP=`pwd`
+TOOLFLAGS="$PKG_SYSCC_ARCH_FLAGS -O -pipe -DCW_OPENSTEP -DHAVE_ICONV -I$TOP/Framework/Pantomime/compat -I$PREFIX/include -I$TOP/Framework/Pantomime/include"
 
 cd Framework/Pantomime
 gnumake -f Makefile.cw CC="$CC" OBJCFLAGS="$OBJCFLAGS" libPantomime.a
@@ -29,7 +30,7 @@ cd "$TOP"
 # -ObjC makes the linker take every member of the archive that has classes or
 # categories in it; most of Pantomime is categories.
 for tool in pmail cwtest; do
-    $CC $OBJCFLAGS -IFramework/Pantomime/include -c $tool.m -o $tool.o
+    $CC $TOOLFLAGS -c $tool.m -o $tool.o
     $CC $PKG_SYSCC_ARCH_FLAGS -ObjC -o $tool $tool.o Framework/Pantomime/libPantomime.a \
         $LIBS -framework Foundation
 done
