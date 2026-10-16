@@ -25,7 +25,7 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.h b/Framework/Pantomime/CWCompat.h
 --- a/Framework/Pantomime/CWCompat.h	1970-01-01 00:00:00.000000000 +0000
 +++ b/Framework/Pantomime/CWCompat.h	2026-10-16 00:51:37.472003495 +0000
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,101 @@
 +/*
 +**  CWCompat.h
 +**
@@ -63,6 +63,10 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
 +#define round(x) floor((x) + 0.5)
 +#define lround(x) ((long)floor((x) + 0.5))
 +
++/* only <sys/types.h> with _POSIX_SOURCE has ssize_t */
++#ifndef _POSIX_SOURCE
++typedef int ssize_t;
++#endif
 +typedef int NSInteger;
 +typedef unsigned int NSUInteger;
 +#define NSUIntegerMax UINT_MAX
