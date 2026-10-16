@@ -1,0 +1,10 @@
+From: Alice Example <alice@example.org>
+To: test@localhost
+Subject: Hello from the test server
+Date: Tue, 06 Oct 2026 10:00:00 +0000
+Message-ID: <plain-1@example.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+
+This is a plain message.
+Second line.

@@ -1,0 +1,4 @@
+ca-certificates
+libiconv
+openssl
+patch

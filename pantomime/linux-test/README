@@ -1,0 +1,13 @@
+Linux-side test environment for the Pantomime port.  Not part of the package.
+
+It starts a real IMAP/POP3 server (Dovecot) and an SMTP receiver (aiosmtpd) on
+127.0.0.1 with a self-signed certificate, so that the library and the pmail tool
+can be run end to end without an OPENSTEP machine.  Needs: dovecot-imapd,
+dovecot-pop3d, ssl-cert, python3 and aiosmtpd (pip install aiosmtpd), as root.
+
+  sh start-servers.sh DIR     create DIR, start everything (ports below)
+  sh stop-servers.sh DIR      stop it
+
+  IMAP 1143 (STARTTLS)   IMAPS 1993       POP3 1110 (STLS)   POP3S 1995
+  SMTP 1025 (STARTTLS)   SMTPS 1465
+  user "test", password "secret"; received mail lands in DIR/smtp-inbox/
