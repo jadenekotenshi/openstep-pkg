@@ -1,0 +1,26 @@
+--- a/gcc/cse.c
++++ b/gcc/cse.c
+@@ -45,6 +45,15 @@
+ #include "rtlhooks-def.h"
+ #include "tree-pass.h"
+ 
++/* The Apple-local change "cse of ZERO/SIGN EXTEND" files a register that
++   holds an extended memory load in the class of the unextended load, which a
++   target on which a QImode register is not part of the SImode register (the
++   m68k) then substitutes in an SImode context.  A target turns it off by
++   defining this as 0.  */
++#ifndef CSE_EXTEND_OF_MEM
++#define CSE_EXTEND_OF_MEM 0
++#endif
++
+ /* The basic idea of common subexpression elimination is to go
+    through the code, keeping a record of expressions that would
+    have the same value at the current scan point, and replacing
+@@ -5250,6 +5259,7 @@
+       {
+ 	elt = lookup (src, sets[i].src_hash, mode);
+ 	if (!elt 
++	    && CSE_EXTEND_OF_MEM
+ 	    && (GET_CODE(src) == ZERO_EXTEND || GET_CODE(src) == SIGN_EXTEND) 
+ 	    && GET_CODE (XEXP (src, 0)) == MEM)
+ 	{
