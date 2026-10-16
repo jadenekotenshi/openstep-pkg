@@ -1720,6 +1720,36 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWI
  #import <Foundation/NSCoder.h>
  #import <Foundation/NSData.h>
  #import <Foundation/NSObject.h>
+diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWInternetAddress.m b/Framework/Pantomime/CWInternetAddress.m
+--- a/Framework/Pantomime/CWInternetAddress.m	2021-08-02 21:36:40.000000000 +0000
++++ b/Framework/Pantomime/CWInternetAddress.m	2026-10-16 01:39:21.255444710 +0000
+@@ -97,7 +97,7 @@
+ 		    {
+ 		      NSRange rangeLastQuotedQuote;
+ 		      // check for the last quoted quote
+-		      rangeLastQuotedQuote = [nameSubStr rangeOfCharacterFromSet: [NSCharacterSet characterSetWithCharactersInString:@"\\"""] options:NSBackwardsSearch range:NSMakeRange(0, [nameSubStr length])];
++		      rangeLastQuotedQuote = [nameSubStr rangeOfCharacterFromSet: [NSCharacterSet characterSetWithCharactersInString:@"\\\""] options:NSBackwardsSearch range:NSMakeRange(0, [nameSubStr length])];
+ 
+ 		      // "Marcotte, Ludovic" <ludovic@Sophos.ca>
+ 		      // we unquote only if the first quote is the first character and the last one is not an escaped quote
+@@ -108,7 +108,7 @@
+ 		    }
+ 	      
+ 		  // un-escape certain characters
+-		  if ([nameSubStr rangeOfCharacterFromSet: [NSCharacterSet characterSetWithCharactersInString:@"\\()[]"""]].location != NSNotFound)
++		  if ([nameSubStr rangeOfCharacterFromSet: [NSCharacterSet characterSetWithCharactersInString:@"\\()[]\""]].location != NSNotFound)
+ 		    {
+ 		      NSMutableString *mutStr;
+                   
+@@ -117,7 +117,7 @@
+ 		      [mutStr replaceOccurrencesOfString:@"\\)" withString:@")" options:0 range:NSMakeRange(0, [mutStr length])];
+ 		      [mutStr replaceOccurrencesOfString:@"\\[" withString:@"]" options:0 range:NSMakeRange(0, [mutStr length])];
+ 		      [mutStr replaceOccurrencesOfString:@"\\[" withString:@"]" options:0 range:NSMakeRange(0, [mutStr length])];
+-		      [mutStr replaceOccurrencesOfString:@"\\""" withString:@"""" options:0 range:NSMakeRange(0, [mutStr length])];
++		      [mutStr replaceOccurrencesOfString:@"\\\"" withString:@"\"" options:0 range:NSMakeRange(0, [mutStr length])];
+ 		      nameSubStr = [NSString stringWithString:mutStr];
+ 		    }
+ 		  [self setPersonal: nameSubStr];
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWKOI8_R.h b/Framework/Pantomime/CWKOI8_R.h
 --- a/Framework/Pantomime/CWKOI8_R.h	2021-08-02 21:36:40.000000000 +0000
 +++ b/Framework/Pantomime/CWKOI8_R.h	2026-10-16 01:25:59.109762789 +0000
