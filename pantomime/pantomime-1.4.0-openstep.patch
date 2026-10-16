@@ -24,8 +24,8 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
  
 diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWCompat.h b/Framework/Pantomime/CWCompat.h
 --- a/Framework/Pantomime/CWCompat.h	1970-01-01 00:00:00.000000000 +0000
-+++ b/Framework/Pantomime/CWCompat.h	2026-10-16 01:25:59.104931069 +0000
-@@ -0,0 +1,102 @@
++++ b/Framework/Pantomime/CWCompat.h	2026-10-16 01:34:17.388724308 +0000
+@@ -0,0 +1,113 @@
 +/*
 +**  CWCompat.h
 +**
@@ -58,6 +58,17 @@ diff -ruN -x Pantomime.framework -x obj -x derived_src a/Framework/Pantomime/CWC
 +#import <Foundation/NSDate.h>
 +
 +#define object_getClass(o) ([(o) class])
++
++// <sys/stat.h> and <errno.h> only have these with _POSIX_SOURCE.
++#ifndef S_IRUSR
++#define S_IRUSR 0000400
++#endif
++#ifndef S_IWUSR
++#define S_IWUSR 0000200
++#endif
++#ifndef EOVERFLOW
++#define EOVERFLOW 84
++#endif
 +
 +// Not in the OPENSTEP math library.
 +#define round(x) floor((x) + 0.5)
