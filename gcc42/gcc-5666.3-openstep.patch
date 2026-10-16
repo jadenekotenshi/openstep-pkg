@@ -132,6 +132,33 @@ index df57fe2..b9fb712 100644
  sparc-*-elf*)
  	tm_file="${tm_file} dbxelf.h elfos.h svr4.h sparc/sysv4.h sparc/sp-elf.h"
  	tmake_file="sparc/t-elf sparc/t-crtfm"
+diff --git a/gcc/cse.c b/gcc/cse.c
+--- a/gcc/cse.c
++++ b/gcc/cse.c
+@@ -45,6 +45,15 @@
+ #include "rtlhooks-def.h"
+ #include "tree-pass.h"
+ 
++/* The Apple-local change "cse of ZERO/SIGN EXTEND" files a register that
++   holds an extended memory load in the class of the unextended load, which a
++   target on which a QImode register is not part of the SImode register (the
++   m68k) then substitutes in an SImode context.  A target turns it off by
++   defining this as 0.  */
++#ifndef CSE_EXTEND_OF_MEM
++#define CSE_EXTEND_OF_MEM 1
++#endif
++
+ /* The basic idea of common subexpression elimination is to go
+    through the code, keeping a record of expressions that would
+    have the same value at the current scan point, and replacing
+@@ -5250,6 +5259,7 @@
+       {
+ 	elt = lookup (src, sets[i].src_hash, mode);
+ 	if (!elt 
++	    && CSE_EXTEND_OF_MEM
+ 	    && (GET_CODE(src) == ZERO_EXTEND || GET_CODE(src) == SIGN_EXTEND) 
+ 	    && GET_CODE (XEXP (src, 0)) == MEM)
+ 	{
 diff --git a/gcc/config/i386/ARCH_INCLUDE.h b/gcc/config/i386/ARCH_INCLUDE.h
 new file mode 100644
 index 0000000..c556c16
@@ -11682,7 +11709,7 @@ new file mode 100644
 index 0000000..804cf36
 --- /dev/null
 +++ b/gcc/config/m68k/next.h
-@@ -0,0 +1,126 @@
+@@ -0,0 +1,142 @@
 +/* Target definitions for GNU compiler for mc680x0 running NeXTSTEP.
 +   Copyright (C) 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997, 1999
 +   Free Software Foundation, Inc.
@@ -11712,6 +11739,9 @@ index 0000000..804cf36
 +   the 68040 (-m68020-40): runs on the 68030+68882 and on the 68040.  */
 +#undef TARGET_DEFAULT
 +#define TARGET_DEFAULT (MASK_68040 | MASK_BITFIELD | MASK_68881 | MASK_68020)
++
++/* Apple's Objective-C front end asks; m68k has no 64-bit mode.  */
++#define TARGET_64BIT 0
 +
 +#undef TARGET_OS_CPP_BUILTINS
 +#define TARGET_OS_CPP_BUILTINS()                 \
@@ -11792,6 +11822,12 @@ index 0000000..804cf36
 +   area.  */
 +#undef PCC_STATIC_STRUCT_RETURN
 +
++/* Classic NeXT has no objc_msgSend_stret or objc_msgSendSuper_stret: the
++   address of an aggregate result (in a1 here) is not a hidden argument, so
++   messages with such results go through the ordinary messengers.  The macro
++   only tells objc-act.c so; the register is m68k.h's M68K_STRUCT_VALUE_REGNUM.  */
++#define NEXTSTEP_STRUCT_VALUE_REGNUM M68K_STRUCT_VALUE_REGNUM
++
 +/* This accounts for the return pc and saved fp on the m68k.  */
 +
 +#define OBJC_FORWARDING_STACK_OFFSET 8
@@ -11809,6 +11845,13 @@ index 0000000..804cf36
 +#undef CLEAR_INSN_CACHE
 +#define CLEAR_INSN_CACHE(BEG, END)   \
 +   __asm__ __volatile__ ("trap #2")
++
++/* Apple's "cse of ZERO/SIGN EXTEND" treats a QImode register as standing for
++   the SImode one it was extended into; on the 68k they are different
++   registers, and the substitution produced pushes of byte registers into
++   long stack slots.  Turn it off (see cse.c).  */
++#undef CSE_EXTEND_OF_MEM
++#define CSE_EXTEND_OF_MEM 0
 diff --git a/gcc/config/m68k/t-next b/gcc/config/m68k/t-next
 new file mode 100644
 index 0000000..30653f1
@@ -11885,32 +11928,3 @@ index 1111111..2222222 100644
    int something_changed = 1;
    char *varying_length;
    rtx body;
-diff --git a/gcc/config/m68k/next.h b/gcc/config/m68k/next.h
---- a/gcc/config/m68k/next.h
-+++ b/gcc/config/m68k/next.h
-@@ -28,6 +28,9 @@
- #undef TARGET_DEFAULT
- #define TARGET_DEFAULT (MASK_68040 | MASK_BITFIELD | MASK_68881 | MASK_68020)
- 
-+/* Apple's Objective-C front end asks; m68k has no 64-bit mode.  */
-+#define TARGET_64BIT 0
-+
- #undef TARGET_OS_CPP_BUILTINS
- #define TARGET_OS_CPP_BUILTINS()                 \
-   do                                             \
-diff --git a/gcc/config/m68k/next.h b/gcc/config/m68k/next.h
---- a/gcc/config/m68k/next.h
-+++ b/gcc/config/m68k/next.h
-@@ -110,6 +110,12 @@
-    area.  */
- #undef PCC_STATIC_STRUCT_RETURN
- 
-+/* Classic NeXT has no objc_msgSend_stret or objc_msgSendSuper_stret: the
-+   address of an aggregate result (in a1 here) is not a hidden argument, so
-+   messages with such results go through the ordinary messengers.  The macro
-+   only tells objc-act.c so; the register is m68k.h's M68K_STRUCT_VALUE_REGNUM.  */
-+#define NEXTSTEP_STRUCT_VALUE_REGNUM M68K_STRUCT_VALUE_REGNUM
-+
- /* This accounts for the return pc and saved fp on the m68k.  */
- 
- #define OBJC_FORWARDING_STACK_OFFSET 8
