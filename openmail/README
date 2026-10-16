@@ -1,0 +1,65 @@
+OpenMail
+========
+
+A mail reader for OPENSTEP 4.2 in the style of NeXTMail, talking to current
+IMAP servers over TLS.  It is built on Pantomime (the `pantomime` package) and
+written in Objective-C with the OPENSTEP AppKit; there is no nib file, the
+windows are made in code.
+
+This is version 0.1, the foundation: it connects, lists the mailboxes and
+shows a mailbox's messages with the text of the selected one.  It cannot yet
+compose or send, flag, delete or move messages, show attachments or HTML, or
+keep a local copy.  Those are the next steps, in about that order.  OAuth 2
+(Gmail, Microsoft 365) is planned for a later major version; for now the
+server must accept a password.
+
+Running it
+----------
+
+    /usr/local/Apps/OpenMail.app/OpenMail
+
+or open the application in the Workspace Manager (it is in `/usr/local/Apps`;
+link it into `/LocalApps` or add it to the dock if you like).  The first time,
+the account panel asks for the servers.  Everything except the password is kept
+in your defaults (`defaults read OpenMail`); the password is asked for at each
+start and is not stored.
+
+  * Incoming mail (IMAP): the server, a security setting and the port.
+    "Encrypted (TLS)" on 993 is the usual one; "Start TLS" is for 143.
+  * Outgoing mail (SMTP): saved now, used when sending is added.
+  * "Check the server's certificate" is on by default.  The certificates are
+    checked against /usr/local/ssl/cert.pem (the `ca-certificates` package);
+    give a file in "Certificates file" to trust your own authority instead.
+    Turn the check off only on a network you control.
+
+The Mailboxes window lists the server's mailboxes; double-click one to open it.
+Selecting a message shows its headers and text in the lower half.  Mailbox ->
+Check Mail asks the server again.
+
+The windows wait for the network (names are looked up, and the TLS handshake
+is done, without returning to the event loop), so the interface can pause for
+a moment while connecting.
+
+Testing without a display
+-------------------------
+
+`openmail-sessiontest` runs the same session code with no windows:
+
+    PMAIL_PASSWORD=... openmail-sessiontest host 993 tls user [cafile|-k] [mailbox]
+
+It lists the mailboxes, opens one, prints the senders and subjects and the text
+of the last message.  `pkg test openmail` runs it against a closed port to check
+that failures are reported, and, if `OPENMAIL_TEST_SERVER` (host[:port]),
+`OPENMAIL_TEST_USER` and `PMAIL_PASSWORD` are set (and `OPENMAIL_TEST_CAFILE`,
+if needed), against a real server.
+
+Layout of the source
+--------------------
+
+  Account.[hm]        the settings, in the defaults
+  MailSession.[hm]    one IMAP conversation (Foundation only; tested on Linux
+                      against Dovecot with Pantomime's linux-test servers)
+  Windows.[hm]        the Mailboxes and Viewer windows
+  AccountPanel.[hm]   the account panel and the password prompt
+  MailApp.[hm]        the application delegate and the menus
+  UIKit.[hm]          helpers that build controls in code
