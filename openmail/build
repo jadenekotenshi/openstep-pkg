@@ -1,0 +1,46 @@
+#!/bin/sh
+
+set -e
+
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC=/bin/cc
+APP=OpenMail.app
+
+export DESTDIR PATH
+
+# Pantomime's headers need its compat directory and OpenSSL's types.
+CFLAGS="$PKG_SYSCC_ARCH_FLAGS -O -pipe -DCW_OPENSTEP -DHAVE_ICONV -I$PREFIX/include/Pantomime-compat -I$PREFIX/include"
+LIBS="$PREFIX/lib/libPantomime.a -L$PREFIX/lib -lssl -lcrypto -liconv"
+
+OBJS=
+for f in Account AccountPanel MailApp MailSession UIKit Windows main; do
+    $CC $CFLAGS -c $f.m -o $f.o
+    OBJS="$OBJS $f.o"
+done
+
+# -ObjC: Pantomime is mostly categories, which the linker would leave out.
+$CC $PKG_SYSCC_ARCH_FLAGS -ObjC -o OpenMail $OBJS $LIBS -framework AppKit -framework Foundation
+
+# The same session code without windows, to test against a server.
+$CC $CFLAGS -c sessiontest.m -o sessiontest.o
+$CC $PKG_SYSCC_ARCH_FLAGS -ObjC -o openmail-sessiontest sessiontest.o Account.o MailSession.o $LIBS -framework Foundation
+
+mkdirs() {
+    mkdirs_path=
+    for mkdirs_part in `echo "$1" | sed 's#/# #g'`; do
+        mkdirs_path="$mkdirs_path/$mkdirs_part"
+        test -d "$mkdirs_path" || mkdir "$mkdirs_path"
+    done
+}
+
+mkdirs "$DESTDIR$PREFIX/Apps/$APP/Resources"
+mkdirs "$DESTDIR$PREFIX/bin"
+mkdirs "$DESTDIR$PREFIX/share/doc/openmail"
+
+cp OpenMail "$DESTDIR$PREFIX/Apps/$APP/OpenMail"
+cp Info-nextstep.plist "$DESTDIR$PREFIX/Apps/$APP/Resources/Info-nextstep.plist"
+cp openmail-sessiontest "$DESTDIR$PREFIX/bin/openmail-sessiontest"
+cp README "$DESTDIR$PREFIX/share/doc/openmail/README"

@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -e
+
+APP="$ROOT_DIR/usr/local/Apps/OpenMail.app"
+
+[ -x "$APP/OpenMail" ]
+[ -f "$APP/Resources/Info-nextstep.plist" ]
+[ -x "$ROOT_DIR/usr/local/bin/openmail-sessiontest" ]
+
+# The windows need a display; what can be checked here is that the
+# session code starts and reports a refused connection properly.
+out=`"$ROOT_DIR/usr/local/bin/openmail-sessiontest" 127.0.0.1 9 tls nobody 2>&1 </dev/null` || :
+echo "$out"
+echo "$out" | grep 'FAILED: Cannot connect to 127.0.0.1' >/dev/null
+
+# Against a real server, if the tester names one (see the README).
+if [ -n "$OPENMAIL_TEST_SERVER" ]; then
+    host=`echo "$OPENMAIL_TEST_SERVER" | sed 's/:.*//'`
+    port=`echo "$OPENMAIL_TEST_SERVER" | sed -n 's/^[^:]*://p'`
+    [ -n "$port" ] || port=993
+    set -- "$host" "$port" tls "$OPENMAIL_TEST_USER"
+    if [ -n "$OPENMAIL_TEST_CAFILE" ]; then
+        set -- "$@" "$OPENMAIL_TEST_CAFILE"
+    fi
+    "$ROOT_DIR/usr/local/bin/openmail-sessiontest" "$@" | grep '^opened INBOX' >/dev/null
+fi
