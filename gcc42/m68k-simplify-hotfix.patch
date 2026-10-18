@@ -1,0 +1,12 @@
+--- a/gcc/simplify-rtx.c
++++ b/gcc/simplify-rtx.c
+@@ -4058,6 +4058,9 @@ simplify_ternary_operation (enum rtx_code code, enum machine_mode mode,
+ 	  && GET_CODE (op1) == CONST_INT
+ 	  && GET_CODE (op2) == CONST_INT
+ 	  && ((unsigned) INTVAL (op1) + (unsigned) INTVAL (op2) <= width)
++	  && (op0_mode == VOIDmode
++	      || ((unsigned) INTVAL (op1) + (unsigned) INTVAL (op2)
++		  <= GET_MODE_BITSIZE (op0_mode)))
+ 	  && width <= (unsigned) HOST_BITS_PER_WIDE_INT)
+ 	{
+ 	  /* Extracting a bit-field from a constant */
