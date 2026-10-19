@@ -59,7 +59,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | diffutils | validated | validated 2.8.1 (2026-10-09) | — |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
 | emacs | validated | validated (2026-10-10; needed the pdumper alignment fixes for the 64-bit wide-int Lisp_Object, and a SPARC `netinet/in.h` big-endian branch) | — |
-| expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | — |
+| expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
 | findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | — |
 | flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
@@ -81,7 +81,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | libgcrypt | 1.5.6 validated (reinstalled on messer 2026-10-10) | validated 1.5.6 (2026-10-10; needs `-D__sparc_v8__` for the V8 udiv/umul in mpi) | — |
 | libgpg-error | 1.12 validated | validated 1.12 (2026-10-09) | — |
 | libhubbub | validated | validated 0.3.8 (2026-10-09) | — |
-| libiconv | validated | validated 1.15 (rebootstrap, 2026-10-08) | — |
+| libiconv | validated | validated 1.15 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | libmad | validated (reinstalled on messer 2026-10-10; `VERSION` is exported to the build) | validated 0.15.1b (2026-10-09) | — |
 | libmpeg2 | validated | validated (2026-10-10) | — |
 | libnsbmp | validated | validated 0.1.7 (2026-10-09) | — |
@@ -139,7 +139,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | — |
 | xz | validated | validated 5.8.4 | — |
 | zip | validated | validated 3.0 (2026-10-09) | — |
-| zlib | validated | validated 1.2.13 (rebootstrap, 2026-10-08) | — |
+| zlib | validated | validated 1.2.13 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | zsh | validated | validated 5.9 | — |
 | zstd | validated | rebuilt 2026-10-09 with memcpy memory access (MEM_FORCE_MEMORY_ACCESS=0); tests clean | — |
 
