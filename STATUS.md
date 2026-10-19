@@ -51,7 +51,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | — |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
-| ca-certificates | validated | validated 2026.09.25 (rebootstrap, 2026-10-08) | — |
+| ca-certificates | validated | validated 2026.09.25 (rebootstrap, 2026-10-08) | validated (2026-10-19; as a dependency of wget-bootstrap) |
 | cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) | — |
 | class-dump | validated | validated (2026-10-10; builds with `-arch $PKG_ARCH`) | — |
 | coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
