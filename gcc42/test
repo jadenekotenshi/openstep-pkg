@@ -168,6 +168,10 @@ typedef struct { int a, b, c; double d; } BootstrapValue;
 #include <stdio.h>
 @interface BootstrapForwarder : NSObject { BootstrapBase *target; }
 - (id) initWithTarget:(BootstrapBase *)value;
+@end
+/* result: is not implemented; it is forwarded (the point of the test), so it is
+   declared where the compiler does not look for an implementation.  */
+@interface BootstrapForwarder (Forwarded)
 - (BootstrapValue) result:(int)value;
 @end
 @implementation BootstrapForwarder
