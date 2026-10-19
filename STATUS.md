@@ -48,14 +48,14 @@ SPARC `test world` of 2026-10-14 covers every row.
 
 | Package | x86 | SPARC | M68k |
 |---|---|---|---|
-| bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | — |
+| bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | validated (2026-10-21; built with gcc42, tests pass) |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
 | ca-certificates | validated | validated 2026.09.25 (rebootstrap, 2026-10-08) | validated (2026-10-19; as a dependency of wget-bootstrap) |
 | cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) | — |
 | class-dump | validated | validated (2026-10-10; builds with `-arch $PKG_ARCH`) | — |
 | coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | — |
+| curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | validated (2026-10-21; built with gcc42, tests pass) |
 | diffutils | validated | validated 2.8.1 (2026-10-09) | — |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
 | emacs | validated | validated (2026-10-10; needed the pdumper alignment fixes for the 64-bit wide-int Lisp_Object, and a SPARC `netinet/in.h` big-endian branch) | — |
