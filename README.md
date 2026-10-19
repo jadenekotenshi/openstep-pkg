@@ -392,6 +392,7 @@ sh ./pkg-world strip world     # pkg strip for every installed package (-o "a b"
 `STRIP_BINARIES=1` in `pkg.conf` strips every package as it is installed (and before a `binpkg` is
 written).  `install-strip` and `reinstall-strip` strip only the packages you name, not their
 dependencies.  `pkg strip` records the new checksums, so `pkg verify` keeps passing.
+A strip replaces a file with a new one, which would turn hard links into copies (git's commands in `libexec/git-core` are links to one executable), so the names of one inode are stripped once and linked again, and identical executables are linked together; running `pkg strip NAME` on a package stripped by an older `pkg` repairs it.
 `pkg rehash NAME` records the checksums of a package as its files are now (for example after a strip that was cut short).
 
 Only thin Mach-O executables are touched: not libraries, object files, static archives, scripts or
