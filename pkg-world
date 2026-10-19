@@ -4,6 +4,7 @@
 # usage: pkg-world [options] install missing
 #        pkg-world [options] test world
 #        pkg-world [options] verify world
+#        pkg-world [options] strip world
 #        pkg-world [options] reinstall world
 #        pkg-world [options] remake entire-world
 #
@@ -16,6 +17,9 @@
 #   test world           run "pkg test" for every installed package
 #   verify world         run "pkg verify" for every installed package: are the
 #                        installed files all there, with their checksums
+#   strip world          run "pkg strip" for every installed package: remove the
+#                        symbols from its executables, in place, and record the
+#                        new checksums (so "verify world" still passes)
 #   reinstall world      rebuild and reinstall every installed package ("pkg
 #                        reinstall"), dependencies first, then test it
 #   remake entire-world  remove every installed package, then rebuild the tree
@@ -52,7 +56,7 @@
 # pkg settings in the environment.
 
 usage() {
-    sed -n '2,52p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,56p' "$0" | sed 's/^# \{0,1\}//'
 }
 
 logdir=
@@ -121,6 +125,9 @@ case "$*" in
     ;;
     "verify world")
         mode=verify
+    ;;
+    "strip world")
+        mode=strip
     ;;
     "reinstall world")
         mode=reinstall
@@ -468,6 +475,13 @@ verify_step() {
             echo "no 'installed' line"
             return 1
         ;;
+        strip)
+            if grep "==> stripped $vs_pkg\$" "$vs_log" > /dev/null 2>&1; then
+                return 0
+            fi
+            echo "no 'stripped' line"
+            return 1
+        ;;
         remove)
             if [ -d "$installed_dir/$vs_pkg" ]; then
                 echo "still installed"
@@ -488,6 +502,7 @@ step() {
         reinstall) st_verb=rebuilding ;;
         remove) st_verb=removing ;;
         verify) st_verb=verifying ;;
+        strip) st_verb=stripping ;;
         *) st_verb=testing ;;
     esac
     say "`stamp`  ...   $st_verb $st_pkg"
@@ -620,7 +635,7 @@ if [ $mode = check ]; then
     fi
     exit 2
 fi
-if [ $mode != test ] && [ $mode != verify ]; then
+if [ $mode != test ] && [ $mode != verify ] && [ $mode != strip ]; then
     check_cycles "`tree_set`" || { echo "pkg-world: not starting; fix the loop first" >&2; exit 2; }
 fi
 
@@ -711,6 +726,24 @@ case $mode in
                     st_opt=
                 else
                     record SKIP verify "$name" "not installed"
+                fi
+            fi
+        done
+    ;;
+    strip)
+        set_to_do=$installed
+        if [ -n "$selected" ]; then
+            set_to_do=$selected
+        fi
+        for name in $set_to_do; do
+            if [ $stop_now = 0 ]; then
+                if in_set "$name" "$installed"; then
+                    st_action=strip
+                    st_pkg=$name
+                    st_arg=$name
+                    step || :
+                else
+                    record SKIP strip "$name" "not installed"
                 fi
             fi
         done

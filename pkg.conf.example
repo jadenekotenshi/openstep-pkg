@@ -13,3 +13,13 @@ X11_PREFIX=/usr/X11R6
 # python311 package (for git-p4).  Set 0 to build git without Python, for example
 # on a machine where python311 does not build yet.
 WITH_PYTHON=1
+
+# 1 strips the symbols from every executable as it is installed (and before a
+# binary package is written).  "pkg install-strip NAME" and "pkg strip NAME"
+# do it for single packages without this.
+STRIP_BINARIES=0
+
+# The strip to run, and its flags.  -x keeps the global symbols, which programs
+# that load code at run time (python, emacs) need.
+#STRIP_PROGRAM=/bin/strip
+#STRIP_FLAGS=-x

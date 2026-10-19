@@ -130,6 +130,14 @@ load_config() {
     # against the python311 package, 0 to leave it out.
     WITH_PYTHON=${WITH_PYTHON-1}
 
+    # STRIP_BINARIES: 1 to strip the symbols from every executable as it is
+    # installed (and put in a binary package).  STRIP_PROGRAM is the strip to
+    # run and STRIP_FLAGS what it is given: -x keeps the global symbols, which
+    # programs that load code at run time (python, emacs) look up.
+    STRIP_BINARIES=${STRIP_BINARIES-0}
+    STRIP_PROGRAM=${STRIP_PROGRAM-/bin/strip}
+    STRIP_FLAGS=${STRIP_FLAGS--x}
+
     if [ -f "$conf_file" ]; then
         . "$conf_file"
     fi
@@ -150,7 +158,20 @@ load_config() {
         ;;
     esac
 
-    export PKG_CONF_FILE HAVE_X11 X11_PREFIX WITH_PYTHON
+    case $STRIP_BINARIES in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: STRIP_BINARIES must be 0 or 1, not '$STRIP_BINARIES'"
+        ;;
+    esac
+
+    # --strip (or PKG_STRIP=1) turns it on for one run.
+    if [ "x$PKG_STRIP" = x1 ]; then
+        STRIP_BINARIES=1
+    fi
+
+    export PKG_CONF_FILE HAVE_X11 X11_PREFIX WITH_PYTHON STRIP_BINARIES STRIP_PROGRAM STRIP_FLAGS
 }
 
 # A package's optional `requires` file names the pkg.conf options it needs:
@@ -317,6 +338,9 @@ usage:
   pkg build <package-dir>
   pkg install <package-dir>...
   pkg reinstall <package-dir>...    (alias: forceinstall)
+  pkg install-strip <package-dir>...
+  pkg reinstall-strip <package-dir>...
+  pkg strip <name>...
   pkg binpkg <package-dir>...
   pkg installpkg <file>...
   pkg list
@@ -343,6 +367,9 @@ options (before the action; each also works as an environment variable set to 1)
   --no-deps                installpkg: do not require the package's dependencies
                            to be installed (PKG_NO_DEPS); conflicts are still
                            refused
+  --strip                  strip the executables of every package this run
+                           installs or writes as a binary package, like
+                           STRIP_BINARIES=1 in the configuration (PKG_STRIP)
   --download-only          with install, reinstall, binpkg or build: fetch the
                            sources of the package and of the dependencies that
                            would be built (those not installed) into the cache
@@ -361,6 +388,13 @@ install actions:
   reinstall    rebuilds and installs the named package even when it is already
                installed at that version (its dependencies are only installed
                when missing)
+  install-strip, reinstall-strip
+               install or reinstall the named packages with their executables
+               stripped (their dependencies are installed as usual, not
+               stripped, unless STRIP_BINARIES is 1)
+  strip        strips the executables of packages that are already installed,
+               in place, and records the new checksums (pkg verify keeps
+               passing); "pkg-world strip world" does this for every package
   binpkg       builds a package like install does, but instead of installing it
                writes <name>-<version>-<arch>.binpkg.tar.gz (into PKG_BINPKG_DIR,
                default the current directory); dependencies are installed first,
@@ -402,6 +436,15 @@ upgrade:
   rebuilds those too (they, and what depends on them, reinstalled after the
   upgrades, dependencies first); that can take very long.  It stops at the first
   failure; run it again to carry on.
+
+strip:
+  Only thin Mach-O executables are stripped (not libraries, object files,
+  archives or scripts), and not files with the setuid or setgid bit.  The
+  default is "strip -x", which keeps the global symbols that programs loading
+  code at run time look up; STRIP_FLAGS and STRIP_PROGRAM change that.  A package
+  may carry a "nostrip" file, and <db>/nostrip is the site's, listing paths to
+  leave alone (shell patterns over the path under the root, one per line, #
+  starts a comment, * also matches /).  Failing to strip a file is a warning.
 
 cleanup:
   pkg cleanup removes what the cache keeps of builds: downloaded sources, build
@@ -1377,6 +1420,13 @@ write_manifest() {
         fi
     done
 
+    # Paths pkg strip leaves alone.
+    if [ -f "$HOOK_DIR/nostrip" ]; then
+        cp "$HOOK_DIR/nostrip" "$INST_DIR/nostrip"
+    else
+        rm -f "$INST_DIR/nostrip"
+    fi
+
     # Paths pkg verify skips for this package (not a hook, so not executable).
     if [ -f "$HOOK_DIR/verify-ignore" ]; then
         cp "$HOOK_DIR/verify-ignore" "$INST_DIR/verify-ignore"
@@ -2192,6 +2242,149 @@ installed_same_version() {
     [ "x$installed_version" = "x$PKG_VERSION" ] && [ -z "$installed_version_extra" ]
 }
 
+# ---- stripping ---------------------------------------------------------------
+# Strip removes the symbol tables of executables, which are only used by
+# debuggers.  Only thin Mach-O executables are touched (not libraries, object
+# files, archives, scripts or fat files), and not files with the setuid or setgid
+# bit, which a strip may drop.  A package may list paths to leave alone in a
+# "nostrip" file (shell patterns over the path under the root, one per line, #
+# starts a comment, * also matches /); <db>/nostrip is the site's own list.
+# Failing to strip a file is a warning, never a failure.
+
+# True when file $1 is a thin Mach-O executable (MH_EXECUTE, type 2), in either
+# byte order: the big-endian magic is 0xfeedface (68k, SPARC), the little-endian
+# one, on x86, has its bytes the other way round.
+macho_executable() {
+    me_bytes=`dd if="$1" bs=16 count=1 2>/dev/null | od -b | sed -n 1p | sed 's/^[0-9]* *//'`
+    me_bytes=`echo $me_bytes`
+    me_magic=`echo "$me_bytes" | cut -d' ' -f1-4`
+    me_type=`echo "$me_bytes" | cut -d' ' -f13-16`
+    case "$me_magic:$me_type" in
+        "376 355 372 316:000 000 000 002") return 0 ;;
+        "316 372 355 376:002 000 000 000") return 0 ;;
+    esac
+    return 1
+}
+
+# Set STRIP_PATTERNS from the nostrip file in directory $1 and the site's.
+strip_load_patterns() {
+    STRIP_PATTERNS=
+    for sl_file in "$1/nostrip" "$DB_ROOT/nostrip"; do
+        if [ -f "$sl_file" ]; then
+            sl_text=`sed -e 's/#.*//' "$sl_file"`
+            for sl_w in $sl_text; do
+                STRIP_PATTERNS="$STRIP_PATTERNS $sl_w"
+            done
+        fi
+    done
+}
+
+strip_find_program() {
+    [ -x "$STRIP_PROGRAM" ] ||
+        die "cannot strip: $STRIP_PROGRAM is not an executable (set STRIP_PROGRAM in $PKG_CONF_FILE)"
+}
+
+# strip_files ROOT LIST DONE: strip the executables among the paths in LIST
+# (paths under ROOT, one per line, starting with /; STRIP_PATTERNS are skipped).
+# DONE gets a line "<path> <size before> <size after>" for each file stripped.
+strip_files() {
+    sf_root=$1
+    sf_list=$2
+    sf_done=$3
+    : > "$sf_done"
+    strip_find_program
+    (
+        set -f
+        while read sf_rel; do
+            sf_path=$sf_root$sf_rel
+            [ -f "$sf_path" ] || continue
+            [ -h "$sf_path" ] && continue
+            if [ -u "$sf_path" ] || [ -g "$sf_path" ]; then
+                continue
+            fi
+            sf_skip=0
+            for sf_pat in $STRIP_PATTERNS; do
+                case $sf_rel in
+                    $sf_pat) sf_skip=1 ;;
+                esac
+            done
+            [ $sf_skip = 0 ] || continue
+            macho_executable "$sf_path" || continue
+            sf_before=`wc -c < "$sf_path" | sed 's/ //g'`
+            if "$STRIP_PROGRAM" $STRIP_FLAGS "$sf_path" > /dev/null 2>&1; then
+                sf_after=`wc -c < "$sf_path" | sed 's/ //g'`
+                echo "$sf_rel $sf_before $sf_after" >> "$sf_done"
+            else
+                echo "warning: could not strip $sf_rel" >&2
+            fi
+        done < "$sf_list"
+    )
+}
+
+# Report what strip_files did (file DONE) for package $2 as "$1 ...".
+strip_report() {
+    sr_done=$1
+    sr_what=$2
+    sr_n=`wc -l < "$sr_done" | sed 's/ //g'`
+    sr_tmp=$sr_done.sum
+    sed 's/^[^ ]* //' "$sr_done" > "$sr_tmp"
+    # (The loop's variables are lost with the stock sh, so it prints the sum.)
+    sr_saved=`sr_s=0; while read sr_b sr_a; do sr_s=\`expr $sr_s + $sr_b - $sr_a\`; done < "$sr_tmp"; echo $sr_s`
+    rm -f "$sr_tmp"
+    if [ "$sr_n" -gt 0 ]; then
+        log "stripped $sr_n executable(s) of $sr_what, $sr_saved bytes smaller"
+    else
+        log "nothing to strip in $sr_what"
+    fi
+}
+
+# Strip the executables in the staged image IMAGE_DIR; nostrip comes from $1.
+strip_image() {
+    si_tmp=${TMPDIR:-/tmp}/pkg-strip-$$
+    (
+        cd "$IMAGE_DIR" && find . -type f -print | sed 's#^\./#/#' | sort
+    ) > "$si_tmp.list"
+    strip_load_patterns "$1"
+    strip_files "$IMAGE_DIR" "$si_tmp.list" "$si_tmp.done"
+    strip_report "$si_tmp.done" "$PKG_NAME"
+    rm -f "$si_tmp.list" "$si_tmp.done"
+}
+
+# Strip the installed package $1 in place and record the new checksums.
+strip_name() {
+    sn_name=$1
+    ROOT_DIR=`default_value "$PKG_ROOT" "/"`
+    ROOT_DIR=`trim_slash "$ROOT_DIR"`
+    LOCAL_ROOT=$ROOT_DIR/usr/local
+    DB_ROOT=`default_value "$PKG_DB" "$LOCAL_ROOT/var/pkg/db"`
+    INST_DIR=$DB_ROOT/installed/$sn_name
+    PKG_NAME=$sn_name
+
+    [ -d "$INST_DIR" ] || die "package is not installed: $sn_name"
+    require_file "$INST_DIR/manifest"
+
+    sn_tmp=${TMPDIR:-/tmp}/pkg-strip-$$
+    strip_load_patterns "$INST_DIR"
+    strip_files "$ROOT_DIR" "$INST_DIR/manifest" "$sn_tmp.done"
+    strip_report "$sn_tmp.done" "$sn_name"
+    sn_count=`wc -l < "$sn_tmp.done" | sed 's/ //g'`
+    rm -f "$sn_tmp.done"
+    if [ "$sn_count" -gt 0 ]; then
+        # The files changed, so the recorded checksums are stale.
+        write_files || log "warning: could not record the file list with checksums for $sn_name"
+    fi
+    log "stripped $sn_name"
+}
+
+strip_pkgs() {
+    [ $# -ge 1 ] || die "strip requires at least one <name>"
+    sp_list="$*"
+    for sp_name in $sp_list
+    do
+        strip_name "$sp_name"
+    done
+}
+
 restore_install_context() {
     PKG_INSTALL_STACK=$saved_install_stack
     PKG_DIR=$saved_pkg_dir
@@ -2214,6 +2407,8 @@ install_pkg() {
     # Only the package named on the command line is forced, not its dependencies.
     install_force=$PKG_FORCE
     PKG_FORCE=0
+    install_strip=$PKG_STRIP_ONE
+    PKG_STRIP_ONE=0
     saved_install_stack=$PKG_INSTALL_STACK
     saved_pkg_dir=$PKG_DIR
     saved_pkg_name=$PKG_NAME
@@ -2280,6 +2475,10 @@ install_pkg() {
 
     HOOK_DIR=$PKG_DIR
     FEATURES_FILE=
+    STRIP_THIS=$STRIP_BINARIES
+    if [ "x$install_strip" = x1 ]; then
+        STRIP_THIS=1
+    fi
     commit_install
 
     restore_install_context
@@ -2326,6 +2525,10 @@ commit_install() {
         set_paths
     fi
 
+    if [ "x$STRIP_THIS" = x1 ]; then
+        strip_image "$HOOK_DIR"
+    fi
+
     log_install_contents
     log "installing $PKG_NAME into $ROOT_DIR"
     install_preflight
@@ -2354,6 +2557,7 @@ install_pkgs() {
     for pkg_arg in $ip_list
     do
         PKG_FORCE=$FORCE_INSTALL
+        PKG_STRIP_ONE=$STRIP_INSTALL
         install_pkg "$pkg_arg"
     done
 }
@@ -2368,6 +2572,7 @@ install_pkgs() {
 #   features    optional options it was built with
 #   post-install, pre-remove, test   the package's hooks, when it has them
 #   verify-ignore   the paths pkg verify skips, when it has any
+#   nostrip         the paths pkg strip leaves alone, when it has any
 # installpkg then does what install does after the build: it replaces any
 # installed version, copies the files in, records the package database and
 # runs post-install.
@@ -2411,6 +2616,9 @@ binpkg_pkg() {
     check_depends
     check_build_shell
     build_or_reuse_image
+    if [ "$STRIP_BINARIES" = 1 ]; then
+        strip_image "$PKG_DIR"
+    fi
 
     bp_dir=`default_value "$PKG_BINPKG_DIR" "."`
     ensure_dir "$bp_dir"
@@ -2433,7 +2641,7 @@ binpkg_pkg() {
     if [ -f "$PKG_DIR/requires" ]; then
         cp "$PKG_DIR/requires" "$bp_meta/requires"
     fi
-    for hook in pre-remove post-install test verify-ignore; do
+    for hook in pre-remove post-install test verify-ignore nostrip; do
         if [ -f "$PKG_DIR/$hook" ]; then
             cp "$PKG_DIR/$hook" "$bp_meta/$hook"
         fi
@@ -2603,6 +2811,7 @@ installpkg_file() {
 
     HOOK_DIR=$ip_meta
     FEATURES_FILE=$ip_meta/features
+    STRIP_THIS=$STRIP_BINARIES
     commit_install
     rm -rf "$ip_meta"
 }
@@ -2764,6 +2973,10 @@ PKG_PRESERVE_DOWNLOAD=${PKG_PRESERVE_DOWNLOAD-0}
 PKG_PRESERVE_BUILD_TREE=${PKG_PRESERVE_BUILD_TREE-0}
 PKG_PRESERVE_INSTALL_TREE=${PKG_PRESERVE_INSTALL_TREE-0}
 PKG_NO_DEPS=${PKG_NO_DEPS-0}
+PKG_STRIP=${PKG_STRIP-0}
+PKG_STRIP_ONE=0
+STRIP_INSTALL=0
+STRIP_THIS=0
 PKG_DOWNLOAD_ONLY=${PKG_DOWNLOAD_ONLY-0}
 PKG_DOWNLOAD_RETRIES=${PKG_DOWNLOAD_RETRIES-3}
 while [ $# -gt 0 ]; do
@@ -2782,6 +2995,10 @@ while [ $# -gt 0 ]; do
         ;;
         --no-deps)
             PKG_NO_DEPS=1
+            shift
+        ;;
+        --strip)
+            PKG_STRIP=1
             shift
         ;;
         --download-only)
@@ -2810,7 +3027,7 @@ while [ $# -gt 0 ]; do
         ;;
     esac
 done
-export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE PKG_NO_DEPS PKG_DOWNLOAD_ONLY PKG_DOWNLOAD_RETRIES
+export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE PKG_NO_DEPS PKG_STRIP PKG_DOWNLOAD_ONLY PKG_DOWNLOAD_RETRIES
 
 # "pkg <action> --help" (or -h) prints the usage too, rather than being taken
 # for a package name.
@@ -2842,10 +3059,10 @@ load_config
 
 if [ "$PKG_DOWNLOAD_ONLY" = 1 ]; then
     case $ACTION in
-        install|reinstall|forceinstall|binpkg|build|download|''|help|-h|--help)
+        install|reinstall|forceinstall|install-strip|reinstall-strip|binpkg|build|download|''|help|-h|--help)
         ;;
         *)
-            die "--download-only applies to install, reinstall, binpkg, build and download, not $ACTION"
+            die "--download-only applies to install, reinstall, install-strip, reinstall-strip, binpkg, build and download, not $ACTION"
         ;;
     esac
 fi
@@ -2865,6 +3082,9 @@ case $ACTION in
         echo "HAVE_X11=$HAVE_X11"
         echo "X11_PREFIX=$X11_PREFIX"
         echo "WITH_PYTHON=$WITH_PYTHON"
+        echo "STRIP_BINARIES=$STRIP_BINARIES"
+        echo "STRIP_PROGRAM=$STRIP_PROGRAM"
+        echo "STRIP_FLAGS=$STRIP_FLAGS"
     ;;
 
     download)
@@ -2892,6 +3112,22 @@ case $ACTION in
     reinstall|forceinstall)
         FORCE_INSTALL=1
         install_pkgs $PKG_ARGS
+    ;;
+
+    install-strip)
+        FORCE_INSTALL=0
+        STRIP_INSTALL=1
+        install_pkgs $PKG_ARGS
+    ;;
+
+    reinstall-strip)
+        FORCE_INSTALL=1
+        STRIP_INSTALL=1
+        install_pkgs $PKG_ARGS
+    ;;
+
+    strip)
+        strip_pkgs $PKG_ARGS
     ;;
 
     binpkg)

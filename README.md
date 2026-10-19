@@ -61,6 +61,7 @@ sh ./pkg remove bash
 ```
 sh ./pkg-world install missing          # install every package that is not installed, dependencies first, then test it
 sh ./pkg-world test world               # pkg test for every installed package
+sh ./pkg-world strip world               # pkg strip for every installed package
 sh ./pkg-world reinstall world          # rebuild and reinstall each installed package, dependencies first, then test it
 sh ./pkg-world remake entire-world      # remove every package, then rebuild the whole tree from an empty system
 ```
@@ -123,6 +124,9 @@ adapt to them.
 | `HAVE_X11` | `0`     | `1` if an X11 server (CubXWindow or similar) and its development headers and libraries are installed |
 | `X11_PREFIX` | `/usr/X11R6` | directory holding the X11 `include/` and `lib/` (CubXWindow installs under `/usr/X11R6`) |
 | `WITH_PYTHON` | `1` | `1` builds optional Python support and depends on `python311` (git: `git-p4`); `0` leaves it out |
+| `STRIP_BINARIES` | `0` | `1` strips the symbols from every executable as it is installed or put in a binary package (see "Stripping") |
+| `STRIP_PROGRAM` | `/bin/strip` | the strip to run |
+| `STRIP_FLAGS` | `-x` | what it is given; `-x` keeps the global symbols that programs loading code at run time look up |
 
 An environment variable of the same name sets the default, and the file overrides it.
 
@@ -288,6 +292,7 @@ Optional:
 - `pre-remove`
 - `test`
 - `verify-ignore` (paths `pkg verify` skips for this package; see "Verifying installed files")
+- `nostrip` (paths `pkg strip` leaves alone; see "Stripping")
 
 ## Upgrading
 
@@ -371,6 +376,29 @@ name paths under the root that `verify` skips, whether they are edited or gone:
 Files that a post-install hook creates from a `.dist` template (`ntpd.conf`, `sudoers`) are not in
 the package image, so they are never checked.  `pkg-world verify world` runs `pkg verify` on every
 installed package and logs each result (`-q` for `--quick`, `-o "a b"` for just those).
+
+## Stripping
+
+Stripping removes an executable's symbol table, which only a debugger uses, and makes it smaller.
+
+```sh
+pkg install-strip git          # install git with its executables stripped
+pkg reinstall-strip git        # rebuild it and do the same
+pkg strip git tar              # strip packages that are already installed, in place
+pkg --strip install git        # strip everything this run installs, dependencies included
+sh ./pkg-world strip world     # pkg strip for every installed package (-o "a b" for just those)
+```
+
+`STRIP_BINARIES=1` in `pkg.conf` strips every package as it is installed (and before a `binpkg` is
+written).  `install-strip` and `reinstall-strip` strip only the packages you name, not their
+dependencies.  `pkg strip` records the new checksums, so `pkg verify` keeps passing.
+
+Only thin Mach-O executables are touched: not libraries, object files, static archives, scripts or
+fat files, and not files with the setuid or setgid bit.  The default is `strip -x`, which keeps the
+global symbols.  Failing to strip a file is a warning, not an error.  A `nostrip` file in a package
+directory (copied into the database and into a binary package) and `<db>/nostrip` (the site's list)
+hold shell patterns, one per line, for paths that must be left alone; the format is that of
+`verify-ignore`.
 
 ## Making the bootstrap distribution (maintainers)
 
