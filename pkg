@@ -2288,14 +2288,47 @@ strip_find_program() {
         die "cannot strip: $STRIP_PROGRAM is not an executable (set STRIP_PROGRAM in $PKG_CONF_FILE)"
 }
 
+# Strip replaces a file by a new one, so a hard link would become a copy: git
+# installs its commands in libexec/git-core as links to one big executable, and
+# stripping each name would make a hundred copies.  So the names of one inode are
+# stripped once and then linked again, and a file identical to one already seen
+# in this run (same size, bytes, mode and owner) is linked to it, which also
+# repairs packages stripped by an older pkg.
+strip_perm() {
+    ls -ld "$1" | sed 's/^\([^ ]*\) *[0-9]* *\([^ ]*\) *\([^ ]*\).*/\1 \2 \3/'
+}
+
+strip_nlinks() {
+    ls -ld "$1" | sed 's/^[^ ]* *\([0-9]*\).*/\1/'
+}
+
+strip_inode() {
+    ls -i "$1" | sed 's/^ *\([0-9]*\).*/\1/'
+}
+
+# strip_twin SIZE PATH PERM: print a file in the size list that is the same as PATH.
+strip_twin() {
+    tw_list=`grep "^$1 " "$sf_done.sz" | sed 's/^[^ ]* //' || :`
+    for tw_p in $tw_list; do
+        if cmp -s "$2" "$tw_p" && [ "`strip_perm "$tw_p"`" = "$3" ]; then
+            echo "$tw_p"
+            break
+        fi
+    done
+}
+
 # strip_files ROOT LIST DONE: strip the executables among the paths in LIST
 # (paths under ROOT, one per line, starting with /; STRIP_PATTERNS are skipped).
-# DONE gets a line "<path> <size before> <size after>" for each file stripped.
+# DONE gets a line "<path> <size before> <size after>" for each file stripped,
+# and DONE.links a line for each file linked to another instead.
 strip_files() {
     sf_root=$1
     sf_list=$2
     sf_done=$3
     : > "$sf_done"
+    : > "$sf_done.links"
+    : > "$sf_done.ino"
+    : > "$sf_done.sz"
     strip_find_program
     (
         set -f
@@ -2314,12 +2347,39 @@ strip_files() {
             done
             [ $sf_skip = 0 ] || continue
             macho_executable "$sf_path" || continue
+            sf_n=`strip_nlinks "$sf_path"`
+            sf_ino=
+            if [ "$sf_n" -gt 1 ]; then
+                sf_ino=`strip_inode "$sf_path"`
+                sf_first=`grep "^$sf_ino " "$sf_done.ino" | sed 's/^[^ ]* //' || :`
+                if [ -n "$sf_first" ]; then
+                    # Another name of a file already stripped: link to it.
+                    if ln -f "$sf_first" "$sf_path"; then
+                        echo "$sf_rel" >> "$sf_done.links"
+                        continue
+                    fi
+                fi
+                echo "$sf_ino $sf_path" >> "$sf_done.ino"
+            fi
             sf_before=`wc -c < "$sf_path" | sed 's/ //g'`
             if "$STRIP_PROGRAM" $STRIP_FLAGS "$sf_path" > /dev/null 2>&1; then
                 sf_after=`wc -c < "$sf_path" | sed 's/ //g'`
                 echo "$sf_rel $sf_before $sf_after" >> "$sf_done"
             else
                 echo "warning: could not strip $sf_rel" >&2
+            fi
+            if [ -z "$sf_ino" ]; then
+                # A file of its own: is there a copy of it already?
+                sf_size=`wc -c < "$sf_path" | sed 's/ //g'`
+                sf_perm=`strip_perm "$sf_path"`
+                sf_twin=`strip_twin "$sf_size" "$sf_path" "$sf_perm"`
+                if [ -n "$sf_twin" ]; then
+                    if ln -f "$sf_twin" "$sf_path"; then
+                        echo "$sf_rel" >> "$sf_done.links"
+                    fi
+                else
+                    echo "$sf_size $sf_path" >> "$sf_done.sz"
+                fi
             fi
         done < "$sf_list"
         exit 0
@@ -2346,10 +2406,14 @@ strip_report() {
     sed 's/^[^ ]* //' "$sr_done" > "$sr_tmp"
     sr_saved=`strip_sum < "$sr_tmp"`
     rm -f "$sr_tmp"
+    sr_l=`wc -l < "$sr_done.links" | sed 's/ //g'`
     if [ "$sr_n" -gt 0 ]; then
         log "stripped $sr_n executable(s) of $sr_what, $sr_saved bytes smaller"
     else
         log "nothing to strip in $sr_what"
+    fi
+    if [ "$sr_l" -gt 0 ]; then
+        log "linked $sr_l identical executable(s) of $sr_what together again (hard links)"
     fi
 }
 
@@ -2362,7 +2426,7 @@ strip_image() {
     strip_load_patterns "$1"
     strip_files "$IMAGE_DIR" "$si_tmp.list" "$si_tmp.done"
     strip_report "$si_tmp.done" "$PKG_NAME"
-    rm -f "$si_tmp.list" "$si_tmp.done"
+    rm -f "$si_tmp.list" "$si_tmp.done" "$si_tmp.done".*
 }
 
 # Strip the installed package $1 in place and record the new checksums.
@@ -2383,7 +2447,7 @@ strip_name() {
     strip_files "$ROOT_DIR" "$INST_DIR/manifest" "$sn_tmp.done"
     strip_report "$sn_tmp.done" "$sn_name"
     sn_count=`wc -l < "$sn_tmp.done" | sed 's/ //g'`
-    rm -f "$sn_tmp.done"
+    rm -f "$sn_tmp.done" "$sn_tmp.done".*
     if [ "$sn_count" -gt 0 ]; then
         # The files changed, so the recorded checksums are stale.
         write_files || log "warning: could not record the file list with checksums for $sn_name"
