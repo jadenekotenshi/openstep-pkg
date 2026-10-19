@@ -23,7 +23,9 @@ extraction from a constant) are fixed in the patch.  The dependencies were built
 the stock cc, which aborts at `-O0` on some 64-bit-heavy files (`tar` now builds at
 `-O1` on every architecture; `wget-bootstrap`, `openssl` and others have m68k-only
 workarounds) and, like SPARC's, compares bytes as signed in `memcmp()`/`strcmp()`.
-No other package has an m68k result yet.
+The packages gcc42 needs to build (make, tar, coreutils, patch, texinfo, gawk, m4,
+bison, flex, and pdksh and grep below them) have also built, installed and tested
+there.  Next is the chain to git.
 
 **x86, 2026-10-08:** a rebootstrap on a fresh host built, installed and tested
 all 93 packages in the tree, including the October 2026 security fixes (bzip2,
@@ -47,12 +49,12 @@ SPARC `test world` of 2026-10-14 covers every row.
 | Package | x86 | SPARC | M68k |
 |---|---|---|---|
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | — |
-| bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | — |
+| bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
 | ca-certificates | validated | validated 2026.09.25 (rebootstrap, 2026-10-08) | — |
 | cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) | — |
 | class-dump | validated | validated (2026-10-10; builds with `-arch $PKG_ARCH`) | — |
-| coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | — |
+| coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | — |
 | diffutils | validated | validated 2.8.1 (2026-10-09) | — |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
@@ -60,15 +62,15 @@ SPARC `test world` of 2026-10-14 covers every row.
 | expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | — |
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
 | findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | — |
-| flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | — |
+| flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | freetype | validated | validated 2.14.3 (2026-10-09) | — |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | — |
 | fribidi | 0.19.7 validated | validated 0.19.7 (2026-10-09) | — |
-| gawk | validated | validated 3.1.8 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | — |
+| gawk | validated | validated 3.1.8 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gcc42 | validated | validated 4.2.1-apple-5666.3 (port; bootstraps, compare passes, `pkg test` passes; clean rebuild on a rebootstrapped host, 2026-10-08) | validated 4.2.1-apple-5666.3 (2026-10-19; `pkg test gcc42` passes with no failures; full native bootstrap on scimitar, a Previous emulator of a NeXTcube Turbo with Dimension, CPU at full speed: `pkg reinstall gcc42` took 88381 s real, 69547 s user, 13409 s system, about 24.5 hours; needs the cse and simplify-rtx fixes in `gcc42/M68K.md`) |
 | git | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated 2.55.0 (needs the unsigned memcmp/strcmp fix and -O0) | — |
 | gperf | validated | validated 3.3 (2026-10-09) | — |
-| grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | — |
+| grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | — |
 | help2man | validated | validated 1.27 | — |
 | jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | — |
@@ -95,8 +97,8 @@ SPARC `test world` of 2026-10-14 covers every row.
 | lua | validated | validated (2026-10-10) | — |
 | lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) | — |
 | lz4 | validated | validated (2026-10-10) | — |
-| m4 | validated | validated 1.4.6 (rebootstrap, 2026-10-08) | — |
-| make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | — |
+| m4 | validated | validated 1.4.6 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
+| make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | — |
 | mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
 | nano | validated | validated 2.9.8 | — |
@@ -111,8 +113,8 @@ SPARC `test world` of 2026-10-14 covers every row.
 | openssl | validated | validated 1.1.1w (rebuilt 2026-10-09 with the unsigned memcmp via pkg_cmp_named, which fixed OID lookups by DER bytes: SHA1, AES, SHA-2, secp384r1 and others had failed; the broadened `pkg test` passes: OIDs, digests, EC keys, signatures, chains, AES). The original failure is fixed: a secp384r1 key now round-trips through `openssl ec -pubout`. curl and openssh rebuilt against it link and pass their tests. Still to check on SPARC: `oidtest` recompiled (an old binary carries the old static library) | — |
 | p7zip | validated | validated (2026-10-10) | — |
 | pantomime | validated 1.4.0 (2026-10-16; build, install and the 46 offline checks pass; `pmail` has connected to a local server; the full IMAP/POP3/SMTP flows are tested against Dovecot on Linux) | validated 1.4.0 (2026-10-16; build, install and the offline checks pass; `pmail` connected to a local server) | — |
-| patch | validated | validated 2.6.1 (rebootstrap, 2026-10-08) | — |
-| pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) | — |
+| patch | validated | validated 2.6.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
+| pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) | — |
 | pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) | — |
 | python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) | — |
@@ -123,10 +125,10 @@ SPARC `test world` of 2026-10-14 covers every row.
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | — |
 | sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | — |
 | sudo | validated | validated 1.7.10p9 (2026-10-09) | — |
-| tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | — |
+| tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | tcsh | validated | validated 6.24.13 (rebootstrap, 2026-10-08; vfork.h fix) | — |
 | termcap | validated | validated 1.3.1 (rebootstrap, 2026-10-08) | — |
-| texinfo | validated | validated 4.8 (rebootstrap, 2026-10-08) | — |
+| texinfo | validated | validated 4.8 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | top | validated | validated 3.6.1 (2026-10-09; needed work: the SPARC kernel refuses the `utask` read through /dev/kmem that holds the command name, so reads are non-fatal and names come from one `ps -axc` snapshot per refresh; the process list matches the x86 one; the earlier SPARC result was only an install) | — |
 | unzip | validated | validated 6.0 (rebootstrap, 2026-10-08) | — |
 | utf8proc | validated | validated (2026-10-10) | — |
