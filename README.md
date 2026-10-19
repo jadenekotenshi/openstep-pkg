@@ -392,6 +392,7 @@ sh ./pkg-world strip world     # pkg strip for every installed package (-o "a b"
 `STRIP_BINARIES=1` in `pkg.conf` strips every package as it is installed (and before a `binpkg` is
 written).  `install-strip` and `reinstall-strip` strip only the packages you name, not their
 dependencies.  `pkg strip` records the new checksums, so `pkg verify` keeps passing.
+`pkg rehash NAME` records the checksums of a package as its files are now (for example after a strip that was cut short).
 
 Only thin Mach-O executables are touched: not libraries, object files, static archives, scripts or
 fat files, and not files with the setuid or setgid bit.  The default is `strip -x`, which keeps the
