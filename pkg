@@ -852,8 +852,18 @@ fetch_source() (
             case " $protocols " in
                 *" $scheme "*)
                     # -C - continues a partial file left by an earlier attempt.
-                    "$curl_path" -fL -C - --retry 3 --connect-timeout 30 -o "$output" "$url"
-                    exit $?
+                    # Servers that make the file as they send it (GitHub's
+                    # archive/ URLs) cannot resume: curl says so with 33, and the
+                    # partial file is dropped and fetched again from the start.
+                    curl_rc=0
+                    "$curl_path" -fL -C - --retry 3 --connect-timeout 30 -o "$output" "$url" || curl_rc=$?
+                    if [ "$curl_rc" -eq 33 ]; then
+                        log "the server cannot resume a partial download; starting $url over" >&2
+                        rm -f "$output"
+                        curl_rc=0
+                        "$curl_path" -fL --retry 3 --connect-timeout 30 -o "$output" "$url" || curl_rc=$?
+                    fi
+                    exit $curl_rc
                 ;;
             esac
         fi
