@@ -39,6 +39,98 @@ if test -d "afterstep-$VERSION.orig"; then cd "afterstep-$VERSION.orig"; fi
 . "$PKG_BUILD_HELPERS"
 patch -p1 < "afterstep-$VERSION-openstep.patch"
 
+# OPENSTEP's libc and headers lack S_IRUSR and friends, waitpid(), putenv(),
+# strdup() and the POSIX <dirent.h>.  A private include directory supplies them
+# (static functions, renamed by macros, so they cannot clash); the compat header is
+# forced into every compile through CFLAGS, which configure copies to the Makefiles.
+/usr/local/bin/mkdir -p openstep
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#undef _POSIX_SOURCE
+#ifndef _NEXT_SOURCE
+# define _NEXT_SOURCE 1
+#endif
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+/bin/cat > openstep/afterstep-compat.h <<'SEOF'
+#ifndef OPENSTEP_AFTERSTEP_COMPAT_H
+#define OPENSTEP_AFTERSTEP_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdlib.h>
+#include <string.h>
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRWXU 0000700
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IRWXG 0000070
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+# define S_IRWXO 0000007
+#endif
+#define alloca __builtin_alloca
+extern char **environ;
+extern int wait4();
+static int
+ostep_waitpid(int pid, int *status, int options)
+{
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != NULL)
+        memcpy(p, s, n);
+    return p;
+}
+static int
+ostep_putenv(char *string)
+{
+    char *eq = strchr(string, '=');
+    size_t n, count;
+    char **e, **newenv;
+
+    if (eq == 0)
+        return -1;
+    n = eq - string;
+    count = 0;
+    for (e = environ; e != 0 && *e != 0; e++) {
+        if (strncmp(*e, string, n) == 0 && (*e)[n] == '=') {
+            *e = string;
+            return 0;
+        }
+        count++;
+    }
+    newenv = (char **) malloc((count + 2) * sizeof(char *));
+    if (newenv == 0)
+        return -1;
+    for (count = 0; environ != 0 && environ[count] != 0; count++)
+        newenv[count] = environ[count];
+    newenv[count++] = string;
+    newenv[count] = 0;
+    environ = newenv;
+    return 0;
+}
+#define waitpid ostep_waitpid
+#define strdup ostep_strdup
+#define putenv ostep_putenv
+#endif
+SEOF
+CFLAGS="$CFLAGS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h"
+export CFLAGS
+
 run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
     --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
     --with-xpm-includes="$x11_prefix/include" --with-xpm-library="$x11_prefix/lib" \
