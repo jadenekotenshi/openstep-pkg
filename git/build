@@ -197,3 +197,30 @@ echo "git: SHA-1 known-answer checks passed"
 make_git strip STRIP=/bin/strip STRIP_OPTS=
 /bin/rm -f openstep-test
 make_git install DESTDIR="$DESTDIR"
+
+# The system-wide defaults for the slow OPENSTEP machines.  They are shipped as
+# gitconfig.dist; post-install copies it to gitconfig only when there is none, so
+# an administrator's file is never replaced.
+test -d "$DESTDIR/usr/local/etc" || /usr/local/bin/mkdir -p "$DESTDIR/usr/local/etc"
+/bin/cat > "$DESTDIR/usr/local/etc/gitconfig.dist" <<'CEOF'
+# System-wide git defaults for OPENSTEP, installed by the git package.  Copied to
+# gitconfig when that does not exist; edit gitconfig, not this file.
+
+[core]
+	# Do not search large files (upstream tarballs, images) for deltas: they
+	# are compressed already, and loading them for the search exhausts the
+	# memory of a 68k or SPARC machine.
+	bigFileThreshold = 1m
+
+[maintenance]
+	# git pull, fetch and commit do not start a background repack.  Run
+	# "git gc" by hand when you want one.
+	auto = false
+
+[gc]
+	auto = 0
+
+[pack]
+	windowMemory = 32m
+	deltaCacheSize = 16m
+CEOF

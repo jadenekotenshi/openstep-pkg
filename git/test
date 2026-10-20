@@ -18,6 +18,12 @@ cd "$work"
 "$GIT" --version
 "$GIT" init -b main original
 cd original
+# The packaged system defaults parse, and the limits mean what they say.
+sysdist=${LOCAL_ROOT-/usr/local}/etc/gitconfig.dist
+test -f "$sysdist"
+test "`"$GIT" config -f "$sysdist" --type=int --get core.bigFileThreshold`" = 1048576
+test "`"$GIT" config -f "$sysdist" --type=bool --get maintenance.auto`" = false
+test "`"$GIT" config -f "$sysdist" --type=int --get gc.auto`" = 0
 "$GIT" config test.large 4294967297
 test "`"$GIT" config --type=int --get test.large`" = 4294967297
 "$GIT" config test.negative -4294967297

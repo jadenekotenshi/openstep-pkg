@@ -1,0 +1,9 @@
+#!/bin/sh
+ETC="$ROOT_DIR/usr/local/etc"
+
+# Install the default system configuration only when there is none: never
+# replace an administrator's gitconfig.
+if [ ! -f "$ETC/gitconfig" ] && [ -f "$ETC/gitconfig.dist" ]; then
+    /bin/cp "$ETC/gitconfig.dist" "$ETC/gitconfig"
+fi
+exit 0
