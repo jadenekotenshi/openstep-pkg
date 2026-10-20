@@ -1,0 +1,14 @@
+#!/bin/sh
+# Give the user who installs the package a default ~/.xinitrc (an aterm, then
+# AfterStep) if they have none.  Nothing is replaced, and nothing is done when
+# installing into another root.
+case "$ROOT_DIR" in
+    ""|/) ;;
+    *) exit 0 ;;
+esac
+src=/usr/local/share/afterstep/xinitrc
+if [ -n "$HOME" ] && [ -d "$HOME" ] && [ ! -f "$HOME/.xinitrc" ] && [ -f "$src" ]; then
+    /bin/cp "$src" "$HOME/.xinitrc"
+    echo "afterstep: installed a default $HOME/.xinitrc (aterm, then afterstep)"
+fi
+exit 0
