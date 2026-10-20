@@ -948,8 +948,8 @@ download_one() (
                         break
                     fi
                     rm -f "$partial"
-                    dl_why="SHA-256 mismatch: $src (partial file discarded)"
-                    dl_final="SHA-256 mismatch: $src (partial file discarded; run again to fetch it afresh)"
+                    dl_why="SHA-256 mismatch: $src (expected $expected, got $actual; partial file discarded)"
+                    dl_final="SHA-256 mismatch: $src (expected $expected, got $actual; partial file discarded; run again to fetch it afresh)"
                 else
                     dl_why="download failed: $src"
                     dl_final="download failed: $src (the partial file $partial is kept; run again to resume, or delete it to start over)"
