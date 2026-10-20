@@ -56,7 +56,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) | n/a (i386 only) |
 | class-dump | validated | validated (2026-10-10; builds with `-arch $PKG_ARCH`) | — |
 | coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| cowsay | — (new 2026-10-20: 3.03+dfsg2; build and test hooks checked on Linux only) | — | — |
+| cowsay | validated 3.03+dfsg2 (2026-10-21; build, install and test pass; `fortune \| cowsay` works) | — | — |
 | curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | validated (2026-10-21; built with gcc42, tests pass) |
 | diffutils | validated | validated 2.8.1 (2026-10-09) | — |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
@@ -68,7 +68,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | freetype | validated | validated 2.14.3 (2026-10-09) | — |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | — |
 | fribidi | 0.19.7 validated | validated 0.19.7 (2026-10-09) | — |
-| fortune | — (new 2026-10-20: fortune-mod 1.99.1 without recode; build and test hooks checked on Linux only; `-m` is built only if the libc has `re_comp`) | — | — |
+| fortune | validated 1.99.1 (2026-10-21; build, install and test pass; built without `-m` pattern search: this libc has no `re_comp`) | — | — |
 | gawk | validated | validated 3.1.8 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gcc42 | validated | validated 4.2.1-apple-5666.3 (port; bootstraps, compare passes, `pkg test` passes; clean rebuild on a rebootstrapped host, 2026-10-08) | validated 4.2.1-apple-5666.3 (2026-10-19; `pkg test gcc42` passes with no failures; full native bootstrap on scimitar, a Previous emulator of a NeXTcube Turbo with Dimension, CPU at full speed: `pkg reinstall gcc42` took 88381 s real, 69547 s user, 13409 s system, about 24.5 hours; needs the cse and simplify-rtx fixes in `gcc42/M68K.md`) |
 | git | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated 2.55.0 (needs the unsigned memcmp/strcmp fix and -O0) | validated (2026-10-23; built with gcc42 at -O0, tests pass; python311 was pulled in as a dependency) |
