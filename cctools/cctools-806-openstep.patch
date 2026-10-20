@@ -1,0 +1,558 @@
+--- a/ar/archive.c
++++ b/ar/archive.c
+@@ -150,7 +150,9 @@
+ 		case EAGAIN:
+ 		case EFAULT:
+ 		case EROFS:
++#ifdef EOVERFLOW
+ 		case EOVERFLOW:
++#endif
+ 		case EFBIG:
+ 
+ 		/* Something bad happened  so no point in going on. */
+@@ -164,9 +166,13 @@
+ 		case ENOLCK:
+ 
+ 		/* Locking seems to not be working */
++#ifdef ENOTSUP
+ 		case ENOTSUP:
++#endif
+ 		case EHOSTUNREACH:
++#ifdef EBADRPC
+ 		case EBADRPC:
++#endif
+ 		default:
+ 			/* Filesystem does not support locking */
+ 			break;
+@@ -321,7 +327,7 @@
+ 		 * things for exact binary equality.
+ 		 */
+ 		if (getenv("ZERO_AR_DATE") == NULL)
+-			tv_sec = (long int)sb->st_mtimespec.tv_sec;
++			tv_sec = (long int)sb->st_mtime;
+ 		else
+ 			tv_sec = (long int)0;
+ 
+--- a/ar/archive.h
++++ b/ar/archive.h
+@@ -112,11 +112,17 @@
+ } CHDR;
+ 
+ /* Header format strings. */
++#ifdef __OPENSTEP__
++/* OPENSTEP off_t is a 32-bit long. */
++#define HDR1 "%s%-13d%-12ld%-6u%-6u%-8o%-10ld%2s"
++#define HDR2 "%-16.16s%-12ld%-6u%-6u%-8o%-10ld%2s"
++#define HDR3 "%-16.15s%-12ld%-6u%-6u%-8o%-10ld%2s"
++#else
+ #define	HDR1	"%s%-13d%-12ld%-6u%-6u%-8o%-10qd%2s"
+ #define	HDR2	"%-16.16s%-12ld%-6u%-6u%-8o%-10qd%2s"
+-
++#define	HDR3	"%-16.15s%-12ld%-6u%-6u%-8o%-10qd%2s"
++#endif
+ #define	OLDARMAXNAME	15
+-#define	HDR3	"%-16.15s%-12ld%-6u%-6u%-8o%-10qd%2s"
+ 
+ 
+ #include <sys/cdefs.h>
+--- a/ar/contents.c
++++ b/ar/contents.c
+@@ -103,7 +103,11 @@
+ 			goto next;
+ 		if (options & AR_V) {
+ 			(void)strmode(chdr.mode, buf);
++#ifdef __OPENSTEP__
++			(void)printf("%s %6d/%-6d %8ld ",
++#else
+ 			(void)printf("%s %6d/%-6d %8qd ",
++#endif
+ 			    buf + 1, chdr.uid, chdr.gid, chdr.size);
+ 			tp = localtime(&chdr.date);
+ 			(void)strftime(buf, sizeof(buf), "%b %e %H:%M %Y", tp);
+--- a/ar/misc.c
++++ b/ar/misc.c
+@@ -87,7 +87,11 @@
+ tmp()
+ {
+ 	extern char *envtmp;
++#ifdef __OPENSTEP__
++	int oset;
++#else
+ 	sigset_t set, oset;
++#endif
+ 	static int first;
+ 	int fd;
+ 	char path[MAXPATHLEN];
+@@ -102,12 +106,20 @@
+ 	else
+ 		strcpy(path, _PATH_ARTMP);
+ 	
++#ifdef __OPENSTEP__
++	oset = sigblock(~0);
++#else
+ 	sigfillset(&set);
+ 	(void)sigprocmask(SIG_BLOCK, &set, &oset);
++#endif
+ 	if ((fd = mkstemp(path)) == -1)
+ 		error(tname);
+         (void)unlink(path);
++#ifdef __OPENSTEP__
++	(void)sigsetmask(oset);
++#else
+ 	(void)sigprocmask(SIG_SETMASK, &oset, NULL);
++#endif
+ 	return (fd);
+ }
+ 
+--- /dev/null
++++ b/ar/openstep.c
+@@ -0,0 +1,63 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <stdarg.h>
++#include <string.h>
++#include <errno.h>
++#include "err.h"
++
++extern char *progname;
++
++static void report(const char *format, va_list ap, int error)
++{
++    fprintf(stderr, "%s: ", progname);
++    if (format != NULL) {
++        vfprintf(stderr, format, ap);
++        if (error != 0)
++            fputs(": ", stderr);
++    }
++    if (error != 0)
++        fputs(strerror(error), stderr);
++    fputc('\n', stderr);
++}
++
++void err(int status, const char *format, ...)
++{
++    int error = errno;
++    va_list ap;
++    va_start(ap, format);
++    report(format, ap, error);
++    va_end(ap);
++    exit(status);
++}
++
++void warn(const char *format, ...)
++{
++    int error = errno;
++    va_list ap;
++    va_start(ap, format);
++    report(format, ap, error);
++    va_end(ap);
++}
++
++void warnx(const char *format, ...)
++{
++    va_list ap;
++    va_start(ap, format);
++    report(format, ap, 0);
++    va_end(ap);
++}
++
++void strmode(int mode, char *buffer)
++{
++    int i;
++    strcpy(buffer, "---------- ");
++    for (i = 0; i < 9; ++i)
++        if (mode & (0400 >> i))
++            buffer[i + 1] = "rwx"[i % 3];
++    if (mode & 04000)
++        buffer[3] = mode & 0100 ? 's' : 'S';
++    if (mode & 02000)
++        buffer[6] = mode & 0010 ? 's' : 'S';
++    if (mode & 01000)
++        buffer[9] = mode & 0001 ? 't' : 'T';
++}
+--- /dev/null
++++ b/include/mach/i386/thread_status.h
+@@ -0,0 +1,5 @@
++#ifndef CCTOOLS_I386_THREAD_STATUS_H
++#define CCTOOLS_I386_THREAD_STATUS_H
++/* NeXT's i386 header has no include guard. */
++#include_next <mach/i386/thread_status.h>
++#endif
+--- /dev/null
++++ b/include/openstep/compat.h
+@@ -0,0 +1,37 @@
++#ifndef CCTOOLS_OPENSTEP_COMPAT_H
++#define CCTOOLS_OPENSTEP_COMPAT_H
++#include <libc.h>
++#include <sys/types.h>
++#include <errno.h>
++#include <stdarg.h>
++#include <limits.h>
++#include <sys/param.h>
++typedef int ssize_t;
++typedef unsigned int uint32_t;
++typedef unsigned char uint8_t;
++typedef unsigned short uint16_t;
++typedef unsigned long long uint64_t;
++typedef int intptr_t;
++typedef unsigned int uintptr_t;
++#define INT32_MAX 2147483647
++#define UINT32_MAX 4294967295U
++#define INT64_MAX 9223372036854775807LL
++#define UINT64_MAX 18446744073709551615ULL
++extern int optind;
++void strmode(int mode, char *buffer);
++#define DEFFILEMODE 0666
++#define O_ACCMODE 3
++#define AR_EFMT1 "#1/"
++#define S_IWUSR 0200
++#define EFTYPE ENOEXEC
++#define MAP_FILE 0
++#define O_FSYNC O_SYNC
++#define PATH_MAX MAXPATHLEN
++void *openstep_mmap(void *, size_t, int, int, int, off_t);
++#define mmap openstep_mmap
++char *strdup(const char *);
++char *realpath(const char *, char *);
++int vsnprintf(char *, size_t, const char *, va_list);
++void qsort_r(void *, size_t, size_t, void *,
++             int (*)(void *, const void *, const void *));
++#endif
+--- /dev/null
++++ b/include/openstep/dirent.h
+@@ -0,0 +1 @@
++#include <sys/dir.h>
+--- /dev/null
++++ b/include/openstep/err.h
+@@ -0,0 +1,6 @@
++#ifndef CCTOOLS_AR_OPENSTEP_ERR_H
++#define CCTOOLS_AR_OPENSTEP_ERR_H
++void err(int status, const char *format, ...);
++void warn(const char *format, ...);
++void warnx(const char *format, ...);
++#endif
+--- /dev/null
++++ b/include/openstep/paths.h
+@@ -0,0 +1 @@
++/* ar uses its own pathnames.h on OPENSTEP. */
+--- /dev/null
++++ b/include/openstep/stdbool.h
+@@ -0,0 +1,7 @@
++#ifndef CCTOOLS_OPENSTEP_STDBOOL_H
++#define CCTOOLS_OPENSTEP_STDBOOL_H
++typedef unsigned char bool;
++#define true 1
++#define false 0
++#define __bool_true_false_are_defined 1
++#endif
+--- /dev/null
++++ b/include/openstep/stdint.h
+@@ -0,0 +1 @@
++#include "compat.h"
+--- /dev/null
++++ b/include/openstep/tzfile.h
+@@ -0,0 +1 @@
++#include <time.h>
+--- a/ld/layout.c
++++ b/ld/layout.c
+@@ -1174,9 +1174,9 @@
+ 	    sizeofcmds += output_cksum_info.prebind_cksum_command.cmdsize;
+ 	}
+ 	/*
+-	 * Create the uuid load command.
+-	 */
+-#ifndef KLD
++	 * Create the uuid load command. OPENSTEP does not support LC_UUID.
++	 */
++#if !defined(KLD) && !defined(__OPENSTEP__)
+ 	if(output_uuid_info.suppress != TRUE &&
+ 	   (output_uuid_info.emit == TRUE ||
+ 	    arch_flag.cputype == CPU_TYPE_ARM)){
+@@ -1186,7 +1186,7 @@
+ 	    ncmds++;
+ 	    sizeofcmds += output_uuid_info.uuid_command.cmdsize;
+ 	}
+-#else
++#elif defined(KLD)
+ 	if(output_uuid_info.uuid_command.cmdsize != 0){
+ 	    ncmds++;
+ 	    sizeofcmds += output_uuid_info.uuid_command.cmdsize;
+--- a/ld/ld.c
++++ b/ld/ld.c
+@@ -422,7 +422,11 @@
+ 
+ /* The variables to support namespace options */
+ __private_extern__ enum bool namespace_specified = FALSE;
++#ifdef __OPENSTEP__
++__private_extern__ enum bool twolevel_namespace = FALSE;
++#else
+ __private_extern__ enum bool twolevel_namespace = TRUE;
++#endif
+ __private_extern__ enum bool force_flat_namespace = FALSE;
+ 
+ #ifndef RLD
+@@ -3511,7 +3515,7 @@
+ ...)
+ {
+ #ifdef KLD
+-    va_list ap;
++	va_list ap;
+ 
+ 	va_start(ap, format);
+ 	vprint(format, ap);
+@@ -3522,6 +3526,7 @@
+ 	char *buffer_ptr;
+ 	int length;
+ 	ssize_t amount_written;
++    va_list ap;
+ 
+ 	if(trace_file == -1){
+ 		if(trace_file_path != NULL){
+@@ -3533,11 +3538,11 @@
+ 			trace_file = fileno(stderr);
+ 		}
+ 	}
+-    va_list ap;
+-
+ 	va_start(ap, format);
+ 	length = vsnprintf(trace_buffer, sizeof(trace_buffer), format, ap);
+ 	va_end(ap);
++	if(length >= (int)sizeof(trace_buffer))
++	    length = sizeof(trace_buffer) - 1;
+ 	buffer_ptr = trace_buffer;
+ 	while(length > 0){
+ 		amount_written = write(trace_file, buffer_ptr, length);
+--- a/libstuff/arch.c
++++ b/libstuff/arch.c
+@@ -311,6 +311,10 @@
+ get_segalign_from_flag(
+ const struct arch_flag *flag)
+ {
++#ifdef __OPENSTEP__
++	if(flag->cputype == CPU_TYPE_I386)
++	    return(0x2000); /* OPENSTEP requires 8K segment alignment. */
++#endif
+ 	if(flag->cputype == CPU_TYPE_POWERPC ||
+ 	   flag->cputype == CPU_TYPE_POWERPC64 ||
+ 	   flag->cputype == CPU_TYPE_VEO ||
+--- a/libstuff/execute.c
++++ b/libstuff/execute.c
+@@ -30,7 +30,9 @@
+ #include "stuff/errors.h"
+ #include "stuff/allocate.h"
+ #include "stuff/execute.h"
++#ifndef __OPENSTEP__
+ #include "mach-o/dyld.h"
++#endif
+ 
+ /*
+  * execute() does an execvp using the argv passed to it.  If the parameter
+@@ -146,6 +148,10 @@
+ cmd_with_prefix(
+ char *str)
+ {
++#ifdef __OPENSTEP__
++	/* Keep the compatible tools together on OPENSTEP. */
++	return(makestr("/usr/local/lib/cctools/bin/", str, NULL));
++#else
+ 	int i;
+ 	char *p;
+ 	char *prefix, buf[MAXPATHLEN], resolved_name[PATH_MAX];
+@@ -167,6 +173,7 @@
+ 	    p[1] = '\0';
+ 
+ 	return(makestr(prefix, str, NULL));
++#endif
+ }
+ 
+ /*
+--- a/libstuff/macosx_deployment_target.c
++++ b/libstuff/macosx_deployment_target.c
+@@ -26,7 +26,9 @@
+ #include <string.h>
+ #include <mach/mach.h>
+ #include <sys/types.h>
++#ifndef __OPENSTEP__
+ #include <sys/sysctl.h>
++#endif
+ #include "stuff/errors.h"
+ #include "stuff/allocate.h"
+ #include "stuff/macosx_deployment_target.h"
+@@ -64,6 +66,12 @@
+ get_macosx_deployment_target(
+ struct macosx_deployment_target *value)
+ {
++#ifdef __OPENSTEP__
++    /* OPENSTEP predates every Mac OS X deployment feature. */
++    value->major = 0;
++    value->minor = 0;
++    value->name = savestr("OPENSTEP");
++#else
+     uint32_t ten, major, minor;
+     char *p, *q, *endp;
+     char osversion[32];
+@@ -163,5 +171,6 @@
+ 		warning("unknown MACOSX_DEPLOYMENT_TARGET environment "
+ 			"variable value: %s ignored (using %s)", p,value->name);
+ 	}
++#endif
+ }
+ #endif /* !defined(RLD) */
+--- /dev/null
++++ b/libstuff/openstep.c
+@@ -0,0 +1,77 @@
++#include "compat.h"
++#include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
++#include <mach/mach.h>
++#include <sys/mman.h>
++
++void *openstep_mmap(void *address, size_t length, int protection,
++                    int flags, int fd, off_t offset)
++{
++    vm_offset_t mapped;
++    kern_return_t result;
++    if (address != NULL || flags != MAP_PRIVATE || length == 0 ||
++        protection != (PROT_READ | PROT_WRITE)) {
++        errno = EINVAL;
++        return (void *)-1;
++    }
++    result = map_fd(fd, offset, &mapped, TRUE, length);
++    if (result != KERN_SUCCESS) {
++        errno = result == KERN_NO_SPACE ? ENOMEM : EINVAL;
++        return (void *)-1;
++    }
++    return (void *)mapped;
++}
++
++char *strdup(const char *string)
++{
++    size_t length = strlen(string) + 1;
++    char *copy = malloc(length);
++    if (copy != NULL)
++        memcpy(copy, string, length);
++    return copy;
++}
++
++/* Only trace diagnostics use this; a temporary stream keeps formatting bounded. */
++int vsnprintf(char *buffer, size_t size, const char *format, va_list arguments)
++{
++    FILE *stream;
++    int length;
++    size_t copied;
++    if (size != 0)
++        buffer[0] = '\0';
++    stream = tmpfile();
++    if (stream == NULL)
++        return -1;
++    length = vfprintf(stream, format, arguments);
++    if (length >= 0 && size != 0) {
++        rewind(stream);
++        copied = fread(buffer, 1, size - 1, stream);
++        buffer[copied] = '\0';
++        if (ferror(stream))
++            length = -1;
++    }
++    fclose(stream);
++    return length;
++}
++
++/* These command-line tools are single threaded; preserve nested sort state. */
++static void *sort_context;
++static int (*sort_compare)(void *, const void *, const void *);
++
++static int compare(const void *left, const void *right)
++{
++    return sort_compare(sort_context, left, right);
++}
++
++void qsort_r(void *base, size_t count, size_t size, void *context,
++             int (*callback)(void *, const void *, const void *))
++{
++    void *saved_context = sort_context;
++    int (*saved_compare)(void *, const void *, const void *) = sort_compare;
++    sort_context = context;
++    sort_compare = callback;
++    qsort(base, count, size, compare);
++    sort_context = saved_context;
++    sort_compare = saved_compare;
++}
+--- a/misc/libtool.c
++++ b/misc/libtool.c
+@@ -3967,6 +3967,7 @@
+ 	char *buffer_ptr;
+ 	int length;
+ 	ssize_t amount_written;
++    va_list ap;
+ 
+ 	if(trace_file == -1){
+ 		if(cmd_flags.trace_file_path != NULL){
+@@ -3978,11 +3979,11 @@
+ 			trace_file = fileno(stderr);
+ 		}
+ 	}
+-    va_list ap;
+-
+ 	va_start(ap, format);
+ 	length = vsnprintf(trace_buffer, sizeof(trace_buffer), format, ap);
+ 	va_end(ap);
++	if(length >= (int)sizeof(trace_buffer))
++	    length = sizeof(trace_buffer) - 1;
+ 	buffer_ptr = trace_buffer;
+ 	while(length > 0){
+ 		amount_written = write(trace_file, buffer_ptr, length);
+--- /dev/null
++++ b/openstep/Makefile
+@@ -0,0 +1,51 @@
++# Native OPENSTEP bootstrap: no GCC 4.2 or newer cctools required.
++CC = /bin/cc
++CFLAGS = -traditional-cpp -O2 -D__OPENSTEP__ -DDEBUG \
++    -Iinclude/openstep -Iinclude -Ild -include include/openstep/compat.h
++OUT = openstep-build
++STUFF = allocate errors arch execute bytesex rnd hppa swap_headers reloc \
++    version_number get_toc_byte_sex best_arch fatals arch_usage ofile \
++    ofile_error print set_arch_flag_name seg_addr_table dylib_table breakout \
++    writeout checkout fatal_arch ofile_get_word vm_flush_cache hash_string \
++    dylib_roots guess_short_name get_arch_from_host crc32 \
++    macosx_deployment_target symbol_list unix_standard_mode openstep
++ARFILES = append ar archive contents delete extract misc move print replace openstep
++LDFILES = ld pass1 objects sections cstring_literals symbols fvmlibs layout \
++    specs pass2 generic_reloc rld sets 4byte_literals 8byte_literals \
++    literal_pointers dylibs indirect_sections mod_sections i860_reloc \
++    ppc_reloc m88k_reloc hppa_reloc sparc_reloc coalesced_sections \
++    debugcompunit debugline arm_reloc
++STUFFOBJ = $(STUFF:%=$(OUT)/libstuff/%.o)
++AROBJ = $(ARFILES:%=$(OUT)/ar/%.o)
++LDOBJ = $(LDFILES:%=$(OUT)/ld/%.o)
++
++all: $(OUT)/ar-tool $(OUT)/ranlib $(OUT)/ld-tool
++
++$(OUT)/libstuff/%.o: libstuff/%.c
++	$(CC) $(CFLAGS) -c $< -o $@
++
++$(OUT)/ar/%.o: ar/%.c
++	$(CC) $(CFLAGS) -c $< -o $@
++
++$(OUT)/ld/%.o: ld/%.c
++	$(CC) $(CFLAGS) -c $< -o $@
++
++$(OUT)/libstuff.a: $(STUFFOBJ)
++	/bin/ar cr $@ $(STUFFOBJ)
++	/bin/ranlib $@
++
++$(OUT)/vers.o:
++	echo 'const char apple_version[] = "cctools-806 (OPENSTEP)";' > $(OUT)/vers.c
++	$(CC) -c $(OUT)/vers.c -o $@
++
++$(OUT)/libtool.o: misc/libtool.c
++	$(CC) $(CFLAGS) -c $< -o $@
++
++$(OUT)/ar-tool: $(AROBJ) $(OUT)/libstuff.a
++	$(CC) -o $@ $(AROBJ) $(OUT)/libstuff.a
++
++$(OUT)/ranlib: $(OUT)/libtool.o $(OUT)/vers.o $(OUT)/libstuff.a
++	$(CC) -o $@ $(OUT)/libtool.o $(OUT)/vers.o $(OUT)/libstuff.a
++
++$(OUT)/ld-tool: $(LDOBJ) $(OUT)/vers.o $(OUT)/libstuff.a
++	$(CC) -o $@ $(LDOBJ) $(OUT)/vers.o $(OUT)/libstuff.a

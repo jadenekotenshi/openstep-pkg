@@ -247,7 +247,7 @@ in_set() {
 # build word: for building, both kinds come first.
 deps_of() {
     if [ -f "$tree/$1/depends" ]; then
-        sed -e 's/#.*//' -e 's/^ *//' -e 's/ *$//' -e 's/^?[^:]*://' \
+        sed -e 's/#.*//' -e 's/^ *//' -e 's/ *$//' -e 's/^?[^:]*://' -e 's/^@[^:]*://' \
             -e '/^!/d' -e '/^$/d' -e 's/ .*//' "$tree/$1/depends"
     fi
 }

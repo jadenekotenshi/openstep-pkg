@@ -7,6 +7,10 @@ VERSION=$2
 PREFIX=/usr/local
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC=/usr/local/bin/gcc-4.2
+# The cctools ar/ranlib on i386 (they keep long member names), the stock ones elsewhere.
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export AR RANLIB
 # mpg123 1.32+ is C99 (for-loop declarations); gcc 4.2 defaults to gnu89.
 CFLAGS='-O2 -std=gnu99 '"$PKG_GCC42_ARCH_FLAGS"
 CONFIG_SHELL=/usr/local/bin/ksh
@@ -177,10 +181,13 @@ run_configure \
     --with-optimization=0 \
     --with-audio=sdl
 
-# NeXT ar truncates long member names, losing the .o suffix. Libtool then
-# omits the SDL object while combining its convenience archive.
-/bin/sed 's/libdefaultmodule_la-sdl/sdl/g' Makefile > Makefile.openstep
-/bin/mv Makefile.openstep Makefile
+# The stock ar truncates long member names (the i386 cctools ar does not), losing
+# the .o suffix. Libtool then omits the SDL object while combining its
+# convenience archive.
+if [ "$PKG_ARCH" != i386 ]; then
+    /bin/sed 's/libdefaultmodule_la-sdl/sdl/g' Makefile > Makefile.openstep
+    /bin/mv Makefile.openstep Makefile
+fi
 
 # Libtool does not propagate framework dependencies on this host.
 /bin/gnumake SHELL="$CONFIG_SHELL" LDFLAGS="$FRAMEWORKS"
@@ -194,7 +201,7 @@ fi
 
 for lib in mpg123 out123 syn123
 do
-    /bin/ranlib "$DESTDIR$PREFIX/lib/lib$lib.a"
+    "$RANLIB" "$DESTDIR$PREFIX/lib/lib$lib.a"
     # The .pc files provide static link flags; libtool's .la dependency
     # records omit the native frameworks and are not useful to consumers.
     /bin/rm -f "$DESTDIR$PREFIX/lib/lib$lib.la"

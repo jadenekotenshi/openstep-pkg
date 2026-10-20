@@ -13,7 +13,10 @@ test -d "$DRIVERKIT_FIXED" || /usr/local/bin/mkdir -p "$DRIVERKIT_FIXED"
 for header in IOEISADeviceDescription.h IOPCMCIADirectDevice.h \
     IOPCIDeviceDescription.h IOPCMCIADeviceDescription.h
 do
-    /bin/cp "$DRIVERKIT_HOLD/$header" "$DRIVERKIT_FIXED/$header"
+    # Newer tar already restores these read-only headers at their full paths.
+    if [ ! -f "$DRIVERKIT_FIXED/$header" ]; then
+        /bin/cp "$DRIVERKIT_HOLD/$header" "$DRIVERKIT_FIXED/$header"
+    fi
     /bin/rm -f "$DRIVERKIT_HOLD/$header"
 done
 /bin/rmdir "$DRIVERKIT_HOLD" 2>/dev/null || :

@@ -3,6 +3,10 @@ set -e
 DESTDIR=$1
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC=/usr/local/bin/gcc-4.2
+# The cctools ar/ranlib on i386 (they keep long member names), the stock ones elsewhere.
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export AR RANLIB
 CFLAGS='-O2 '"$PKG_GCC42_ARCH_FLAGS"' -DNeXT'
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
@@ -16,16 +20,19 @@ if test -d "libmpeg2-$2"; then cd "libmpeg2-$2"; fi
 patch -p1 < "libmpeg2-$2-openstep.patch"
 run_configure --build=$PKG_TARGET --prefix=/usr/local \
     --disable-shared --enable-static --disable-dependency-tracking
-# NeXT ar truncates long names; libtool needs the surviving .o suffix.
-for makefile in libmpeg2/Makefile libmpeg2/convert/Makefile
-do
-    sed 's/libmpeg2convertarch_la-//g;s/libmpeg2arch_la-//g' "$makefile" > "$makefile.tmp"
-    /bin/mv "$makefile.tmp" "$makefile"
-done
+# The stock ar truncates long names (the i386 cctools ar does not); libtool needs
+# the surviving .o suffix.
+if [ "$PKG_ARCH" != i386 ]; then
+    for makefile in libmpeg2/Makefile libmpeg2/convert/Makefile
+    do
+        sed 's/libmpeg2convertarch_la-//g;s/libmpeg2arch_la-//g' "$makefile" > "$makefile.tmp"
+        /bin/mv "$makefile.tmp" "$makefile"
+    done
+fi
 /bin/gnumake SHELL="$CONFIG_SHELL"
 if [ "$PKG_ARCH" = i386 ]; then
     /bin/csh -f /usr/local/bin/sdl-fix-macho-i486-subtype src/mpeg2dec
 fi
 /bin/gnumake SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"
-/bin/ranlib "$DESTDIR/usr/local/lib/libmpeg2.a"
-/bin/ranlib "$DESTDIR/usr/local/lib/libmpeg2convert.a"
+"$RANLIB" "$DESTDIR/usr/local/lib/libmpeg2.a"
+"$RANLIB" "$DESTDIR/usr/local/lib/libmpeg2convert.a"

@@ -9,6 +9,10 @@ PATCHFILE="libcss-$VERSION-openstep.patch"
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 NSSHARED=/usr/local/share/netsurf-buildsystem
 CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# The cctools ar/ranlib on i386 (they keep long member names), the stock ones elsewhere.
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export AR RANLIB
 BUILD_CC=/usr/local/bin/gcc-4.2
 PERL=/usr/bin/perl
 MAKE=gnumake
@@ -60,8 +64,11 @@ rebuild_archive()
     /bin/ranlib "$BUILDDIR/libcss.a"
 }
 
-gnumake PREFIX="$PREFIX" WARNFLAGS=
-rebuild_archive
+gnumake PREFIX="$PREFIX" WARNFLAGS= AR="$AR" RANLIB="$RANLIB"
+# The stock ar truncates the member names; rebuild the archive with short ones.
+if [ "$PKG_ARCH" != i386 ]; then
+    rebuild_archive
+fi
 
-gnumake install DESTDIR="$DESTDIR" PREFIX="$PREFIX" WARNFLAGS=
-/bin/ranlib "$DESTDIR$PREFIX/lib/libcss.a"
+gnumake install DESTDIR="$DESTDIR" PREFIX="$PREFIX" WARNFLAGS= AR="$AR" RANLIB="$RANLIB"
+"$RANLIB" "$DESTDIR$PREFIX/lib/libcss.a"

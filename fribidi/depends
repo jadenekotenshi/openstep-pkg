@@ -8,3 +8,4 @@ coreutils
 pkgconf
 diffutils
 bzip2
+@i386:cctools

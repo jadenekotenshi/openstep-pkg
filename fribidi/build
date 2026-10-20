@@ -3,6 +3,10 @@ set -e
 DESTDIR=$1
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC=/usr/local/bin/gcc-4.2
+# The cctools ar/ranlib on i386 (they keep long member names), the stock ones elsewhere.
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export AR RANLIB
 CFLAGS="-O2 ${PKG_GCC42_ARCH_FLAGS-} -DNeXT"
 AWK=/usr/local/bin/gawk
 GREP=/usr/local/bin/grep
@@ -14,16 +18,19 @@ patch -p1 < "fribidi-$2-openstep.patch"
 . "$PKG_BUILD_HELPERS"
 run_configure --build=$PKG_TARGET --prefix=/usr/local \
     --disable-shared --enable-static --disable-dependency-tracking
-# Avoid collisions when libtool extracts the convenience archive with NeXT ar.
-for suffix in '' -cap-rtl -cp1255 -cp1256 -iso8859-6 -iso8859-8 -utf8
-do
-    /bin/rm -f "charset/cs$suffix.c"
-    /bin/ln -s "fribidi-char-sets$suffix.c" "charset/cs$suffix.c"
-done
-sed 's/fribidi-char-sets\([-a-z0-9]*\)\.lo/cs\1.lo/g' charset/Makefile > charset/Makefile.tmp
-/bin/mv charset/Makefile.tmp charset/Makefile
-/bin/rm -f charset/.libs/libfribidi-char-sets.a charset/libfribidi-char-sets.la
+# Avoid collisions when libtool extracts the convenience archive with the stock
+# ar, which truncates long member names (the i386 cctools ar does not).
+if [ "$PKG_ARCH" != i386 ]; then
+    for suffix in '' -cap-rtl -cp1255 -cp1256 -iso8859-6 -iso8859-8 -utf8
+    do
+        /bin/rm -f "charset/cs$suffix.c"
+        /bin/ln -s "fribidi-char-sets$suffix.c" "charset/cs$suffix.c"
+    done
+    sed 's/fribidi-char-sets\([-a-z0-9]*\)\.lo/cs\1.lo/g' charset/Makefile > charset/Makefile.tmp
+    /bin/mv charset/Makefile.tmp charset/Makefile
+    /bin/rm -f charset/.libs/libfribidi-char-sets.a charset/libfribidi-char-sets.la
+fi
 /bin/gnumake SHELL="$CONFIG_SHELL"
 /bin/gnumake SHELL="$CONFIG_SHELL" LOG_COMPILER="$CONFIG_SHELL" check
 /bin/gnumake SHELL="$CONFIG_SHELL" install DESTDIR="$DESTDIR"
-/bin/ranlib "$DESTDIR/usr/local/lib/libfribidi.a"
+"$RANLIB" "$DESTDIR/usr/local/lib/libfribidi.a"

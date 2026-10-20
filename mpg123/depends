@@ -6,3 +6,4 @@ gawk
 patch
 sdl12
 bzip2
+@i386:cctools

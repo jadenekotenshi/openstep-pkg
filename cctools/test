@@ -1,0 +1,102 @@
+#!/bin/sh
+set -e
+TOOLS="$LOCAL_ROOT/lib/cctools/bin"
+AR="$TOOLS/ar"
+RANLIB="$TOOLS/ranlib"
+LD="$TOOLS/ld"
+TMP=/tmp/pkg-cctools-$$
+trap 'cd /; /bin/rm -rf "$TMP"' 0
+trap 'exit 1' 1 2 15
+mkdir "$TMP"
+cd "$TMP"
+
+cat > one.c <<'EOF'
+int first_member(void) { return 20; }
+EOF
+cat > two.c <<'EOF'
+int second_member(void) { return 22; }
+EOF
+cat > main.c <<'EOF'
+extern int first_member(void), second_member(void);
+int main(void) { return first_member() + second_member() != 42; }
+EOF
+FIRST=archive_members_with_the_same_prefix_one.o
+SECOND=archive_members_with_the_same_prefix_two.o
+/bin/cc -traditional-cpp -c one.c -o "$FIRST"
+/bin/cc -traditional-cpp -c two.c -o "$SECOND"
+/bin/cc -traditional-cpp -c main.c -o main.o
+"$AR" rcS libtest.a "$FIRST" "$SECOND"
+"$AR" t libtest.a > members
+/bin/grep "^$FIRST\$" members >/dev/null
+/bin/grep "^$SECOND\$" members >/dev/null
+mkdir extract
+cd extract
+"$AR" x ../libtest.a "$FIRST" "$SECOND"
+cmp "$FIRST" "../$FIRST"
+cmp "$SECOND" "../$SECOND"
+cd ..
+# ranlib aligns object contents to eight bytes with newline padding.
+"$RANLIB" -V libtest.a
+"$LD" -arch i386 -dynamic -o native -lcrt1.o main.o libtest.a -lcc_dynamic -framework System
+./native
+mkdir indexed
+cd indexed
+"$AR" x ../libtest.a "$FIRST" "$SECOND"
+for member in "$FIRST" "$SECOND"; do
+    /bin/cp "../$member" expected
+    set -- `wc -c < expected`
+    size=$1
+    while test "`/bin/expr "$size" % 8`" != 0; do
+        printf '\n' >> expected
+        size=`/bin/expr "$size" + 1`
+    done
+    cmp "$member" expected
+done
+cd ..
+# This is the extraction/repacking step used by libtool convenience archives.
+"$AR" rcs flattened.a extract/*.o
+"$LD" -arch i386 -dynamic -o flattened -lcrt1.o main.o flattened.a -lcc_dynamic -framework System
+./flattened
+"$LD" -r -o combined.o main.o libtest.a
+"$LD" -arch i386 -dynamic -o combined -lcrt1.o combined.o -lcc_dynamic -framework System
+./combined
+
+# Replacement and deletion must distinguish names with identical short prefixes.
+"$AR" rcs libtest.a "$FIRST"
+"$AR" d libtest.a "$FIRST"
+"$AR" t libtest.a > remaining
+if /bin/grep "^$FIRST\$" remaining >/dev/null; then exit 1; fi
+/bin/grep "^$SECOND\$" remaining >/dev/null
+"$AR" rcs libtest.a "$FIRST"
+"$LD" -arch i386 -dynamic -o replaced -lcrt1.o main.o libtest.a -lcc_dynamic -framework System
+./replaced
+
+# Old archives remain readable, including mixed short and long member names.
+/bin/ar cr old.a main.o
+/bin/ranlib old.a
+"$AR" rcs old.a "$FIRST" "$SECOND"
+"$LD" -arch i386 -dynamic -o mixed -lcrt1.o old.a -lcc_dynamic -framework System
+./mixed
+
+# Odd-sized data, spaces in filenames, and member order exercise archive padding.
+printf abc > 'a long filename with spaces'
+printf 12345 > another_long_filename
+"$AR" rcS data.a 'a long filename with spaces' another_long_filename
+"$AR" p data.a 'a long filename with spaces' > printed
+cmp printed 'a long filename with spaces'
+"$AR" mbS 'a long filename with spaces' data.a another_long_filename
+"$AR" t data.a > order
+test "`head -1 order`" = another_long_filename
+cd extract
+"$AR" x ../data.a
+cmp 'a long filename with spaces' '../a long filename with spaces'
+cmp another_long_filename ../another_long_filename
+cd ..
+printf 'invalid archive' > bad.a
+if "$AR" t bad.a > bad.log 2>&1; then exit 1; fi
+if "$AR" p data.a missing-member > missing.log 2>&1; then exit 1; fi
+
+# The optional GCC spec selects only the linker; GCC is not a dependency.
+/bin/grep '/usr/local/lib/cctools/bin/ld' \
+    "$LOCAL_ROOT/lib/cctools/gcc42.specs" >/dev/null
+echo 'cctools archive operations, long names, native linking and partial linking passed'
