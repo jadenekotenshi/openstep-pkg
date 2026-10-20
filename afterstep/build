@@ -77,6 +77,12 @@ SEOF
 # define S_IXOTH 0000001
 # define S_IRWXO 0000007
 #endif
+#ifdef OSTEP_NEED_MODE_T
+typedef unsigned short mode_t;
+#endif
+#ifdef OSTEP_NEED_SSIZE_T
+typedef int ssize_t;
+#endif
 #ifndef R_OK
 # define F_OK 0
 # define X_OK 1
@@ -139,7 +145,19 @@ ostep_putenv(char *string)
 #define putenv ostep_putenv
 #endif
 SEOF
-CFLAGS="$CFLAGS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h"
+# Types this <sys/types.h> may lack (probed, since a typedef cannot be tested for).
+OSTEP_DEFS=
+printf '#include <sys/types.h>\nmode_t probe_mode;\nint main(void) { return 0; }\n' > mode-probe.c
+if $CC -c mode-probe.c -o mode-probe.o > /dev/null 2>&1; then :; else
+    OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_MODE_T"
+fi
+printf '#include <sys/types.h>\nssize_t probe_ssize;\nint main(void) { return 0; }\n' > ssize-probe.c
+if $CC -c ssize-probe.c -o ssize-probe.o > /dev/null 2>&1; then :; else
+    OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_SSIZE_T"
+fi
+rm -f mode-probe.c mode-probe.o ssize-probe.c ssize-probe.o
+# -fno-strict-aliasing: the sources dereference type-punned pointers.
+CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h"
 export CFLAGS
 
 run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
