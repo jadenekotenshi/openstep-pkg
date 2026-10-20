@@ -1,0 +1,85 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+
+# aterm needs the X11 development files.  X11_PREFIX in pkg.conf says where
+# they live (default /usr/X11R6, where CubXWindow installs).
+x11_prefix=
+for d in $X11_PREFIX /usr/X11R6; do
+    if test -n "$d" && test -f "$d/include/X11/Xlib.h"; then
+        x11_prefix=$d
+        break
+    fi
+done
+if test -z "$x11_prefix"; then
+    echo "aterm: cannot find X11/Xlib.h; install the X11 development files" >&2
+    echo "aterm: and set X11_PREFIX in pkg.conf to the directory holding include/ and lib/" >&2
+    exit 1
+fi
+echo "aterm: using X11 under $x11_prefix"
+CFLAGS='-O2'
+CPPFLAGS="-I$x11_prefix/include -I/usr/local/include"
+LDFLAGS="-L$x11_prefix/lib -L/usr/local/lib"
+export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED
+if test -d "aterm-$VERSION"; then cd "aterm-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+
+# OPENSTEP's libc may lack unsetenv(), which aterm calls unconditionally: if a
+# program using it does not link, supply a private one (forced into every
+# compile).
+cat > probe_unsetenv.c <<'PEOF'
+extern int unsetenv(const char *);
+int main(void) { unsetenv("PKG_PROBE"); return 0; }
+PEOF
+if $CC probe_unsetenv.c -o probe_unsetenv > /dev/null 2>&1; then
+    echo "aterm: unsetenv is available"
+else
+    echo "aterm: no unsetenv; using a private one"
+    /bin/cat > aterm-compat.h <<'CEOF'
+#ifndef ATERM_OPENSTEP_COMPAT_H
+#define ATERM_OPENSTEP_COMPAT_H
+#include <string.h>
+extern char **environ;
+static int
+ostep_unsetenv(const char *name)
+{
+    char **src, **dst;
+    size_t n = strlen(name);
+
+    if (environ == 0)
+        return 0;
+    for (src = dst = environ; *src != 0; src++) {
+        if (strncmp(*src, name, n) == 0 && (*src)[n] == '=')
+            continue;
+        *dst++ = *src;
+    }
+    *dst = 0;
+    return 0;
+}
+#define unsetenv ostep_unsetenv
+#endif
+CEOF
+    CFLAGS="$CFLAGS -include `pwd`/aterm-compat.h"
+    export CFLAGS
+fi
+rm -f probe_unsetenv probe_unsetenv.c probe_unsetenv.o
+
+# The pixmap, JPEG and PNG support of the AfterStep libraries is left out; the
+# scrollbar is the NeXT-style one (the default).  No utmp/wtmp logging: that
+# needs root.
+run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
+    --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
+    --disable-aftersteplibs --without-jpeg --without-png \
+    --disable-utmp --disable-wtmp
+
+/usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p"
+/usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p" install DESTDIR="$DESTDIR"
