@@ -77,6 +77,17 @@ SEOF
 # define S_IXOTH 0000001
 # define S_IRWXO 0000007
 #endif
+#ifndef R_OK
+# define F_OK 0
+# define X_OK 1
+# define W_OK 2
+# define R_OK 4
+#endif
+#ifndef SEEK_SET
+# define SEEK_SET 0
+# define SEEK_CUR 1
+# define SEEK_END 2
+#endif
 #define alloca __builtin_alloca
 extern char **environ;
 extern int wait4();
