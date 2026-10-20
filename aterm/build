@@ -81,5 +81,17 @@ run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
     --disable-aftersteplibs --without-jpeg --without-png \
     --disable-utmp --disable-wtmp
 
-/usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p"
-/usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p" install DESTDIR="$DESTDIR"
+# The Makefiles run their sub-makes in "for ... (cd dir; make || exit 1)" loops,
+# which the stock sh does not stop on a failure: a compile error then looked like
+# success.  Run each directory's make here, so a failure stops the build.
+MKDIRP="/usr/local/bin/mkdir -p"
+for dir in src doc src/graphics; do
+    (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP") || exit 1
+done
+test -f src/aterm || { echo "aterm: src/aterm was not built" >&2; exit 1; }
+
+$MKDIRP "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
+for dir in src doc; do
+    (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP" install DESTDIR="$DESTDIR") || exit 1
+done
+test -x "$DESTDIR$PREFIX/bin/aterm" || { echo "aterm: the binary was not installed" >&2; exit 1; }
