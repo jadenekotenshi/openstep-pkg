@@ -1,0 +1,46 @@
+--- a/asimagelib/as_png.c	2001-09-28 13:47:58.000000000 +0000
++++ b/asimagelib/as_png.c	2026-10-20 22:46:27.766146849 +0000
+@@ -192,7 +192,7 @@
+    * the normal method of doing things with libpng).  REQUIRED unless you
+    * set up your own error handlers in the png_create_read_struct() earlier.
+    */
+-  if (setjmp (png_ptr->jmpbuf))
++  if (setjmp (png_jmpbuf (png_ptr)))
+     {
+       /* Free all of the memory associated with the png_ptr and info_ptr */
+       png_destroy_read_struct (&png_ptr, &info_ptr, (png_infopp) NULL);
+--- a/asimagelib/stepgfx.c	2001-09-28 13:47:58.000000000 +0000
++++ b/asimagelib/stepgfx.c	2026-10-20 22:46:27.763353928 +0000
+@@ -228,7 +228,7 @@
+ /* will scatter supplied pair of colors over supplied array making
+    illusion of smooth gradient
+  */
+-static RND32 stepgfx_rnd32_seed = GRADIENT_SEED;
++RND32 stepgfx_rnd32_seed = GRADIENT_SEED;
+ 
+ ASCOLOR
+ MakeLight (ASCOLOR base)
+--- a/src/WinList/WinList.c	2001-09-28 13:48:03.000000000 +0000
++++ b/src/WinList/WinList.c	2026-10-20 22:46:27.760638015 +0000
+@@ -37,8 +37,8 @@
+ static int AutoHide = 0;
+ static MyStyle *Style = NULL;
+ /*static MyStyle *hide_style = NULL; */
+-static Atom _AS_STYLE;
+-static Atom _XROOTPMAP_ID;
++Atom _AS_STYLE;
++Atom _XROOTPMAP_ID;
+ 
+ /* X stuff */
+ static int hidden = 1;
+--- a/src/Zharf/Zharf.c	2001-09-28 13:48:04.000000000 +0000
++++ b/src/Zharf/Zharf.c	2026-10-20 22:46:27.755219413 +0000
+@@ -66,7 +66,7 @@
+ 
+ char *MyName;
+ 
+-static Atom _AS_STYLE;
++Atom _AS_STYLE;
+ 
+ MyFont font;
+ 
