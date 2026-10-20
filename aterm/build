@@ -217,11 +217,13 @@ POSIX_OBJ="`pwd`/openstep_posix.o"
 
 # The pixmap, JPEG and PNG support of the AfterStep libraries is left out; the
 # scrollbar is the NeXT-style one (the default).  No utmp/wtmp logging: that
-# needs root.
+# needs root.  TERM is set to xterm: OPENSTEP's /etc/termcap has no rxvt entry
+# (aterm -tn NAME or the termName resource still changes it).
 run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
     --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
     --disable-aftersteplibs --without-jpeg --without-png \
-    --disable-utmp --disable-wtmp
+    --disable-utmp --disable-wtmp \
+    --with-term=xterm
 
 # The Makefiles run their sub-makes in "for ... (cd dir; make || exit 1)" loops,
 # which the stock sh does not stop on a failure: a compile error then looked like
