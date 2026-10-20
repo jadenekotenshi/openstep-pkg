@@ -10,3 +10,4 @@ jpeg
 libpng
 zlib
 @i386:cctools
+aterm

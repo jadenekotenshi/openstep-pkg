@@ -22,6 +22,9 @@ test -d "$LR/share/afterstep"
 test -f "$LR/share/afterstep/base.24bpp"
 test -f "$LR/share/afterstep/autoexec"
 test -d "$LR/share/afterstep/start"
+test -x "$LR/share/afterstep/xinitrc"
+grep '^exec afterstep$' "$LR/share/afterstep/xinitrc" > /dev/null
+grep '^aterm &$' "$LR/share/afterstep/xinitrc" > /dev/null
 test -d "$LR/share/afterstep/desktop" || test -d "$LR/share/afterstep/non-configurable"
 
 echo "AfterStep checks passed (the window manager itself needs an X display)"
