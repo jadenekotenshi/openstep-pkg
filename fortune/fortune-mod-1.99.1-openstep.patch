@@ -1,5 +1,5 @@
 --- a/fortune/fortune.c	2026-10-20 20:43:38.409022717 +0000
-+++ b/fortune/fortune.c	2026-10-20 20:43:55.010369384 +0000
++++ b/fortune/fortune.c	2026-10-20 20:54:04.610163501 +0000
 @@ -139,8 +139,12 @@
  #include	<string.h>
  #include	<errno.h>
@@ -27,7 +27,20 @@
  #ifdef HAVE_REGEX_H
  #include	<regex.h>
  #endif
-@@ -1673,21 +1682,9 @@
+@@ -160,8 +169,12 @@
+ 
+ #include	"strfile.h"
+ 
++#ifndef TRUE
+ #define	TRUE	1
++#endif
++#ifndef FALSE
+ #define	FALSE	0
++#endif
+ #define	bool	short
+ 
+ #define	MINW	6		/* minimum wait if desired */
+@@ -1673,21 +1686,9 @@
  
  int main(int ac, char *av[])
  {
@@ -49,6 +62,29 @@
  
  #ifndef NO_REGEX
      if (Match)
+--- a/util/strfile.c	2026-10-20 20:43:38.409188072 +0000
++++ b/util/strfile.c	2026-10-20 20:54:04.609631498 +0000
+@@ -74,6 +74,7 @@
+ 
+ #include	<stdlib.h>
+ #include	<unistd.h>
++#include	<sys/types.h>
+ #include	<netinet/in.h>
+ #include	<sys/param.h>
+ #include	<stdio.h>
+@@ -114,8 +115,12 @@
+  * 
+  */
+ 
++#ifndef TRUE
+ #define	TRUE	1
++#endif
++#ifndef FALSE
+ #define	FALSE	0
++#endif
+ 
+ #define	STORING_PTRS	(Oflag || Rflag)
+ #define	CHUNKSIZE	512
 --- a/util/strfile.h	2026-10-20 20:43:38.409204260 +0000
 +++ b/util/strfile.h	2026-10-20 20:44:26.135571133 +0000
 @@ -43,14 +43,14 @@
