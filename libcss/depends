@@ -4,3 +4,4 @@ netsurf-buildsystem
 libwapcaplet
 libparserutils
 patch
+cctools

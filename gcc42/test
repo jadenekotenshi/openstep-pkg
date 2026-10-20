@@ -20,6 +20,7 @@ do
 done
 
 "$CC" --version | grep '4\.2\.1' >/dev/null 2>&1
+[ "`"$CC" -print-prog-name=ld`" = /usr/local/lib/cctools/bin/ld ]
 
 /bin/rm -f "$TMP.c" "$TMP.cc" "$TMP.m" "$TMP.mm" "$TMP.s" \
     "$TMP-c" "$TMP-cxx" "$TMP-objc" "$TMP-objcpp" "$TMP.log"

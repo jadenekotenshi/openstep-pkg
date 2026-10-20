@@ -34,9 +34,16 @@ AWK=/usr/local/bin/gawk
 MAKE=/usr/local/bin/gnumake
 AS=/bin/as
 LD=/bin/ld
+# The stock seed compiler links host libraries with its stock linker.
+AR=/bin/ar
+RANLIB=/bin/ranlib
+AR_FOR_BUILD=$AR
+RANLIB_FOR_BUILD=$RANLIB
+AR_FOR_TARGET=/usr/local/lib/cctools/bin/ar
+RANLIB_FOR_TARGET=/usr/local/lib/cctools/bin/ranlib
 NM=/bin/nm
 AS_FOR_TARGET=$AS
-LD_FOR_TARGET=$LD
+LD_FOR_TARGET=/usr/local/lib/cctools/bin/ld
 NM_FOR_TARGET=$NM
 MAKEINFO=/usr/local/bin/makeinfo
 FLEX=/usr/local/bin/flex
@@ -56,6 +63,7 @@ ac_cv_func_mmap=no
 
 export DESTDIR VERSION BUILDROOT SRCDIR PATCHFILE BUILDDIR TARGET PREFIX
 export PATH TMPDIR CONFIG_SHELL CC CXX AS LD NM AS_FOR_TARGET LD_FOR_TARGET NM_FOR_TARGET
+export AR RANLIB AR_FOR_BUILD RANLIB_FOR_BUILD AR_FOR_TARGET RANLIB_FOR_TARGET
 export MAKEINFO FLEX BISON BUILD_CFLAGS CPPFLAGS CC_FOR_BUILD AWK MAKE CFLAGS CXXFLAGS
 export CFLAGS_FOR_BUILD CXXFLAGS_FOR_BUILD CFLAGS_FOR_TARGET CXXFLAGS_FOR_TARGET
 export am_cv_CC_dependencies_compiler_type ac_cv_func_mmap
@@ -85,7 +93,7 @@ cd "$BUILDDIR"
     --target="$TARGET" \
     --prefix="$PREFIX" \
     --with-as="$AS" \
-    --with-ld="$LD" \
+    --with-ld="$LD_FOR_TARGET" \
     --program-suffix=-4.2 \
     --with-gxx-include-dir=/usr/local/include/c++/4.2.1 \
     --enable-languages=c,c++,objc,obj-c++ \
@@ -117,21 +125,6 @@ cd "$BUILDDIR"
 # compare parks the final compiler/runtime in stage3-*; restore them for install.
 "$MAKE" SHELL="$CONFIG_SHELL" unstage
 
-# OPENSTEP ar truncates long member names.  When libtool flattens the
-# libsupc++ convenience archive, the long-named exception objects otherwise
-# disappear from libstdc++.a.  Merge the complete standalone archive back in.
-LIBSTDCXX_A="$BUILDDIR/$TARGET/libstdc++-v3/src/.libs/libstdc++.a"
-LIBSUPCXX_A="$BUILDDIR/$TARGET/libstdc++-v3/libsupc++/.libs/libsupc++.a"
-LIBSTDCXX_MERGE_DIR="$BUILDDIR/next-libstdcxx-merge"
-test -d "$LIBSTDCXX_MERGE_DIR" || mkdir "$LIBSTDCXX_MERGE_DIR"
-(
-    cd "$LIBSTDCXX_MERGE_DIR"
-    /bin/ar x "$LIBSUPCXX_A"
-    /bin/rm -f __.SYMDEF*
-    /bin/ar r "$LIBSTDCXX_A" *
-    /bin/ranlib "$LIBSTDCXX_A"
-)
-
 "$MAKE" SHELL="$CONFIG_SHELL" DESTDIR="$DESTDIR" \
     CFLAGS="$BUILD_CFLAGS" CXXFLAGS="$BUILD_CFLAGS" \
     CFLAGS_FOR_BUILD="$BUILD_CFLAGS" CXXFLAGS_FOR_BUILD="$BUILD_CFLAGS" \
@@ -143,9 +136,8 @@ test -d "$LIBSTDCXX_MERGE_DIR" || mkdir "$LIBSTDCXX_MERGE_DIR"
     CFLAGS_FOR_TARGET="$BUILD_CFLAGS" CXXFLAGS_FOR_TARGET="$BUILD_CFLAGS" \
     install-target-libstdc++-v3
 
-# The package installer's legacy tar cannot transport these four paths even
-# though the OPENSTEP filesystem accepts them.  Stage short-path copies for
-# post-install to restore after the image has been extracted.
+# Keep short-path fallback copies for hosts whose legacy tar cannot
+# transport these four paths. Post-install restores any missing headers.
 DRIVERKIT_FIXED="$DESTDIR/usr/local/lib/gcc/$TARGET/4.2.1/include/driverkit/__next_i386__"
 DRIVERKIT_HOLD="$DESTDIR/usr/local/lib/gcc42-header-hold"
 test -d "$DRIVERKIT_HOLD" || /usr/local/bin/mkdir -p "$DRIVERKIT_HOLD"
@@ -164,6 +156,6 @@ for archive in \
     "$DESTDIR/usr/local/lib/libsupc++.a"
 do
     if [ -f "$archive" ]; then
-        /bin/ranlib "$archive"
+        "$RANLIB_FOR_TARGET" "$archive"
     fi
 done
