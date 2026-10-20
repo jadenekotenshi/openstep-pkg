@@ -58,6 +58,18 @@ Packages that need the newer compiler depend on `gcc42` and explicitly use
 The GCC 4.2 package bootstraps directly from stock `/bin/cc`: stage 1 uses
 `-O0`, stages 2/3 and runtimes use `-O2`, and stage 2 is compared with stage 3.
 
+`gcc42` depends on `cctools` and uses its OPENSTEP-compatible cctools-806
+linker. The matched `ar` and `ranlib` preserve long archive member names.
+They live in `/usr/local/lib/cctools/bin`, with public commands `ar-806`,
+`ranlib-806`, and `ld-806`. Package builds select `AR` and `RANLIB`
+explicitly. Stock-compiler bootstrap builds use `/bin/ar` and `/bin/ranlib`.
+
+The separate `cctools-as` package supplies the newer assembler. Select it
+with `-specs=/usr/local/lib/cctools-as/gcc42.specs`; GCC otherwise keeps
+using `/bin/as`. Existing GCC installations can select the newer linker
+with `-specs=/usr/local/lib/cctools/gcc42.specs` until GCC is rebuilt.
+Both options can be used together.
+
 Python 3.11 builds at `-O3`, except its generated `deepfreeze.c` unit, which uses
 `-O0 -g0` to avoid GCC42 allocation failures and optimizer crashes on OPENSTEP.
 
