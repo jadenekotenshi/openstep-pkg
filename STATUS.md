@@ -49,7 +49,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | Package | x86 | SPARC | M68k |
 |---|---|---|---|
 | afterstep | — (new 2026-10-22: AfterStep 1.8.11, the last 1.x with the NeXTSTEP-style borders; needs HAVE_X11 and libXpm; build and test hooks checked on Linux only) | — | — |
-| aterm | validated 0.4.2 (2026-10-23; builds with the termios/waitpid/setsid/putenv shims, installs, test passes, runs under CubXWindow) | — | — |
+| aterm | validated 0.4.2 (2026-10-23; builds with the termios/waitpid/setsid/putenv shims, installs, test passes, runs under CubXWindow) | validated 0.4.2 (2026-10-23; builds, installs, tests and runs) | — |
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | validated (2026-10-21; built with gcc42, tests pass) |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
