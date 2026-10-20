@@ -5,6 +5,13 @@ VERSION=$2
 PREFIX=/usr/local
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them ("no table of contents").  A gcc42 built after
+# the cctools package links with the cctools ld by itself; an older one needs the
+# specs file that selects it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
 CONFIG_SHELL=/usr/local/bin/ksh
 GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
