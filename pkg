@@ -104,7 +104,24 @@ detect_arch() {
     PKG_SYSCC_ARCH_FLAGS=${PKG_SYSCC_ARCH_FLAGS-$arch_syscc}
     PKG_GCC42_ARCH_FLAGS=${PKG_GCC42_ARCH_FLAGS-$arch_gcc42}
 
-    export PKG_ARCH PKG_TARGET PKG_SYSCC_ARCH_FLAGS PKG_GCC42_ARCH_FLAGS
+    # The archive tools package builds use.  On i386 the cctools package supplies
+    # an ar and ranlib that keep long member names; the stock ones truncate them
+    # to 14 characters, so the other architectures (which have no cctools package)
+    # use the stock tools and the builds work around the truncation.
+    case $PKG_ARCH in
+        i386)
+            arch_ar=/usr/local/lib/cctools/bin/ar
+            arch_ranlib=/usr/local/lib/cctools/bin/ranlib
+        ;;
+        *)
+            arch_ar=/bin/ar
+            arch_ranlib=/bin/ranlib
+        ;;
+    esac
+    PKG_AR=${PKG_AR-$arch_ar}
+    PKG_RANLIB=${PKG_RANLIB-$arch_ranlib}
+
+    export PKG_ARCH PKG_TARGET PKG_SYSCC_ARCH_FLAGS PKG_GCC42_ARCH_FLAGS PKG_AR PKG_RANLIB
 }
 
 # Site configuration lives outside the package tree, in a plain sh file of
@@ -509,6 +526,14 @@ dep_resolve() {
             dr_val=`option_value "$dr_opt"` ||
                 die "unknown option in depends entry: $dr_entry"
             if [ "x$dr_val" = x1 ]; then
+                echo "$dr_rest"
+            fi
+        ;;
+        @*:*)
+            # @ARCH:package: needed only on that architecture (@i386:cctools).
+            dr_arch=`echo "$dr_entry" | sed 's/^@//; s/:.*//'`
+            dr_rest=`echo "$dr_entry" | sed 's/^[^:]*://'`
+            if [ "x$dr_arch" = "x$PKG_ARCH" ]; then
                 echo "$dr_rest"
             fi
         ;;
@@ -1916,7 +1941,7 @@ version_cmp() {
 up_deps_of() {
     up_deps=
     if [ -f "$up_tree/$up_name/depends" ]; then
-        up_deps=`sed -e 's/#.*//' -e 's/^ *//' -e 's/ *$//' -e 's/^?[^:]*://' \
+        up_deps=`sed -e 's/#.*//' -e 's/^ *//' -e 's/ *$//' -e 's/^?[^:]*://' -e 's/^@[^:]*://' \
             -e '/^!/d' -e '/^$/d' -e 's/ .*//' "$up_tree/$up_name/depends"`
     fi
 }
@@ -3179,6 +3204,8 @@ case $ACTION in
         echo "PKG_TARGET=$PKG_TARGET"
         echo "PKG_SYSCC_ARCH_FLAGS=$PKG_SYSCC_ARCH_FLAGS"
         echo "PKG_GCC42_ARCH_FLAGS=$PKG_GCC42_ARCH_FLAGS"
+        echo "PKG_AR=$PKG_AR"
+        echo "PKG_RANLIB=$PKG_RANLIB"
     ;;
 
     config)

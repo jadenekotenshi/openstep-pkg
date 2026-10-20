@@ -154,6 +154,11 @@ A `depends` entry can be made conditional on an option with `?OPTION:package`, f
 `?HAVE_X11:neXtaw`: the dependency is installed (and checked) only when that option is 1, and is
 ignored otherwise.  `!package` conflicts work the same way (`?HAVE_X11:!package`).
 
+A dependency can also be limited to one architecture with `@ARCH:package`, for example `@i386:cctools`: it
+is installed (and checked) only on that architecture and ignored on the others.  Builds that need an
+`ar` and `ranlib` that keep long member names use `$PKG_AR` and `$PKG_RANLIB`, which `pkg` sets to the
+`cctools` ones on i386 and to `/bin/ar` and `/bin/ranlib` elsewhere (`pkg arch` prints them).
+
 A dependency can say when it is needed, with a word after the name:
 
 ```
@@ -216,6 +221,18 @@ by default, or `sparc-next-openstep4` on OPENSTEP/SPARC (override with `GCC42_AR
 The SPARC back end is not in Apple's GCC tree, so it comes from FSF GCC 4.2.1
 (`gcc-sparc-config-4.2.1.tar.gz`, unpacked over the source) with the NeXT layer in the patch
 (`gcc/config/sparc/next.h`). See `gcc42/SPARC.md` for its status and bring-up checklist.
+
+On i386, `gcc42` depends on `cctools` and uses its OPENSTEP-compatible cctools-806
+linker (the `cctools` package is i386-only; SPARC and 68k keep the stock `ar`, `ranlib` and `ld`). The matched `ar` and `ranlib` preserve long archive member names.
+They live in `/usr/local/lib/cctools/bin`, with public commands `ar-806`,
+`ranlib-806`, and `ld-806`. Package builds select `AR` and `RANLIB`
+explicitly. Stock-compiler bootstrap builds use `/bin/ar` and `/bin/ranlib`.
+
+The separate `cctools-as` package supplies the newer assembler. Select it
+with `-specs=/usr/local/lib/cctools-as/gcc42.specs`; GCC otherwise keeps
+using `/bin/as`. Existing GCC installations can select the newer linker
+with `-specs=/usr/local/lib/cctools/gcc42.specs` until GCC is rebuilt.
+Both options can be used together.
 
 Python 3.11 builds at `-O3`, except its generated `deepfreeze.c` unit, which uses
 `-O0 -g0` to avoid GCC42 allocation failures and optimizer crashes on OPENSTEP.
