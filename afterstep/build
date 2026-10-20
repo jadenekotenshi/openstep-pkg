@@ -98,6 +98,15 @@ typedef unsigned short mode_t;
 #ifdef OSTEP_NEED_SSIZE_T
 typedef int ssize_t;
 #endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
 #ifndef R_OK
 # define F_OK 0
 # define X_OK 1
@@ -184,8 +193,18 @@ run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
 
 # configure adds -fPIC and the stock ar/ranlib to every Makefile; the libraries
 # are static and the archives need the matching ar/ranlib (cctools on i386).
+# configure left the X libraries out of the link lines (only -lXpm); name them
+# here, for the ones that are installed.  Xpm depends on X11, so it comes first.
+LIBS_X_VALUE="-L$x11_prefix/lib -lXpm"
+for xlib in Xext X11 SM ICE; do
+    if ls "$x11_prefix"/lib/lib$xlib.* > /dev/null 2>&1; then
+        LIBS_X_VALUE="$LIBS_X_VALUE -l$xlib"
+    fi
+done
+echo "afterstep: X libraries: $LIBS_X_VALUE"
 for mk in `find . -name Makefile -print`; do
     sed -e 's/ -fPIC//' \
+        -e "s#^LIBS_X[ 	]*=.*#LIBS_X		= $LIBS_X_VALUE#" \
         -e "s#^AR[ 	]*=.*#AR		= $AR_CMD#" \
         -e "s#^RANLIB[ 	]*=.*#RANLIB		= $PKG_RANLIB#" \
         "$mk" > "$mk.openstep"
