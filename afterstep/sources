@@ -1,0 +1,4 @@
+# AfterStep 1.8.11, the last of the 1.x series (the NeXTSTEP-style window borders and Wharf).
+# Debian's original tarball, from the archive.
+https://archive.debian.org/debian/pool/main/a/afterstep/afterstep_1.8.11.orig.tar.gz
+afterstep-1.8.11-openstep.patch afterstep-1.8.11.orig

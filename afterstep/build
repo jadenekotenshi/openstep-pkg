@@ -1,0 +1,61 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+
+# AfterStep needs the X11 development files, including libXpm.  X11_PREFIX in
+# pkg.conf says where they live (default /usr/X11R6, where CubXWindow installs).
+x11_prefix=
+for d in $X11_PREFIX /usr/X11R6; do
+    if test -n "$d" && test -f "$d/include/X11/Xlib.h"; then
+        x11_prefix=$d
+        break
+    fi
+done
+if test -z "$x11_prefix"; then
+    echo "afterstep: cannot find X11/Xlib.h; install the X11 development files" >&2
+    echo "afterstep: and set X11_PREFIX in pkg.conf to the directory holding include/ and lib/" >&2
+    exit 1
+fi
+if test ! -f "$x11_prefix/include/X11/xpm.h"; then
+    echo "afterstep: $x11_prefix/include/X11/xpm.h is missing; AfterStep needs libXpm" >&2
+    exit 1
+fi
+echo "afterstep: using X11 under $x11_prefix"
+CFLAGS='-O2'
+CPPFLAGS="-I$x11_prefix/include -I/usr/local/include"
+LDFLAGS="-L$x11_prefix/lib -L/usr/local/lib"
+AR_CMD="$PKG_AR clq"
+export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED
+if test -d "afterstep-$VERSION.orig"; then cd "afterstep-$VERSION.orig"; fi
+. "$PKG_BUILD_HELPERS"
+patch -p1 < "afterstep-$VERSION-openstep.patch"
+
+run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
+    --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
+    --with-xpm-includes="$x11_prefix/include" --with-xpm-library="$x11_prefix/lib" \
+    --with-jpeg-includes=/usr/local/include --with-jpeg-library=/usr/local/lib \
+    --with-png-includes=/usr/local/include --with-png-library=/usr/local/lib \
+    --disable-script
+
+# configure adds -fPIC and the stock ar/ranlib to every Makefile; the libraries
+# are static and the archives need the matching ar/ranlib (cctools on i386).
+for mk in `find . -name Makefile -print`; do
+    sed -e 's/ -fPIC//' \
+        -e "s#^AR[ 	]*=.*#AR		= $AR_CMD#" \
+        -e "s#^RANLIB[ 	]*=.*#RANLIB		= $PKG_RANLIB#" \
+        "$mk" > "$mk.openstep"
+    mv "$mk.openstep" "$mk"
+done
+
+MKDIRP=/usr/local/bin/mkdir
+/usr/local/bin/gnumake MKDIR="$MKDIRP"
+/usr/local/bin/gnumake MKDIR="$MKDIRP" install DESTDIR="$DESTDIR"
