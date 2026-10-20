@@ -30,6 +30,10 @@ if [ "$ARCH" = i386 ]; then
 fi
 
 "$CC" --version | grep '4\.2\.1' >/dev/null 2>&1
+# On i386 gcc42 links with the cctools linker (the cctools package).
+case `"$CC" -dumpmachine` in
+i386-*) [ "`"$CC" -print-prog-name=ld`" = /usr/local/lib/cctools/bin/ld ] ;;
+esac
 
 /bin/rm -f "$TMP.c" "$TMP.cc" "$TMP.m" "$TMP.mm" "$TMP.s" \
     "$TMP-c" "$TMP-cxx" "$TMP-objc" "$TMP-objcpp" "$TMP.log"

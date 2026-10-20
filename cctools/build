@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/bin:/usr/bin:/usr/ucb
+export PATH
+if test -d "cctools-cctools-$VERSION"; then cd "cctools-cctools-$VERSION"; fi
+patch -p1 < "cctools-$VERSION-openstep.patch"
+for dir in openstep-build openstep-build/libstuff openstep-build/ar openstep-build/ld; do
+    test -d "$dir" || mkdir "$dir"
+done
+/bin/gnumake -f openstep/Makefile SHELL=/usr/local/bin/ksh
+for dir in usr usr/local usr/local/bin usr/local/lib usr/local/lib/cctools \
+    usr/local/lib/cctools/bin \
+    usr/local/share usr/local/share/doc usr/local/share/doc/cctools; do
+    test -d "$DESTDIR/$dir" || mkdir "$DESTDIR/$dir"
+done
+/usr/bin/install -c -m 755 openstep-build/ar-tool "$DESTDIR/usr/local/lib/cctools/bin/ar"
+/usr/bin/install -c -m 755 openstep-build/ranlib "$DESTDIR/usr/local/lib/cctools/bin/ranlib"
+/usr/bin/install -c -m 755 openstep-build/ld-tool "$DESTDIR/usr/local/lib/cctools/bin/ld"
+for tool in ar ranlib ld; do
+    /bin/ln -s "../lib/cctools/bin/$tool" "$DESTDIR/usr/local/bin/$tool-806"
+done
+/usr/bin/install -c -m 644 gcc42.specs "$DESTDIR/usr/local/lib/cctools/gcc42.specs"
+for doc in README APPLE_LICENSE ar/ar.1 ar/ar.5 man/ranlib.1 man/ranlib.5; do
+    /usr/bin/install -c -m 644 "$doc" "$DESTDIR/usr/local/share/doc/cctools/"
+done

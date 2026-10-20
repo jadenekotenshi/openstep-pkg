@@ -15,7 +15,8 @@ compilation, including -pipe. GCC still reports /bin/as with
 -print-prog-name=as; use -v to see the assembler actually invoked.
 Without the specs option GCC continues to use the stock assembler.
 Apple's optional PCH repository path (-fsave-repository) still uses stock as.
-The linker, system tools, compiler ABI, and CPU options are unchanged.
+These assembler specs preserve the compiler's configured linker, ABI, and
+CPU options. They work with both stock ld and the separate cctools linker.
 
 Only the i386 backend is installed. Instruction encoding support does not
 imply runtime CPU or operating-system support. In particular, keep SSE/SSE2
