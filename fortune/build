@@ -30,9 +30,50 @@ if $CC regexprobe.c -o regexprobe > /dev/null 2>&1 && ./regexprobe; then
     REGEXDEFS="-DBSD_REGEX"
 else
     echo "fortune: no usable re_comp/re_exec; building without -m (pattern search)"
-    REGEXDEFS="-DNO_REGEX"
+    REGEXDEFS=""
 fi
 rm -f regexprobe regexprobe.c regexprobe.o
+
+# OPENSTEP has no POSIX <dirent.h> (it has <sys/dir.h> and struct direct), no
+# snprintf() and no strdup().  Private headers supply them; they go first on the
+# include path and the compat header is forced into every compile.
+/usr/local/bin/mkdir -p openstep
+cp snprintf-shim.h openstep/snprintf-shim.h
+if [ -z "$FORTUNE_NO_DIRENT_WRAPPER" ]; then
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#undef _POSIX_SOURCE
+#ifndef _NEXT_SOURCE
+# define _NEXT_SOURCE 1
+#endif
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+fi
+/bin/cat > openstep/fortune-compat.h <<'SEOF'
+#ifndef OPENSTEP_FORTUNE_COMPAT_H
+#define OPENSTEP_FORTUNE_COMPAT_H
+#include <sys/types.h>
+#include <stdlib.h>
+#include <string.h>
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != NULL)
+        memcpy(p, s, n);
+    return p;
+}
+#define strdup ostep_strdup
+#include "snprintf-shim.h"
+#endif
+SEOF
+COMPAT="-Iopenstep -include fortune-compat.h"
 
 # The compiled-in paths go in a header, which avoids quoting them on the command line.
 cat > openstep-paths.h <<PEOF
@@ -45,9 +86,9 @@ CFLAGS="-O2 -std=gnu89 -fsigned-char -DHAVE_STDBOOL $REGEXDEFS"
 
 for prog in strfile unstr rot
 do
-    $CC $CFLAGS -o util/$prog util/$prog.c
+    $CC $CFLAGS $COMPAT -o util/$prog util/$prog.c
 done
-$CC $CFLAGS -include openstep-paths.h -Iutil -o fortune/fortune fortune/fortune.c
+$CC $CFLAGS $COMPAT -include openstep-paths.h -Iutil -o fortune/fortune fortune/fortune.c
 
 # The cookie files.  The Debian tree recodes them to UTF-8; here they stay in
 # their original character set.  The offensive ones are kept rot13 encoded.
