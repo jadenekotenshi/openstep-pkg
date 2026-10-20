@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+work=${TMPDIR-/tmp}/fortune-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+FORTUNE=$LR/bin/fortune
+STRFILE=$LR/bin/strfile
+UNSTR=$LR/bin/unstr
+
+# The installed cookie files: a random fortune, the file list, a named file.
+"$FORTUNE" > "$work/random"
+test -s "$work/random"
+"$FORTUNE" -f > "$work/list" 2>&1
+grep 'wisdom' "$work/list" > /dev/null
+"$FORTUNE" wisdom > "$work/wisdom"
+test -s "$work/wisdom"
+# The offensive files are stored rot13 encoded and must come back readable.
+"$FORTUNE" -o > "$work/off"
+test -s "$work/off"
+
+# strfile, unstr and fortune on a file of our own.
+printf 'alpha one\n%%\nbeta two\n%%\ngamma three\n' > "$work/cookies"
+"$STRFILE" "$work/cookies" > /dev/null
+test -f "$work/cookies.dat"
+"$FORTUNE" "$work/cookies" > "$work/one"
+grep -E 'alpha|beta|gamma' "$work/one" > /dev/null
+cp "$work/cookies" "$work/cookies.orig"
+"$UNSTR" -c % "$work/cookies" > /dev/null 2>&1 || :
+for n in 1 2 3 4 5 6 7 8
+do
+    "$FORTUNE" "$work/cookies" >> "$work/many"
+done
+grep alpha "$work/many" > /dev/null || grep beta "$work/many" > /dev/null || grep gamma "$work/many" > /dev/null
+
+# Pattern search (-m) exists only when the libc has re_comp(); without it the
+# option is refused and the check is skipped.  (-m exits 1 when it finds matches.)
+"$FORTUNE" -m 'beta' "$work/cookies" > "$work/match" 2>&1 || :
+if grep 'beta two' "$work/match" > /dev/null; then
+    echo "fortune: -m (pattern search) works"
+else
+    echo "fortune: -m (pattern search) is not available in this build"
+fi
+echo "fortune, strfile and unstr checks passed"

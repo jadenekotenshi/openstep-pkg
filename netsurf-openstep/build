@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+COMMIT=5fd34769deeb53a5b631f5d519561c77fe9d9b90
+APP=NetSurf.app
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+export PATH
+if test -d "netsurf-openstep-$COMMIT"; then cd "netsurf-openstep-$COMMIT"; fi
+
+# The checked-in Makefile.config selects GCC 4.2, the OPENSTEP compatibility
+# headers and the libraries installed under /usr/local (found with pkg-config).
+/usr/local/bin/gnumake HOST=NeXT TARGET=openstep
+
+test -x "$APP/NetSurf"
+
+mkdirs() {
+    mkdirs_path=
+    for mkdirs_part in `echo "$1" | sed 's#/# #g'`; do
+        mkdirs_path="$mkdirs_path/$mkdirs_part"
+        test -d "$mkdirs_path" || mkdir "$mkdirs_path"
+    done
+}
+
+mkdirs "$DESTDIR$PREFIX/Apps"
+mkdirs "$DESTDIR$PREFIX/share/doc/netsurf-openstep"
+cp -pR "$APP" "$DESTDIR$PREFIX/Apps/$APP"
+cp -p COPYING "$DESTDIR$PREFIX/share/doc/netsurf-openstep/COPYING"
+cp -p frontends/openstep/RELEASE-README.txt "$DESTDIR$PREFIX/share/doc/netsurf-openstep/README.txt"
+cp -p frontends/openstep/THIRD_PARTY_NOTICES "$DESTDIR$PREFIX/share/doc/netsurf-openstep/THIRD_PARTY_NOTICES"
