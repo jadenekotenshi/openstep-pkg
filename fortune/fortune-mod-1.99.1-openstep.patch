@@ -1,0 +1,73 @@
+--- a/fortune/fortune.c	2026-10-20 20:43:38.409022717 +0000
++++ b/fortune/fortune.c	2026-10-20 20:43:55.010369384 +0000
+@@ -139,8 +139,12 @@
+ #include	<string.h>
+ #include	<errno.h>
+ #include	<locale.h>
+-#include	<langinfo.h>
+-#include 	<recode.h>
++/* OPENSTEP has neither recode nor nl_langinfo.  The data files stay in their
++   single byte character set, so nothing is ever converted. */
++typedef int RECODE_REQUEST;
++typedef int RECODE_OUTER;
++#define recode_string(request, text)	strdup(text)
++#define recode_delete_request(request)	((void) 0)
+ 
+ 
+ /* This makes GNU libc to prototype the BSD regex functions */
+@@ -148,6 +152,11 @@
+ #define	_REGEX_RE_COMP
+ #endif
+ 
++#ifdef BSD_REGEX
++/* Not every libc declares these (OPENSTEP's does not). */
++extern char *re_comp(const char *);
++extern int re_exec(const char *);
++#endif
+ #ifdef HAVE_REGEX_H
+ #include	<regex.h>
+ #endif
+@@ -1673,21 +1682,9 @@
+ 
+ int main(int ac, char *av[])
+ {
+-    char *ctype, *crequest;
+     getargs(ac, av);
+ 
+-    outer = recode_new_outer(true);
+-    request = recode_new_request (outer);
+-
+     setlocale(LC_ALL,"");
+-    ctype = nl_langinfo(CODESET);
+-    if(strcmp(ctype,"ANSI_X3.4-1968") == 0)
+-        ctype="ISO-8859-1";
+-	
+-    crequest = malloc(strlen(ctype) + 7 + 1);
+-    sprintf(crequest, "UTF-8..%s", ctype);
+-    recode_scan_request (request, crequest);
+-    free(crequest);
+ 
+ #ifndef NO_REGEX
+     if (Match)
+--- a/util/strfile.h	2026-10-20 20:43:38.409204260 +0000
++++ b/util/strfile.h	2026-10-20 20:44:26.135571133 +0000
+@@ -43,14 +43,14 @@
+ 
+ typedef struct {				/* information table */
+ #define	VERSION		2
+-	u_int32_t	str_version;		/* version number */
+-	u_int32_t	str_numstr;		/* # of strings in the file */
+-	u_int32_t	str_longlen;		/* length of longest string */
+-	u_int32_t	str_shortlen;		/* length of shortest string */
++	unsigned int	str_version;		/* version number */
++	unsigned int	str_numstr;		/* # of strings in the file */
++	unsigned int	str_longlen;		/* length of longest string */
++	unsigned int	str_shortlen;		/* length of shortest string */
+ #define	STR_RANDOM	0x1			/* randomized pointers */
+ #define	STR_ORDERED	0x2			/* ordered pointers */
+ #define	STR_ROTATED	0x4			/* rot-13'd text */
+-	u_int32_t	str_flags;		/* bit field for flags */
++	unsigned int	str_flags;		/* bit field for flags */
+ 	u_int8_t	stuff[4];		/* long aligned space */
+ #define	str_delim	stuff[0]		/* delimiting character */
+ } STRFILE;

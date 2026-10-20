@@ -1,0 +1,38 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+APP=$LR/Apps/NetSurf.app
+work=${TMPDIR-/tmp}/netsurf-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+
+# The bundle: executable, resources, fonts, licenses and the CA bundle.
+test -x "$APP/NetSurf"
+test -f "$APP/ca-bundle"
+test -f "$APP/default.css"
+test -d "$APP/Resources/Fonts"
+fonts=`ls "$APP/Resources/Fonts" | grep -c '\.ttf$'`
+test "$fonts" -eq 12
+test -f "$APP/Resources/Licenses/NetSurf-COPYING"
+
+# A Mach-O executable (magic 0xfeedface, in either byte order).
+magic=`dd if="$APP/NetSurf" bs=4 count=1 2>/dev/null | od -b | sed -n 1p | sed 's/^[0-9]* *//'`
+magic=`echo $magic`
+case "$magic" in
+    "316 372 355 376"|"376 355 372 316") ;;
+    *) echo "netsurf: $APP/NetSurf is not a Mach-O executable ($magic)" >&2; exit 1 ;;
+esac
+
+# The release links the libraries in, so only the system's own should be needed.
+# (A warning only: a build against dynamic libraries still runs on this machine.)
+if [ -x /bin/otool ]; then
+    /bin/otool -L "$APP/NetSurf" > "$work/libs" 2>&1 || :
+    if grep '/usr/local' "$work/libs" > /dev/null; then
+        echo "netsurf: warning: the executable needs libraries under /usr/local:" >&2
+        grep '/usr/local' "$work/libs" >&2
+    fi
+fi
+echo "NetSurf.app bundle checks passed (the window itself needs a display and is not started)"

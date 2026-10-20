@@ -1,0 +1,25 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PERL=${COWSAY_PERL-/usr/local/bin/perl}
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+export PATH
+if test -d "cowsay-$VERSION"; then cd "cowsay-$VERSION"; fi
+
+# The bundled install.sh asks questions and uses mkdir -p; do what it does here.
+# The script and its man page carry the perl and the install prefix as markers.
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/share/man/man1" \
+    "$DESTDIR$PREFIX/share/cows"
+sed -e "s,%BANGPERL%,!$PERL," -e "s,%PREFIX%,$PREFIX," cowsay > "$DESTDIR$PREFIX/bin/cowsay"
+chmod 755 "$DESTDIR$PREFIX/bin/cowsay"
+/bin/ln -s cowsay "$DESTDIR$PREFIX/bin/cowthink"
+sed -e "s,%BANGPERL%,!$PERL," -e "s,%PREFIX%,$PREFIX," cowsay.1 > "$DESTDIR$PREFIX/share/man/man1/cowsay.1"
+chmod 644 "$DESTDIR$PREFIX/share/man/man1/cowsay.1"
+/bin/ln -s cowsay.1 "$DESTDIR$PREFIX/share/man/man1/cowthink.1"
+for cow in cows/*.cow
+do
+    /usr/bin/install -c -m 644 "$cow" "$DESTDIR$PREFIX/share/cows/"
+done
+test -f "$DESTDIR$PREFIX/share/cows/default.cow"

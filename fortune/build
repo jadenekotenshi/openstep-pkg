@@ -1,0 +1,95 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="${FORTUNE_CC-/usr/local/bin/gcc-4.2} $PKG_GCC42_ARCH_FLAGS"
+export PATH
+if test -d "fortune-mod-$VERSION"; then cd "fortune-mod-$VERSION"; fi
+patch -p1 < "fortune-mod-$VERSION-openstep.patch"
+
+COOKIEDIR=$PREFIX/share/games/fortunes
+OCOOKIEDIR=$COOKIEDIR/off
+LOCALDIR=$PREFIX/share/games/fortunes-local
+LOCALODIR=$LOCALDIR/off
+
+# fortune -m needs the BSD re_comp()/re_exec(); use them if this libc has them.
+cat > regexprobe.c <<'PEOF'
+extern char *re_comp(const char *);
+extern int re_exec(const char *);
+int main(void)
+{
+    if (re_comp("a+b") != 0)
+        return 1;
+    return re_exec("caab") == 1 && re_exec("ccc") == 0 ? 0 : 1;
+}
+PEOF
+if $CC regexprobe.c -o regexprobe > /dev/null 2>&1 && ./regexprobe; then
+    echo "fortune: re_comp/re_exec work; building with -m (pattern search)"
+    REGEXDEFS="-DBSD_REGEX"
+else
+    echo "fortune: no usable re_comp/re_exec; building without -m (pattern search)"
+    REGEXDEFS="-DNO_REGEX"
+fi
+rm -f regexprobe regexprobe.c regexprobe.o
+
+# The compiled-in paths go in a header, which avoids quoting them on the command line.
+cat > openstep-paths.h <<PEOF
+#define FORTDIR "$COOKIEDIR"
+#define OFFDIR "$OCOOKIEDIR"
+#define LOCFORTDIR "$LOCALDIR"
+#define LOCOFFDIR "$LOCALODIR"
+PEOF
+CFLAGS="-O2 -std=gnu89 -fsigned-char -DHAVE_STDBOOL $REGEXDEFS"
+
+for prog in strfile unstr rot
+do
+    $CC $CFLAGS -o util/$prog util/$prog.c
+done
+$CC $CFLAGS -include openstep-paths.h -Iutil -o fortune/fortune fortune/fortune.c
+
+# The cookie files.  The Debian tree recodes them to UTF-8; here they stay in
+# their original character set.  The offensive ones are kept rot13 encoded.
+cd datfiles
+COOKIES="art ascii-art computers cookie definitions drugs education ethnic \
+    food fortunes goedel humorists kids law linuxcookie literature \
+    love magic medicine men-women miscellaneous news people pets \
+    platitudes politics riddles science songs-poems sports \
+    startrek translate-me wisdom work linux perl knghtbrd \
+    paradoxum zippy debian"
+for i in $COOKIES
+do
+    ../util/strfile $i
+done
+cd off
+OCOOKIES="drugs misandry privates sex astrology ethnic \
+    miscellaneous racism songs-poems black-humor hphobia misogyny \
+    religion vulgarity definitions limerick politics riddles zippy \
+    cookie fortunes linux art atheism debian"
+for i in $OCOOKIES
+do
+    ../../util/rot < unrotated/$i > $i
+    ../../util/strfile -x $i
+done
+cd ../..
+
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/share/man/man1" \
+    "$DESTDIR$PREFIX/share/man/man6" "$DESTDIR$COOKIEDIR/off"
+/usr/bin/install -c -m 755 fortune/fortune "$DESTDIR$PREFIX/bin/fortune"
+/usr/bin/install -c -m 755 util/strfile "$DESTDIR$PREFIX/bin/strfile"
+/usr/bin/install -c -m 755 util/unstr "$DESTDIR$PREFIX/bin/unstr"
+for i in $COOKIES
+do
+    /usr/bin/install -c -m 644 datfiles/$i datfiles/$i.dat "$DESTDIR$COOKIEDIR/"
+done
+for i in $OCOOKIES
+do
+    /usr/bin/install -c -m 644 datfiles/off/$i datfiles/off/$i.dat "$DESTDIR$COOKIEDIR/off/"
+done
+/usr/bin/install -c -m 644 util/strfile.man "$DESTDIR$PREFIX/share/man/man1/strfile.1"
+/bin/ln -s strfile.1 "$DESTDIR$PREFIX/share/man/man1/unstr.1"
+# fortune.6 is the man page with the stock paths; rewrite them for this layout.
+sed -e "s#/usr/share/fortune#$COOKIEDIR#g" \
+    fortune/fortune.6 > fortune/fortune.6.openstep
+/usr/bin/install -c -m 644 fortune/fortune.6.openstep "$DESTDIR$PREFIX/share/man/man6/fortune.6"
