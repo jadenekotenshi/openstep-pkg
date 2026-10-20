@@ -98,6 +98,15 @@ typedef unsigned short mode_t;
 #ifdef OSTEP_NEED_SSIZE_T
 typedef int ssize_t;
 #endif
+#ifdef OSTEP_NEED_PID_T
+typedef int pid_t;
+#endif
+#ifdef OSTEP_NEED_UID_T
+typedef unsigned short uid_t;
+#endif
+#ifdef OSTEP_NEED_GID_T
+typedef unsigned short gid_t;
+#endif
 #ifndef S_ISDIR
 # define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 #endif
@@ -171,15 +180,15 @@ ostep_putenv(char *string)
 SEOF
 # Types this <sys/types.h> may lack (probed, since a typedef cannot be tested for).
 OSTEP_DEFS=
-printf '#include <sys/types.h>\nmode_t probe_mode;\nint main(void) { return 0; }\n' > mode-probe.c
-if $CC -c mode-probe.c -o mode-probe.o > /dev/null 2>&1; then :; else
-    OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_MODE_T"
-fi
-printf '#include <sys/types.h>\nssize_t probe_ssize;\nint main(void) { return 0; }\n' > ssize-probe.c
-if $CC -c ssize-probe.c -o ssize-probe.o > /dev/null 2>&1; then :; else
-    OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_SSIZE_T"
-fi
-rm -f mode-probe.c mode-probe.o ssize-probe.c ssize-probe.o
+for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
+    printf '#include <sys/types.h>\n%s probe_var;\nint main(void) { return 0; }\n' "$ostep_type" > type-probe.c
+    if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+        ostep_upper=`echo $ostep_type | tr 'a-z' 'A-Z'`
+        OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
+    fi
+done
+rm -f type-probe.c type-probe.o
+echo "afterstep: missing types:$OSTEP_DEFS"
 # -fno-strict-aliasing: the sources dereference type-punned pointers.
 CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h"
 export CFLAGS
