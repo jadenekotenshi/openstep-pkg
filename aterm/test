@@ -12,6 +12,8 @@ trap 'exit 1' 1 2 3 15
 test -x "$LR/bin/aterm"
 "$LR/bin/aterm" -h > "$work/help" 2>&1 || :
 grep -i 'usage' "$work/help" > /dev/null
+# TERM defaults to xterm (OPENSTEP's termcap has no rxvt entry).
+strings "$LR/bin/aterm" | grep '^TERM=xterm$' > /dev/null
 test -f "$LR/man/man1/aterm.1" || test -f "$LR/share/man/man1/aterm.1"
 
 # A Mach-O executable (magic 0xfeedface, in either byte order).
