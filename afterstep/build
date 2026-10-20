@@ -56,6 +56,24 @@ for mk in `find . -name Makefile -print`; do
     mv "$mk.openstep" "$mk"
 done
 
+# The Makefiles run their sub-makes in "for ... (cd dir; make || exit 1)" loops,
+# which the stock sh does not stop on a failure: a compile error then looked like
+# success.  Take the directory list from the top Makefile and run each one here,
+# so a failure stops the build.
 MKDIRP=/usr/local/bin/mkdir
-/usr/local/bin/gnumake MKDIR="$MKDIRP"
-/usr/local/bin/gnumake MKDIR="$MKDIRP" install DESTDIR="$DESTDIR"
+subdirs=`sed -n -e '/^subdirs/,/^$/p' Makefile | sed -e 's/^subdirs[ 	]*=//' -e 's/\\\\$//' | tr '\n' ' '`
+count=0
+for dir in $subdirs; do count=`expr $count + 1`; done
+test "$count" -ge 20 || { echo "afterstep: could not read the module list from Makefile ($subdirs)" >&2; exit 1; }
+
+for dir in $subdirs; do
+    (cd $dir && /usr/local/bin/gnumake MKDIR="$MKDIRP") || exit 1
+done
+test -f src/afterstep/afterstep || { echo "afterstep: src/afterstep/afterstep was not built" >&2; exit 1; }
+
+$MKDIRP -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/lib" "$DESTDIR$PREFIX/man/man1"
+/usr/local/bin/gnumake MKDIR="$MKDIRP" install.data DESTDIR="$DESTDIR" || exit 1
+for dir in $subdirs; do
+    (cd $dir && /usr/local/bin/gnumake MKDIR="$MKDIRP" install DESTDIR="$DESTDIR") || exit 1
+done
+test -x "$DESTDIR$PREFIX/bin/afterstep" || { echo "afterstep: the window manager was not installed" >&2; exit 1; }
