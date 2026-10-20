@@ -13,7 +13,11 @@ cd "$TMP"
 "$AS" -v -o empty.o /dev/null > version.log 2>&1
 grep 'cctools-806' version.log >/dev/null
 [ "`"$CC" -print-prog-name=as`" = /bin/as ]
-[ "`"$CC" -print-prog-name=ld`" = /bin/ld ]
+LINKER=`"$CC" -print-prog-name=ld`
+case "$LINKER" in
+    /bin/ld|/usr/local/lib/cctools/bin/ld) ;;
+    *) echo "Unexpected GCC linker: $LINKER" >&2; exit 1 ;;
+esac
 
 cat > probe.s <<'EOF'
 .text
@@ -160,4 +164,4 @@ grep '/usr/local/bin/as-806 ' objc.log >/dev/null
     -framework Foundation -o objcpp > objcpp.log 2>&1
 grep '/usr/local/bin/as-806 ' objcpp.log >/dev/null
 ./objcpp
-echo 'cctools-as 806: encodings, relocations, stock linking and GCC opt-in passed'
+echo 'cctools-as 806: encodings, relocations, native linking and GCC opt-in passed'

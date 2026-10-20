@@ -1,0 +1,4 @@
+https://github.com/apple-oss-distributions/cctools/archive/refs/tags/cctools-806.tar.gz
+cctools-806-openstep.patch cctools-cctools-806
+gcc42.specs cctools-cctools-806
+README cctools-cctools-806

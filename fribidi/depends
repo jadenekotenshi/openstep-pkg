@@ -8,3 +8,4 @@ coreutils
 pkg-config
 diffutils
 bzip2
+cctools

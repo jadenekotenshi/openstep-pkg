@@ -1,0 +1,56 @@
+cctools 806 for OPENSTEP/i386
+
+This package supplies ar, ranlib, and the classic cctools linker. It builds
+with stock /bin/cc and has no GCC 4.2 dependency, so gcc42 can depend on it.
+The cctools-as package supplies the assembler separately.
+
+Install with: sh ./pkg install cctools
+Test with:    sh ./pkg test cctools
+
+The matched tools live in /usr/local/lib/cctools/bin. The public commands
+are ar-806, ranlib-806, and ld-806. Package builds select AR and RANLIB
+explicitly. ar runs the matching ranlib from that private directory.
+
+The gcc42 package configures this linker directly when rebuilt. An existing
+Apple GCC 4.2 installation can select it explicitly with
+-specs=/usr/local/lib/cctools/gcc42.specs. This changes only the linker and
+can be combined with cctools-as's assembler specs. Do not install this
+partial specs file as GCC's default specs file; GCC expects a complete
+specification there.
+
+Rebuild an existing gcc42 installation to make this linker its default.
+Since pkg skips an installed package with the same version,
+run "sh ./pkg build NAME" first; after it succeeds, run "sh ./pkg remove NAME",
+"sh ./pkg install NAME", and "sh ./pkg test NAME".
+
+Stock /bin/cc, ar, ranlib, and ld remain available. The stock compiler
+hardcodes its linker, so it cannot link archives with extended member names.
+Its bootstrap libraries use /bin/ar and /bin/ranlib. Libraries with
+extended member names require the matching cctools archive tools and linker.
+Do not run stock ranlib on a long-name archive: it cannot index its members.
+
+The native linker uses 8 KB segments and a flat namespace, and omits UUID
+load commands. These match OPENSTEP's executable format. Optional LLVM
+bitcode support is outside this native Mach-O toolchain build.
+
+The patch adds private BSD/libc compatibility routines, uses Mach map_fd
+for private file mappings, and retains 32-bit OPENSTEP archive offsets.
+The package is intended for native i386 OPENSTEP output.
+
+The ar sources include software developed by the University of California,
+Berkeley and its contributors. Copyright and license notices remain in the
+upstream source; the Apple license and tool manuals are installed here.
+
+Validated on 2026-10-19, OPENSTEP 4.2/i386 at 192.168.1.76, as user me:
+  - cctools built with stock cc, installed, and passed its package test:
+    distinct long names, replacement/deletion, extraction/repacking,
+    old-format archives, odd-sized members, malformed-input rejection,
+    native execution, and relocatable linking.
+  - gcc42 completed its three-stage bootstrap. Both upstream comparisons
+    passed; the strict comparison checked 612 pairs, with 608 exact matches,
+    four upstream exclusions, and no failures.
+  - The installed GCC C, C++, Objective-C, and Objective-C++ regressions
+    passed using the new linker and newly built runtime archives.
+  - cctools-as rebuilt and passed its instruction-byte, relocation,
+    mixed-object, C++, and Objective-C tests with the new linker.
+  - The patch applies cleanly to pristine cctools-806.

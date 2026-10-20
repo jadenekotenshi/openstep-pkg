@@ -9,6 +9,9 @@ PATCHFILE="libcss-$VERSION-openstep.patch"
 PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
 NSSHARED=/usr/local/share/netsurf-buildsystem
 CC=/usr/local/bin/gcc-4.2
+AR=/usr/local/lib/cctools/bin/ar
+RANLIB=/usr/local/lib/cctools/bin/ranlib
+export AR RANLIB
 BUILD_CC=/usr/local/bin/gcc-4.2
 PERL=/usr/bin/perl
 MAKE=gnumake
@@ -36,32 +39,7 @@ cat > Makefile.config.override <<'EOF'
 CFLAGS := $(CFLAGS) -DNeXT -I/NextDeveloper/Headers
 EOF
 
-rebuild_archive()
-{
-    olddir=`pwd`
+gnumake PREFIX="$PREFIX" WARNFLAGS= AR="$AR" RANLIB="$RANLIB"
 
-    rm -f "$BUILDDIR/libcss.a"
-    rm -rf "$BUILDDIR/arobjs"
-    mkdir "$BUILDDIR/arobjs"
-
-    n=0
-    for obj in "$BUILDDIR"/*.o; do
-        test -f "$obj" || continue
-        n=`expr $n + 1`
-        cp "$obj" "$BUILDDIR/arobjs/o$n.o"
-    done
-
-    cd "$BUILDDIR/arobjs"
-    for obj in o*.o; do
-        /bin/ar r ../libcss.a "$obj" >/dev/null
-    done
-    cd "$olddir"
-
-    /bin/ranlib "$BUILDDIR/libcss.a"
-}
-
-gnumake PREFIX="$PREFIX" WARNFLAGS=
-rebuild_archive
-
-gnumake install DESTDIR="$DESTDIR" PREFIX="$PREFIX" WARNFLAGS=
-/bin/ranlib "$DESTDIR$PREFIX/lib/libcss.a"
+gnumake install DESTDIR="$DESTDIR" PREFIX="$PREFIX" WARNFLAGS= AR="$AR" RANLIB="$RANLIB"
+"$RANLIB" "$DESTDIR$PREFIX/lib/libcss.a"
