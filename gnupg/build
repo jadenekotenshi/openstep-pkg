@@ -101,7 +101,11 @@ typedef unsigned short gid_t;
 #endif
 SEOF
 compat=`pwd`/openstep/gnupg-compat.h
-CFLAGS="-O2 -I/usr/local/include $OSTEP_DEFS -include $compat"
+# The compat header is forced in only for the compile, not for configure: its
+# function checks declare each function themselves, which clashes with the
+# prototypes in the header's includes and makes the checks wrongly fail.
+CFLAGS="-O2 -I/usr/local/include $OSTEP_DEFS"
+MAKE_CFLAGS="$CFLAGS -include $compat"
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
@@ -124,9 +128,9 @@ run_configure \
   --with-bzip2=/usr/local
 
 # The stock sh does not stop a failed sub-make in a loop, so check for the results.
-gnumake
+gnumake CFLAGS="$MAKE_CFLAGS"
 test -f g10/gpg
 test -f g10/gpgv
-gnumake install DESTDIR="$DESTDIR"
+gnumake install CFLAGS="$MAKE_CFLAGS" DESTDIR="$DESTDIR"
 test -x "$DESTDIR$PREFIX/bin/gpg"
 test -x "$DESTDIR$PREFIX/bin/gpgv"
