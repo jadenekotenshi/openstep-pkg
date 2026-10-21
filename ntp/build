@@ -592,6 +592,7 @@ $CC $CFLAGS -c openstep_rand.c -o openstep_rand.o
 
 extern char *getwd();
 extern int wait4();
+extern int wait3();
 
 char *
 getcwd(char *buf, size_t size)
@@ -615,6 +616,9 @@ getcwd(char *buf, size_t size)
 int
 waitpid(int pid, int *status, int options)
 {
+    /* wait4() reports ECHILD for pid -1 here; wait3() is "any child" */
+    if (pid == -1)
+        return wait3((void *) status, options, (void *) 0);
     return wait4(pid, (void *) status, options, (void *) 0);
 }
 
