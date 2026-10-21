@@ -12,6 +12,30 @@ trap 'exit 1' 1 2 3 15
 HOME=$work
 export HOME
 
+# A fork storm of fish processes wedged the whole machine once (and this system's
+# "ulimit -u" does nothing), so a watchdog runs beside the test: if more than 12
+# processes named fish*, fishd* ... exist it kills them all and the test with them.
+LIMIT=12
+fish_pids() {
+    ps -axw | awk '$5 ~ /(^|\/)fish[a-z_]*$/ { print $1 }'
+}
+testpid=$$
+(
+    while :; do
+        sleep 1
+        n=`fish_pids | wc -l | awk '{print $1}'`
+        if [ "$n" -gt "$LIMIT" ]; then
+            for p in `fish_pids`; do kill -9 $p 2> /dev/null; done
+            echo "fish test: $n fish processes (limit $LIMIT): killed them all" >&2
+            kill -9 $testpid 2> /dev/null
+            exit 1
+        fi
+    done
+) &
+watchdog=$!
+trap 'kill $watchdog 2>/dev/null; rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+
 test -x "$FISH"
 test -x "$LR/bin/fishd"
 "$FISH" --version 2>&1 | grep 'fish, version 1\.23' > /dev/null
