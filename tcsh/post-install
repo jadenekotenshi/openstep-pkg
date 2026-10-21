@@ -1,0 +1,14 @@
+#!/bin/sh
+# List the shell in /etc/shells so it can be used as a login shell (chsh, ftpd,
+# sshd and others consult that file).  Only shells that are installed are added,
+# and a line is never added twice.
+SHELLS="$ROOT_DIR/etc/shells"
+for s in /usr/local/bin/tcsh; do
+    [ -x "$ROOT_DIR$s" ] || continue
+    if [ -f "$SHELLS" ] && grep "^$s\$" "$SHELLS" > /dev/null 2>&1; then
+        continue
+    fi
+    echo "$s" >> "$SHELLS" ||
+        echo "tcsh: could not add $s to $SHELLS" >&2
+done
+exit 0

@@ -449,3 +449,5 @@ test -x src/dash || { echo "dash: src/dash was not built" >&2; exit 1; }
 /usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
 /usr/bin/install -c -m 755 src/dash "$DESTDIR$PREFIX/bin/dash"
 /usr/bin/install -c -m 644 src/dash.1 "$DESTDIR$PREFIX/man/man1/dash.1"
+# dash is the package for "ash"; the name is kept as a link for scripts that ask for it.
+/bin/ln -s dash "$DESTDIR$PREFIX/bin/ash"

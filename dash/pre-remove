@@ -1,0 +1,14 @@
+#!/bin/sh
+# Take the shell back out of /etc/shells.  The file is rewritten in place (cat
+# into it) so its owner and mode stay as they were.
+SHELLS="$ROOT_DIR/etc/shells"
+[ -f "$SHELLS" ] || exit 0
+for s in /usr/local/bin/dash /usr/local/bin/ash; do
+    if grep "^$s\$" "$SHELLS" > /dev/null 2>&1; then
+        tmp="$SHELLS.pkg.$$"
+        grep -v "^$s\$" "$SHELLS" > "$tmp" || :
+        cat "$tmp" > "$SHELLS"
+        rm -f "$tmp"
+    fi
+done
+exit 0
