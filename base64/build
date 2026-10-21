@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+CFLAGS='-O2'
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+export PATH CC CFLAGS CONFIG_SHELL GREP EGREP AWK SED
+if test -d "base64-$VERSION"; then cd "base64-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+# base64 ends its lines with CR LF (RFC 1341) unless built for binary-mode I/O,
+# which is Windows-only; a Unix tool should write plain LF.  Decoding accepts both.
+sed 's/^"\\r\\n"$/"\\n"/' base64.c > base64.c.new
+mv base64.c.new base64.c
+run_configure --build=$PKG_TARGET --prefix="$PREFIX"
+/usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p"
+test -x base64 || { echo "base64: not built" >&2; exit 1; }
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
+/usr/bin/install -c -m 755 base64 "$DESTDIR$PREFIX/bin/base64"
+/usr/bin/install -c -m 644 base64.1 "$DESTDIR$PREFIX/man/man1/base64.1"

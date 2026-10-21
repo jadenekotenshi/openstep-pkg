@@ -1,0 +1,47 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+GPG=$LR/bin/gpg
+work=${TMPDIR-/tmp}/gnupg-pkg-test-$$
+mkdir "$work"
+chmod 700 "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+GNUPGHOME=$work
+export GNUPGHOME
+
+test -x "$GPG"
+test -x "$LR/bin/gpgv"
+"$GPG" --version | grep 'gpg (GnuPG) 1\.4' > /dev/null
+
+# Message digests against known vectors (SHA-256 and SHA-1 of "abc").
+printf 'abc' > "$work/abc"
+"$GPG" --batch --print-md SHA256 "$work/abc" | tr -d ' \n' | grep -i 'BA7816BF8F01CFEA414140DE5DAE2223B00361A396177A9CB410FF61F20015AD' > /dev/null
+"$GPG" --batch --print-md SHA1 "$work/abc" | tr -d ' \n' | grep -i 'A9993E364706816ABA3E25717850C26C9CD0D89D' > /dev/null
+
+# Symmetric encryption round trip (AES-256 and 3DES; the passphrase comes in on fd 3).
+dd if=/dev/zero bs=1024 count=40 2>/dev/null | tr '\0' 'x' > "$work/plain"
+echo "hello gnupg" >> "$work/plain"
+for cipher in AES256 3DES; do
+    echo "secret" | "$GPG" --batch --yes --no-tty --passphrase-fd 0 --s2k-mode 0 \
+        --cipher-algo $cipher -o "$work/enc.$cipher" -c "$work/plain"
+    test -s "$work/enc.$cipher"
+    if cmp "$work/plain" "$work/enc.$cipher" > /dev/null 2>&1; then
+        echo "gnupg: $cipher output is not encrypted" >&2
+        exit 1
+    fi
+    echo "secret" | "$GPG" --batch --yes --no-tty --passphrase-fd 0 \
+        -o "$work/dec.$cipher" -d "$work/enc.$cipher"
+    cmp "$work/plain" "$work/dec.$cipher"
+done
+
+# Armoured output and a wrong passphrase must fail.
+echo "secret" | "$GPG" --batch --yes --no-tty --passphrase-fd 0 --armor -o "$work/arm" -c "$work/plain"
+head -1 "$work/arm" | grep 'BEGIN PGP MESSAGE' > /dev/null
+if echo "wrong" | "$GPG" --batch --yes --no-tty --passphrase-fd 0 -o "$work/bad" -d "$work/arm" > /dev/null 2>&1; then
+    echo "gnupg: decryption with a wrong passphrase succeeded" >&2
+    exit 1
+fi
+echo "gnupg ok"

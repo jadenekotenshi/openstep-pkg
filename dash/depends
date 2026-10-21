@@ -1,0 +1,8 @@
+gcc42
+make
+coreutils
+sed
+grep
+gawk
+pdksh
+@i386:cctools

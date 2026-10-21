@@ -1,0 +1,451 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them.  A gcc42 built after the cctools package links
+# with the cctools ld by itself; an older one needs the specs file selecting it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+CFLAGS='-O2'
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export PATH CC CFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
+if test -d "dash-$VERSION"; then cd "dash-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+
+# This libc has no <stdint.h>/<inttypes.h>, no POSIX signals (sigaction and the
+# sigset functions), no waitpid(), setpgid(), tcgetpgrp(), tcsetpgrp(), getcwd()
+# or strtoll().  Private headers and a small library supply them; every function is
+# renamed by a macro, so it cannot clash with a libc that has it.
+/usr/local/bin/mkdir -p openstep
+/bin/cat > openstep/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef signed char dash_int8_t;
+typedef short dash_int16_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long long intmax_t;
+typedef unsigned long long uintmax_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#define INTMAX_MAX 9223372036854775807LL
+#define INTMAX_MIN (-9223372036854775807LL-1)
+#define UINTMAX_MAX 18446744073709551615ULL
+#endif
+SEOF
+/bin/cat > openstep/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <stdint.h>
+#define PRIdMAX "lld"
+#define PRIuMAX "llu"
+#define PRIxMAX "llx"
+extern intmax_t ostep_strtoimax(const char *, char **, int);
+extern uintmax_t ostep_strtoumax(const char *, char **, int);
+#define strtoimax ostep_strtoimax
+#define strtoumax ostep_strtoumax
+#endif
+SEOF
+/bin/cat > openstep/dash-compat.h <<'SEOF'
+#ifndef OPENSTEP_DASH_COMPAT_H
+#define OPENSTEP_DASH_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef OSTEP_NEED_PID_T
+typedef int pid_t;
+#endif
+#ifdef OSTEP_NEED_MODE_T
+typedef unsigned short mode_t;
+#endif
+#ifdef OSTEP_NEED_SSIZE_T
+typedef int ssize_t;
+#endif
+#ifdef OSTEP_NEED_UID_T
+typedef unsigned short uid_t;
+#endif
+#ifdef OSTEP_NEED_GID_T
+typedef unsigned short gid_t;
+#endif
+#ifndef PATH_MAX
+# define PATH_MAX 1024
+#endif
+#ifndef FD_CLOEXEC
+# define FD_CLOEXEC 1
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef S_ISFIFO
+# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#endif
+#ifndef WEXITSTATUS
+# define WEXITSTATUS(s) ((int) (((s) >> 8) & 0xff))
+#endif
+extern int ostep_waitpid(int, int *, int);
+extern int ostep_setpgid(int, int);
+extern int ostep_tcgetpgrp(int);
+extern int ostep_tcsetpgrp(int, int);
+extern char *ostep_getcwd(char *, int);
+extern long long ostep_strtoll(const char *, char **, int);
+#define waitpid ostep_waitpid
+#define setpgid ostep_setpgid
+#define tcgetpgrp ostep_tcgetpgrp
+#define tcsetpgrp ostep_tcsetpgrp
+#define getcwd ostep_getcwd
+#define strtoll ostep_strtoll
+#endif
+SEOF
+
+# Types the system's <sys/types.h> may lack (probed: a typedef cannot be tested for).
+OSTEP_DEFS=
+for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
+    printf '#include <sys/types.h>\n%s probe_var;\nint main(void) { return 0; }\n' "$ostep_type" > type-probe.c
+    if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+        ostep_upper=`echo $ostep_type | tr 'a-z' 'A-Z'`
+        OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
+    fi
+done
+rm -f type-probe.c type-probe.o
+echo "dash: missing types:$OSTEP_DEFS"
+
+sig_h=`pwd`/openstep-sig.h
+/bin/cat > "$sig_h" <<'SIGEOF'
+#include <sys/types.h>
+#include <signal.h>
+SIGEOF
+probe_sig() {
+    { echo "#include \"$sig_h\""; echo "$1"; } > probe_sig.c
+    $CC $CFLAGS -c probe_sig.c -o probe_sig.o > /dev/null 2>&1
+}
+probe_sig 'sigset_t probe_set;' || echo 'typedef unsigned int sigset_t;' >> "$sig_h"
+probe_sig 'int probe_how[3] = { SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK };' || /bin/cat >> "$sig_h" <<'SIGEOF'
+#define SIG_BLOCK	1
+#define SIG_UNBLOCK	2
+#define SIG_SETMASK	3
+SIGEOF
+probe_sig 'struct sigaction probe_sa; int probe_f(void) { probe_sa.sa_handler = 0; probe_sa.sa_mask = 0; probe_sa.sa_flags = 0; return 0; }' || /bin/cat >> "$sig_h" <<'SIGEOF'
+struct sigaction {
+    void (*sa_handler)();
+    sigset_t sa_mask;
+    int sa_flags;
+};
+SIGEOF
+/bin/cat >> "$sig_h" <<'SIGEOF'
+#ifndef SA_RESTART
+# define SA_RESTART	0x10000
+#endif
+#ifndef SA_NOCLDSTOP
+# define SA_NOCLDSTOP	0x20000
+#endif
+SIGEOF
+/bin/rm -f probe_sig.c probe_sig.o
+
+/bin/cat > openstep_sig.c <<'SIGEOF'
+#include "openstep-sig.h"
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+extern int sigvec();
+extern int sigblock();
+extern int sigsetmask();
+extern int sigpause();
+
+#define SIGBIT(sig)	(1 << ((sig) - 1))
+
+int
+sigemptyset(sigset_t *set)
+{
+    *set = 0;
+    return 0;
+}
+
+int
+sigfillset(sigset_t *set)
+{
+    *set = ~0;
+    return 0;
+}
+
+int
+sigaddset(sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    *set |= SIGBIT(sig);
+    return 0;
+}
+
+int
+sigdelset(sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    *set &= ~SIGBIT(sig);
+    return 0;
+}
+
+int
+sigismember(const sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    return (*set & SIGBIT(sig)) != 0;
+}
+
+int
+sigprocmask(int how, const sigset_t *set, sigset_t *oset)
+{
+    int old;
+
+    if (set == 0)
+	old = sigblock(0);
+    else switch (how) {
+    case SIG_BLOCK:
+	old = sigblock((int)*set);
+	break;
+    case SIG_UNBLOCK:
+	old = sigsetmask(sigblock(0) & ~(int)*set);
+	break;
+    case SIG_SETMASK:
+	old = sigsetmask((int)*set);
+	break;
+    default:
+	errno = EINVAL;
+	return -1;
+    }
+    if (oset)
+	*oset = (sigset_t)old;
+    return 0;
+}
+
+int
+sigsuspend(const sigset_t *mask)
+{
+    return sigpause((int)*mask);
+}
+
+/* POSIX handlers are not restarted unless SA_RESTART; BSD sigvec() restarts
+   unless SV_INTERRUPT, so the sense of the flag is reversed. */
+int
+sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+{
+    struct sigvec nsv, osv;
+    int r;
+
+    if (act) {
+	nsv.sv_handler = (void (*)())act->sa_handler;
+	nsv.sv_mask = (int)act->sa_mask;
+	nsv.sv_flags = (act->sa_flags & SA_RESTART) ? 0 : SV_INTERRUPT;
+    }
+    r = sigvec(sig, act ? &nsv : (struct sigvec *)0, &osv);
+    if (r == 0 && oact) {
+	oact->sa_handler = (void (*)())osv.sv_handler;
+	oact->sa_mask = (sigset_t)osv.sv_mask;
+	oact->sa_flags = (osv.sv_flags & SV_INTERRUPT) ? 0 : SA_RESTART;
+    }
+    return r;
+}
+SIGEOF
+$CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
+
+
+# The other missing functions, under renamed symbols.
+/bin/cat > openstep_misc.c <<'MEOF'
+#include <errno.h>
+#include <string.h>
+#include <sys/param.h>
+#include <sys/ioctl.h>
+
+extern int wait4();
+extern int setpgrp();
+extern char *getwd();
+
+int
+ostep_waitpid(int pid, int *status, int options)
+{
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+
+int
+ostep_setpgid(int pid, int pgrp)
+{
+    return setpgrp(pid, pgrp);
+}
+
+int
+ostep_tcgetpgrp(int fd)
+{
+    int pgrp;
+
+    if (ioctl(fd, TIOCGPGRP, (char *) &pgrp) < 0)
+        return -1;
+    return pgrp;
+}
+
+int
+ostep_tcsetpgrp(int fd, int pgrp)
+{
+    return ioctl(fd, TIOCSPGRP, (char *) &pgrp);
+}
+
+char *
+ostep_getcwd(char *buf, int size)
+{
+    char tmp[MAXPATHLEN + 1];
+
+    if (buf == 0 || size <= 0) {
+        errno = EINVAL;
+        return 0;
+    }
+    if (getwd(tmp) == 0)
+        return 0;
+    if ((int) strlen(tmp) >= size) {
+        errno = ERANGE;
+        return 0;
+    }
+    strcpy(buf, tmp);
+    return buf;
+}
+
+/* strtoll / strtoimax / strtoumax: a plain 64-bit parser. */
+static unsigned long long
+ostep_parse(const char *s, char **end, int base, int *neg, int *overflow)
+{
+    unsigned long long v = 0, limit;
+    int digit, any = 0;
+
+    *neg = 0;
+    *overflow = 0;
+    while (*s == ' ' || (*s >= '\t' && *s <= '\r'))
+        s++;
+    if (*s == '-') {
+        *neg = 1;
+        s++;
+    } else if (*s == '+') {
+        s++;
+    }
+    if ((base == 0 || base == 16) && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')
+        && ((s[2] >= '0' && s[2] <= '9') || (s[2] >= 'a' && s[2] <= 'f')
+            || (s[2] >= 'A' && s[2] <= 'F'))) {
+        s += 2;
+        base = 16;
+    } else if (base == 0) {
+        base = (s[0] == '0') ? 8 : 10;
+    }
+    limit = ~0ULL;
+    for (;; s++) {
+        if (*s >= '0' && *s <= '9')
+            digit = *s - '0';
+        else if (*s >= 'a' && *s <= 'z')
+            digit = *s - 'a' + 10;
+        else if (*s >= 'A' && *s <= 'Z')
+            digit = *s - 'A' + 10;
+        else
+            break;
+        if (digit >= base)
+            break;
+        any = 1;
+        if (v > (limit - digit) / base)
+            *overflow = 1;
+        else
+            v = v * base + digit;
+    }
+    if (end)
+        *end = (char *) (any ? s : (const char *) 0);
+    return v;
+}
+
+long long
+ostep_strtoll(const char *s, char **end, int base)
+{
+    unsigned long long v;
+    int neg, ovf;
+    char *e;
+
+    v = ostep_parse(s, &e, base, &neg, &ovf);
+    if (end)
+        *end = e ? e : (char *) s;
+    if (neg) {
+        if (ovf || v > 9223372036854775808ULL) {
+            errno = ERANGE;
+            return -9223372036854775807LL - 1;
+        }
+        return (long long) (0 - v);
+    }
+    if (ovf || v > 9223372036854775807ULL) {
+        errno = ERANGE;
+        return 9223372036854775807LL;
+    }
+    return (long long) v;
+}
+
+long long
+ostep_strtoimax(const char *s, char **end, int base)
+{
+    return ostep_strtoll(s, end, base);
+}
+
+unsigned long long
+ostep_strtoumax(const char *s, char **end, int base)
+{
+    unsigned long long v;
+    int neg, ovf;
+    char *e;
+
+    v = ostep_parse(s, &e, base, &neg, &ovf);
+    if (end)
+        *end = e ? e : (char *) s;
+    if (ovf) {
+        errno = ERANGE;
+        return ~0ULL;
+    }
+    return neg ? 0 - v : v;
+}
+MEOF
+$CC $CFLAGS -c openstep_misc.c -o openstep_misc.o
+/bin/rm -f libopenstepdash.a
+"$AR" rc libopenstepdash.a openstep_sig.o openstep_misc.o
+"$RANLIB" libopenstepdash.a
+LIBS="-L`pwd` -lopenstepdash $LIBS"
+export LIBS
+CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/dash-compat.h -include `pwd`/openstep-sig.h"
+export CFLAGS
+
+run_configure --build=$PKG_TARGET --prefix="$PREFIX" --without-libedit
+/usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p"
+test -x src/dash || { echo "dash: src/dash was not built" >&2; exit 1; }
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
+/usr/bin/install -c -m 755 src/dash "$DESTDIR$PREFIX/bin/dash"
+/usr/bin/install -c -m 644 src/dash.1 "$DESTDIR$PREFIX/man/man1/dash.1"

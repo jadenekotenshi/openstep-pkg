@@ -1,0 +1,34 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+work=${TMPDIR-/tmp}/base64-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+B64=$LR/bin/base64
+
+# RFC 4648 test vectors, both ways.
+check() {
+    printf '%s' "$1" > "$work/in"
+    "$B64" "$work/in" > "$work/enc"
+    test "`cat "$work/enc"`" = "$2"
+    printf '%s\n' "$2" > "$work/enc"
+    "$B64" -d "$work/enc" > "$work/dec"
+    cmp "$work/in" "$work/dec"
+}
+check "f" "Zg=="
+check "fo" "Zm8="
+check "foo" "Zm9v"
+check "foob" "Zm9vYg=="
+check "fooba" "Zm9vYmE="
+check "foobar" "Zm9vYmFy"
+
+# Every byte value, and a long input with line wrapping.
+awk 'BEGIN { for (i = 0; i < 256; i++) printf "%c", i }' > "$work/bytes" 2>/dev/null || :
+cp "$B64" "$work/bin"
+"$B64" "$work/bin" > "$work/bin.b64"
+"$B64" -d "$work/bin.b64" > "$work/bin.out"
+cmp "$work/bin" "$work/bin.out"
+echo "base64 checks passed"
