@@ -195,6 +195,48 @@ ostep_vasprintf(char **strp, const char *fmt, va_list ap)
     return vsnprintf(*strp, n + 1, fmt, ap);
 }
 #define vasprintf ostep_vasprintf
+/* The system's printf family does not understand %llu, %zu and %zd (darkhttpd uses
+   them in its log lines and messages): an unknown conversion makes it read the
+   wrong arguments, and a %s then dereferences garbage.  Format with the shim's
+   vsnprintf() and write the result out. */
+static int
+ostep_vfprintf(FILE *f, const char *fmt, va_list ap)
+{
+    char *buf;
+    int n;
+
+    n = ostep_vasprintf(&buf, fmt, ap);
+    if (n < 0)
+        return -1;
+    fputs(buf, f);
+    free(buf);
+    return n;
+}
+static int
+ostep_fprintf(FILE *f, const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+
+    va_start(ap, fmt);
+    n = ostep_vfprintf(f, fmt, ap);
+    va_end(ap);
+    return n;
+}
+static int
+ostep_printf(const char *fmt, ...)
+{
+    va_list ap;
+    int n;
+
+    va_start(ap, fmt);
+    n = ostep_vfprintf(stdout, fmt, ap);
+    va_end(ap);
+    return n;
+}
+#define vfprintf ostep_vfprintf
+#define fprintf ostep_fprintf
+#define printf ostep_printf
 #endif
 CEOF
 
