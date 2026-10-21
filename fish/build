@@ -615,6 +615,50 @@ fi
 # mmap() here has no munmap() to go with it.  fish only maps its history file
 # read-only, so a <sys/mman.h> that reads the file into malloc'd memory will do.
 /usr/local/bin/mkdir -p openstep/sys
+# There is no POSIX <regex.h> here.  Only mimedb uses it, to pull the description
+# of a MIME type out of the shared-mime-info XML; with this stand-in no pattern ever
+# matches, so mimedb still maps names and files to MIME types but gives no
+# descriptions.
+/bin/cat > openstep/regex.h <<'MEOF'
+#ifndef OPENSTEP_REGEX_H
+#define OPENSTEP_REGEX_H
+#include <sys/types.h>
+typedef struct {
+    int unused;
+} regex_t;
+typedef struct {
+    int rm_so;
+    int rm_eo;
+} regmatch_t;
+#define REG_EXTENDED 1
+#define REG_NOMATCH 1
+static int
+ostep_regcomp(regex_t *re, const char *pattern, int flags)
+{
+    return 0;
+}
+static int
+ostep_regexec(const regex_t *re, const char *s, unsigned long n, regmatch_t *m, int flags)
+{
+    return REG_NOMATCH;
+}
+static unsigned long
+ostep_regerror(int code, const regex_t *re, char *buf, unsigned long size)
+{
+    if (size > 0)
+	buf[0] = 0;
+    return 1;
+}
+static void
+ostep_regfree(regex_t *re)
+{
+}
+#define regcomp ostep_regcomp
+#define regexec ostep_regexec
+#define regerror ostep_regerror
+#define regfree ostep_regfree
+#endif
+MEOF
 # reader.c includes <sys/poll.h> without using poll().
 echo '/* empty: not needed here */' > openstep/sys/poll.h
 /bin/cat > openstep/sys/mman.h <<'MEOF'
