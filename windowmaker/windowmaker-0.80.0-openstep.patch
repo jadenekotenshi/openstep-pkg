@@ -1,0 +1,11 @@
+--- a/wrlib/png.c	2001-04-20 16:36:13.000000000 +0000
++++ b/wrlib/png.c	2026-10-21 00:04:40.124209848 +0000
+@@ -97,7 +97,7 @@
+     }
+ 
+     RErrorCode = RERR_INTERNAL;
+-    if (setjmp(png->jmpbuf)) {
++    if (setjmp(png_jmpbuf(png))) {
+ 	fclose(f);
+ 	png_destroy_read_struct(&png, &pinfo, &einfo);
+ 	if (image)

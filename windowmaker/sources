@@ -1,0 +1,4 @@
+# Window Maker 0.80.0: the last release before Xft/fontconfig became mandatory, so it
+# builds against the X11 of CubXWindow.  Debian's original tarball, from the archive.
+https://archive.debian.org/debian/pool/main/w/wmaker/wmaker_0.80.0.orig.tar.gz
+windowmaker-0.80.0-openstep.patch WindowMaker-0.80.0

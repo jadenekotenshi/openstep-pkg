@@ -1,0 +1,31 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+work=${TMPDIR-/tmp}/windowmaker-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+
+# The window manager and its tools (the manager needs an X server to run, so only
+# its version is checked).
+"$LR/bin/wmaker" --version > "$work/version" 2>&1
+grep 'Window Maker 0\.80' "$work/version" > /dev/null
+for tool in wmsetbg wdwrite wdread getstyle setstyle wmaker.inst; do
+    test -x "$LR/bin/$tool"
+done
+test -x "$LR/GNUstep/Apps/WPrefs.app/WPrefs"
+
+# The default configuration: no Dock, no Clip, aterm in the menu.
+cfg=$LR/etc/WindowMaker
+grep 'DisableDock = YES;' "$cfg/WindowMaker" > /dev/null
+grep 'DisableClip = YES;' "$cfg/WindowMaker" > /dev/null
+grep 'aterm' "$cfg/WMRootMenu" > /dev/null
+test -d "$LR/share/WindowMaker/Themes"
+test -x "$LR/share/WindowMaker/xinitrc"
+grep '^exec wmaker$' "$LR/share/WindowMaker/xinitrc" > /dev/null
+grep '^aterm &$' "$LR/share/WindowMaker/xinitrc" > /dev/null
+
+# wmsetbg is a plain X client but --help does not need a display.
+echo "Window Maker checks passed (the window manager itself needs an X display)"

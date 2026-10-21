@@ -1,0 +1,13 @@
+gcc42
+make
+coreutils
+patch
+sed
+grep
+gawk
+pdksh
+jpeg
+libpng
+zlib
+@i386:cctools
+aterm
