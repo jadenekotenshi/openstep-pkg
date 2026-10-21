@@ -603,6 +603,54 @@ extern wint_t towupper(wint_t);
 MEOF
 fi
 /bin/rm -f wide-probe.c wide-probe.o wide-probe
+# mmap() here has no munmap() to go with it.  fish only maps its history file
+# read-only, so a <sys/mman.h> that reads the file into malloc'd memory will do.
+/usr/local/bin/mkdir -p openstep/sys
+/bin/cat > openstep/sys/mman.h <<'MEOF'
+#ifndef OPENSTEP_SYS_MMAN_H
+#define OPENSTEP_SYS_MMAN_H
+#include <sys/types.h>
+#include <stdlib.h>
+#define PROT_READ 1
+#define MAP_PRIVATE 2
+#define MAP_FAILED ((void *) -1)
+extern long lseek();
+extern int read();
+static void *
+ostep_mmap(void *addr, unsigned long len, int prot, int flags, int fd, long off)
+{
+    char *p = (char *) malloc(len > 0 ? len : 1);
+    unsigned long got = 0;
+    int n;
+
+    if (p == 0)
+	return MAP_FAILED;
+    if (lseek(fd, off, 0) < 0) {
+	free(p);
+	return MAP_FAILED;
+    }
+    while (got < len) {
+	n = read(fd, p + got, len - got);
+	if (n <= 0)
+	    break;
+	got += n;
+    }
+    if (got < len) {
+	free(p);
+	return MAP_FAILED;
+    }
+    return p;
+}
+static int
+ostep_munmap(void *addr, unsigned long len)
+{
+    free(addr);
+    return 0;
+}
+#define mmap ostep_mmap
+#define munmap ostep_munmap
+#endif
+MEOF
 /bin/cat > openstep/stdint.h <<'MEOF'
 #ifndef OPENSTEP_STDINT_H
 #define OPENSTEP_STDINT_H
