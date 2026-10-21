@@ -37,6 +37,11 @@ for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
     fi
 done
 /bin/rm -f type-probe.c type-probe.o
+# rndunix.c includes the System V shared memory headers though it only uses them
+# when configure found them (it did not); empty ones do.
+/usr/local/bin/mkdir -p openstep/sys
+echo '/* empty: System V IPC is not available here */' > openstep/sys/ipc.h
+echo '/* empty: System V shared memory is not available here */' > openstep/sys/shm.h
 # <sys/utsname.h> is unusable here (dotlock.c cannot get a struct utsname from it);
 # uname() is made from gethostname().
 /usr/local/bin/mkdir -p openstep/sys
