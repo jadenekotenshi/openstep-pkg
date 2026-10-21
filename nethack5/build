@@ -1,0 +1,225 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+# NetHack 5.0 is C99 (and builds Lua 5.4); gcc 4.2 does it with -std=gnu99.
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS -std=gnu99"
+AR_CMD="$PKG_AR"
+RANLIB_CMD="$PKG_RANLIB"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them.  A gcc42 built after the cctools package links
+# with the cctools ld by itself; an older one needs the specs file selecting it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+export PATH CC
+if test -d "NetHack-$VERSION"; then cd "NetHack-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+
+# Lua 5.4.8 comes in lib/lua-5.4.8 (the sources file puts it there); it needs the
+# same OPENSTEP fixes as the lua package (wait macros, popen, frexp, strtod).
+(cd lib/lua-5.4.8 && patch -p1 < ../../lua-5.4.8-openstep.patch)
+
+# This libc and these headers lack a good deal NetHack 5.0 assumes: <stdint.h>,
+# <inttypes.h>, the POSIX <dirent.h>, snprintf() and vsnprintf(), and the wait-status
+# macros for an int.  A private include directory supplies them (static code
+# renamed by macros, so nothing needs linking and nothing can clash).  The
+# directory is not called "openstep": make would take that for a target.
+inc=`pwd`/ostep-inc
+/usr/local/bin/mkdir -p ostep-inc/sys
+/bin/cat > ostep-inc/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long long intmax_t;
+typedef unsigned long long uintmax_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#define INT8_MAX 127
+#define INT16_MAX 32767
+#define INT32_MAX 2147483647
+#define INT64_MAX 9223372036854775807LL
+#define UINT8_MAX 255
+#define UINT16_MAX 65535
+#define UINT32_MAX 4294967295U
+#define UINT64_MAX 18446744073709551615ULL
+#define INTMAX_MAX 9223372036854775807LL
+#define UINTMAX_MAX 18446744073709551615ULL
+#endif
+SEOF
+/bin/cat > ostep-inc/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <stdint.h>
+#define PRId32 "d"
+#define PRIu32 "u"
+#define PRIx32 "x"
+#define PRId64 "lld"
+#define PRIu64 "llu"
+#define PRIx64 "llx"
+#define PRIdMAX "lld"
+#define PRIuMAX "llu"
+#endif
+SEOF
+/bin/cat > ostep-inc/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+echo '/* empty: select() and fd_set come with <sys/types.h> here */' > ostep-inc/sys/select.h
+/bin/cat > ostep-inc/sys/wait.h <<'SEOF'
+#ifndef OPENSTEP_SYS_WAIT_H
+#define OPENSTEP_SYS_WAIT_H
+#include_next <sys/wait.h>
+#undef WIFEXITED
+#undef WEXITSTATUS
+#undef WIFSIGNALED
+#undef WTERMSIG
+#define WIFEXITED(s) ((((int) (s)) & 0xff) == 0)
+#define WEXITSTATUS(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSIGNALED(s) ((((int) (s)) & 0xff) != 0 && (((int) (s)) & 0xff) != 0x7f)
+#define WTERMSIG(s) (((int) (s)) & 0x7f)
+#endif
+SEOF
+/bin/cat > ostep-inc/nethack5-compat.h <<'SEOF'
+#ifndef OPENSTEP_NETHACK5_COMPAT_H
+#define OPENSTEP_NETHACK5_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifndef PATH_MAX
+# define PATH_MAX 1024
+#endif
+#ifndef O_NONBLOCK
+# ifdef FNDELAY
+#  define O_NONBLOCK FNDELAY
+# else
+#  define O_NONBLOCK 0x0004
+# endif
+#endif
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef ENOSYS
+# define ENOSYS 78
+#endif
+#include "snprintf-shim.h"
+#endif
+SEOF
+/bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+
+# unixconf.h: this is a BSD system with termcap and without POSIX job control or
+# types (the same settings the nethack package uses for 3.6.7).
+/bin/sed \
+    -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
+    -e 's|^#define SYSV |#undef SYSV |' \
+    -e 's|^#define SVR4 |#undef SVR4 |' \
+    -e 's|^#define TERMINFO |#undef TERMINFO |' \
+    -e 's|^#define POSIX_JOB_CONTROL |#undef POSIX_JOB_CONTROL |' \
+    -e 's|^#define POSIX_TYPES |#undef POSIX_TYPES |' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+/bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
+/bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+
+# The hints file for this system.  The game goes in /usr/local/lib/nethack5dir with
+# a launcher in /usr/local/bin/nethack5, so it can sit beside the 3.6.7 package.
+# There is no games user or group here, so ownership is left alone and the score and
+# save files are writable by everyone who can run it.
+hints=sys/unix/hints/openstep.500
+/bin/cat > "$hints" <<HEOF
+#-PRE
+# OPENSTEP hints (generated by the pkg build script)
+PREFIX=/usr/local
+HACKDIR=\$(PREFIX)/lib/\$(GAME)dir
+INSTDIR=\$(DESTDIR)\$(HACKDIR)
+VARDIR=\$(DESTDIR)\$(HACKDIR)
+SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
+
+CFLAGS=-O2 -I../include -I$inc -DNeXT -include $inc/nethack5-compat.h
+CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
+CFLAGS+=-DHACKDIR=\\"\$(HACKDIR)\\"
+SYSCFLAGS=-I$inc -DNeXT -DLUA_USE_POSIX
+LINK=\$(CC)
+
+WINSRC = \$(WINTTYSRC)
+WINOBJ = \$(WINTTYOBJ)
+WINLIB = \$(WINTTYLIB)
+WINTTYLIB = -ltermcap
+
+# No <regex.h> here: NetHack's own pattern matcher.
+REGEXOBJ = \$(TARGETPFX)pmatchregex.o
+
+CHOWN=true
+CHGRP=true
+ROOTCHECK=true
+DIRPERM = 0755
+FILEPERM = 0644
+EXEPERM = 0755
+GAMEPERM = 0755
+VARDIRPERM = 0777
+VARFILEPERM = 0666
+HEOF
+
+/bin/sh sys/unix/setup.sh "$hints"
+
+# Build and install; "make all" would also format the Guidebook with nroff.
+# GAME names the binary and the data directory.  The archives Lua is put in are made
+# by the same ar and ranlib as the rest.
+luaflags="CC='$CC' SYSCFLAGS='-I$inc -DNeXT -DLUA_USE_POSIX' AR='$AR_CMD rcu' RANLIB='$RANLIB_CMD'"
+/bin/gnumake CC="$CC" AR="$AR_CMD" RANLIB="$RANLIB_CMD" GAME=nethack5 \
+    LUAMAKEFLAGS="$luaflags" install DESTDIR="$DESTDIR"
+
+# This build uses a system configuration file and the game refuses to start without
+# one: install the stock sysconf.
+gamedir="$DESTDIR$PREFIX/lib/nethack5dir"
+/bin/cp sys/unix/sysconf "$gamedir/sysconf"
+/bin/chmod 644 "$gamedir/sysconf"
+
+# Replace the stock launcher (it uses shell features the system sh lacks).
+/bin/cat > "$DESTDIR$PREFIX/bin/nethack5" <<'LEOF'
+#!/bin/sh
+HACKDIR=/usr/local/lib/nethack5dir
+export HACKDIR
+cd $HACKDIR
+exec $HACKDIR/nethack5 ${1+"$@"}
+LEOF
+/bin/chmod 755 "$DESTDIR$PREFIX/bin/nethack5"
+
+test -x "$gamedir/nethack5"
+test -f "$gamedir/data"
+test -f "$gamedir/Arc-strt.lua"
+test -f "$gamedir/sysconf"

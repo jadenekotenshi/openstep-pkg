@@ -1,0 +1,6 @@
+# NetHack 5.0.0 (May 2026).  It builds its own Lua 5.4, which is not in the tarball
+# (submodules/lua is empty), so Lua goes into lib/ where the makefile looks for it.
+https://www.nethack.org/download/5.0.0/nethack-500-src.tgz
+https://www.lua.org/ftp/lua-5.4.8.tar.gz NetHack-5.0.0/lib
+lua-5.4.8-openstep.patch NetHack-5.0.0
+snprintf-shim.h NetHack-5.0.0
