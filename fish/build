@@ -1091,6 +1091,9 @@ typedef long rlim_t;
 #ifndef WUNTRACED
 # define WUNTRACED 2
 #endif
+/* getopt()'s variables are in the libc but no header declares them. */
+extern char *optarg;
+extern int optind, opterr, optopt;
 extern int ostep_waitpid(int, int *, int);
 extern int ostep_setpgid(int, int);
 extern int ostep_getpgid(int);
