@@ -145,6 +145,53 @@ SEOF
 #ifndef ENOSYS
 # define ENOSYS 78
 #endif
+#include <time.h>
+extern int wait3();
+extern int wait4();
+extern char *getwd();
+/* getcwd(), waitpid() and the _r time functions are missing from this libc; they are
+   static here and renamed by macros, so nothing needs linking.  wait4() with a pid
+   of -1 reports ECHILD here, so "any child" goes through wait3(). */
+static char *
+ostep_getcwd(char *buf, size_t size)
+{
+    if (buf == 0 || size < MAXPATHLEN) {
+        errno = ERANGE;
+        return 0;
+    }
+    return getwd(buf);
+}
+static int
+ostep_waitpid(int pid, int *status, int options)
+{
+    if (pid == -1)
+        return wait3((void *) status, options, (void *) 0);
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+static struct tm *
+ostep_gmtime_r(const time_t *t, struct tm *out)
+{
+    struct tm *p = gmtime(t);
+
+    if (p == 0)
+        return 0;
+    *out = *p;
+    return out;
+}
+static struct tm *
+ostep_localtime_r(const time_t *t, struct tm *out)
+{
+    struct tm *p = localtime(t);
+
+    if (p == 0)
+        return 0;
+    *out = *p;
+    return out;
+}
+#define getcwd ostep_getcwd
+#define waitpid ostep_waitpid
+#define gmtime_r ostep_gmtime_r
+#define localtime_r ostep_localtime_r
 #include "snprintf-shim.h"
 #endif
 SEOF
