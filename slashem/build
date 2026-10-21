@@ -1,0 +1,123 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+export PATH CC
+if test -d "slashem-$VERSION"; then cd "slashem-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+
+# Slash'EM 0.0.7E7F3 is NetHack 3.4.3 with additions, so it is set up the way the
+# nethack package does it: OPENSTEP is treated as a BSD system with termcap and
+# no POSIX job control or types.  tty interface only.
+# unixconf.h: BSD instead of SYSV/SVR4, termcap instead of terminfo.
+/bin/sed \
+    -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
+    -e 's|^#define SYSV[ 	]|#undef SYSV |' \
+    -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
+    -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
+    -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
+    -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+# The rewritten lines must still read as a comment to the end of the original
+# comment; check that BSD ended up defined and SYSV did not.
+/bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
+/bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+
+# Compile-time settings go in a header included with -include: OPENSTEP has no
+# PATH_MAX or getcwd() (getwd() takes a MAXPATHLEN buffer), and gzip is used for
+# compressed save files and bones.
+/bin/cat > openstep-slashem.h <<'HEOF'
+#ifndef OPENSTEP_SLASHEM_H
+#define OPENSTEP_SLASHEM_H
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+#endif
+HEOF
+compat=`pwd`/openstep-slashem.h
+# COMPRESS is defined by config.h itself; point it at gzip.
+/bin/sed \
+    -e 's|"/usr/bin/compress"|"/usr/local/bin/gzip"|' \
+    -e 's|"\.Z"|".gz"|' \
+    include/config.h > include/config.h.new
+/bin/mv include/config.h.new include/config.h
+# The old Bourne /bin/sh treats an unquoted ^ as a pipe (see the nethack package).
+for mk in sys/unix/Makefile.dat sys/unix/Makefile.src sys/unix/Makefile.top sys/unix/Makefile.utl; do
+    /bin/sed -e "s/grep ^#define/grep '^#define'/" -e "s/grep -v ^#define/grep -v '^#define'/" $mk > $mk.new
+    /bin/mv $mk.new $mk
+done
+
+# strdup() is missing from this libc and is used by the level and dungeon
+# compilers; supply it as an object linked into those tools and the game.
+/bin/cat > openstep_strdup.c <<'SDEOF'
+#include <stdlib.h>
+#include <string.h>
+
+char *
+strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != 0)
+	memcpy(p, s, n);
+    return p;
+}
+SDEOF
+$CC $PKG_GCC42_ARCH_FLAGS -O2 -c openstep_strdup.c -o openstep_strdup.o
+strdup_obj=`pwd`/openstep_strdup.o
+
+/bin/sed \
+    -e "s|^CFLAGS = -O -I../include|CFLAGS = -O2 $PKG_GCC42_ARCH_FLAGS -I../include -DHACKDIR=\\\\\"/usr/local/slashemdir\\\\\" -include $compat|" \
+    -e "s|^WINTTYLIB = -ltermlib|WINTTYLIB = -ltermcap $strdup_obj|" \
+    -e 's|^CC *=.*||' \
+    sys/unix/Makefile.src > sys/unix/Makefile.src.new
+/bin/mv sys/unix/Makefile.src.new sys/unix/Makefile.src
+/bin/sed \
+    -e "s|^CFLAGS = -O -I../include|CFLAGS = -O2 $PKG_GCC42_ARCH_FLAGS -I../include -DHACKDIR=\\\\\"/usr/local/slashemdir\\\\\" -include $compat|" \
+    -e "s|^LFLAGS *=.*|LFLAGS = $strdup_obj|" \
+    sys/unix/Makefile.utl > sys/unix/Makefile.utl.new
+/bin/mv sys/unix/Makefile.utl.new sys/unix/Makefile.utl
+/bin/grep 'HACKDIR' sys/unix/Makefile.src sys/unix/Makefile.utl > /dev/null
+
+# Install under /usr/local/slashemdir with a launcher in /usr/local/bin.  There is
+# no games user or group here, so ownership is left alone and the score and save
+# files are writable by everyone who can run it.
+/bin/sed \
+    -e 's|^PREFIX *=.*|PREFIX = /usr|' \
+    -e 's|^CHOWN *=.*|CHOWN = true|' \
+    -e 's|^CHGRP *=.*|CHGRP = true|' \
+    -e 's|^VARDIRPERM *=.*|VARDIRPERM = 0777|' \
+    -e 's|^VARFILEPERM *=.*|VARFILEPERM = 0666|' \
+    -e 's|^GAMEPERM *=.*|GAMEPERM = 0755|' \
+    sys/unix/Makefile.top > sys/unix/Makefile.top.new
+/bin/mv sys/unix/Makefile.top.new sys/unix/Makefile.top
+
+/bin/sh sys/unix/setup.sh
+
+# Build everything, then install into DESTDIR by overriding the install
+# locations on the command line (the game itself looks in /usr/local/slashemdir).
+# The Guidebook is not formatted (it needs nroff); install builds what is needed.
+/bin/gnumake
+gamedir="$DESTDIR/usr/local/slashemdir"
+/usr/local/bin/mkdir -p "$DESTDIR/usr/local/bin"
+/bin/gnumake install \
+    GAMEDIR="$gamedir" \
+    SHELLDIR="$DESTDIR/usr/local/bin"
+
+# Replace the stock launcher (it uses shell features the system sh lacks).
+/bin/cat > "$DESTDIR/usr/local/bin/slashem" <<'LEOF'
+#!/bin/sh
+HACKDIR=/usr/local/slashemdir
+export HACKDIR
+cd $HACKDIR
+exec $HACKDIR/slashem ${1+"$@"}
+LEOF
+/bin/chmod 755 "$DESTDIR/usr/local/bin/slashem"
+
+test -x "$gamedir/slashem"
+test -f "$gamedir/data" -o -f "$gamedir/slashem.dlb" -o -f "$gamedir/dungeon"
+test -f "$gamedir/license"

@@ -48,8 +48,9 @@ SPARC `test world` of 2026-10-14 covers every row.
 
 | Package | x86 | SPARC | M68k |
 |---|---|---|---|
-| afterstep | validated 1.8.11 (2026-10-23; builds with the NeXT-style default title bar, installs, test passes, runs under CubXWindow; needs libXpm) | — | — |
+| afterstep | validated 1.8.11 (2026-10-23; builds with the NeXT-style default title bar, installs, test passes, runs under CubXWindow; needs libXpm) | validated 1.8.11 (2026-10-24; builds, installs and tests on SPARC) | — |
 | aterm | validated 0.4.2 (2026-10-23; builds with the termios/waitpid/setsid/putenv shims, installs, test passes, runs under CubXWindow) | validated 0.4.2 (2026-10-23; builds, installs, tests and runs) | — |
+| base64 | — (new 2026-10-24: Fourmilab base64 1.5, output with LF line ends; the RFC 4648 test passes on Linux) | — | — |
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | validated (2026-10-21; built with gcc42, tests pass) |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
@@ -60,12 +61,15 @@ SPARC `test world` of 2026-10-14 covers every row.
 | coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | cowsay | validated 3.03+dfsg2 (2026-10-21; build, install and test pass; `fortune \| cowsay` works) | validated 3.03+dfsg2 (2026-10-22; build, install and test pass) | — |
 | curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | validated (2026-10-21; built with gcc42, tests pass) |
+| darkhttpd | — (new 2026-10-24: 1.13, the last select()-based release, with an snprintf() shim; the test serves a directory and fetches from it; passes on Linux) | — | — |
+| dash | — (new 2026-10-24: 0.5.12, the Debian ash; private stdint/inttypes, a sigaction-on-sigvec shim and waitpid/setpgid/tcgetpgrp/getcwd/strtoll shims; `sh -n build` and the test script are checked on Linux only) | — | — |
 | diffutils | validated | validated 2.8.1 (2026-10-09) | — |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
 | emacs | validated | validated (2026-10-10; needed the pdumper alignment fixes for the 64-bit wide-int Lisp_Object, and a SPARC `netinet/in.h` big-endian branch) | — |
 | expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
 | findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | — |
+| fish | — (new 2026-10-24: 1.23.1, the last all-C release; a small wide-character library (single-byte text only) and POSIX shims for signals, termios, waitpid, setsid, nanosleep and realpath; the shim functions and the test are checked on Linux only) | — | — |
 | flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | freetype | validated | validated 2.14.3 (2026-10-09) | — |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | — |
@@ -74,6 +78,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | gawk | validated | validated 3.1.8 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gcc42 | validated | validated 4.2.1-apple-5666.3 (port; bootstraps, compare passes, `pkg test` passes; clean rebuild on a rebootstrapped host, 2026-10-08) | validated 4.2.1-apple-5666.3 (2026-10-19; `pkg test gcc42` passes with no failures; full native bootstrap on scimitar, a Previous emulator of a NeXTcube Turbo with Dimension, CPU at full speed: `pkg reinstall gcc42` took 88381 s real, 69547 s user, 13409 s system, about 24.5 hours; needs the cse and simplify-rtx fixes in `gcc42/M68K.md`) |
 | git | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated 2.55.0 (needs the unsigned memcmp/strcmp fix and -O0) | validated (2026-10-23; built with gcc42 at -O0, tests pass; python311 was pulled in as a dependency) |
+| gnupg | — (new 2026-10-24: 1.4.23, the single-binary gpg without keyserver helpers, readline or the agent; the test (digests, symmetric AES256/3DES round trips) passes on Linux) | — | — |
 | gperf | validated | validated 3.3 (2026-10-09) | — |
 | grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | — |
@@ -108,6 +113,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
 | nano | validated | validated 2.9.8 | — |
 | ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | — |
+| nedit | — (new 2026-10-24: 5.7; needs Motif 1.2 or newer, which the build checks for under X11_PREFIX and /usr/local; not built yet) | — | — |
 | nethack | validated (tty and X11) | validated 3.6.7 (`pkg test` passes, game starts; a stray "pkg: Stock: not found" after the install was a script replaced mid-run, fixed in pkg; rebootstrap, 2026-10-08) | — |
 | netsurf-buildsystem | validated | validated 1.10 (rebootstrap, 2026-10-08) | — |
 | netsurf-openstep | validated 3.12-dev.20261002 (2026-10-22; builds from turbolent/netsurf-openstep at 5fd3476, installs NetSurf.app into /usr/local/Apps, test passes; connects to slashdot.org over TLS) | n/a (i386 only) | n/a (i386 only) |
@@ -130,6 +136,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | rsync | validated | validated (2026-10-10) | — |
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | — |
 | sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | — |
+| slashem | — (new 2026-10-24: 0.0.7E7F3, tty interface only, set up as a BSD/termcap build like nethack; the build edits are checked on Linux only) | — | — |
 | sudo | validated | validated 1.7.10p9 (2026-10-09) | — |
 | tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | tcsh | validated | validated 6.24.13 (rebootstrap, 2026-10-08; vfork.h fix) | — |

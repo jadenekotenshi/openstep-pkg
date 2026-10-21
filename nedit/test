@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+
+test -x "$LR/bin/nedit"
+test -x "$LR/bin/nc"
+# -V prints the version and exits before any X connection is made.
+"$LR/bin/nedit" -V 2>&1 | /usr/local/bin/grep 'NEdit' > /dev/null
+echo "nedit ok"
