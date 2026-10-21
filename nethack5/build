@@ -194,6 +194,13 @@ VARDIRPERM = 0777
 VARFILEPERM = 0666
 HEOF
 
+# GNU make 3.81 (the system's gnumake) takes "target: VAR:=value", with no space
+# before :=, for the start of a static pattern rule ("target pattern contains no
+# %"); the fetch-lua targets in Makefile.top are written that way.
+/bin/sed -e 's/: LUA_URL_list:=/: LUA_URL_list :=/' sys/unix/Makefile.top > sys/unix/Makefile.top.new
+/bin/mv sys/unix/Makefile.top.new sys/unix/Makefile.top
+/bin/grep 'LUA_URL_list :=' sys/unix/Makefile.top > /dev/null
+
 /bin/sh sys/unix/setup.sh "$hints"
 
 # Build and install; "make all" would also format the Guidebook with nroff.
