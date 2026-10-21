@@ -1,0 +1,38 @@
+diff --git a/Python/pymath.c b/Python/pymath.c
+--- a/Python/pymath.c
++++ b/Python/pymath.c
+@@ -81,26 +81,28 @@ ldexp(double x, int n)
+ #if defined(NeXT) && defined(__m68k__)
+ /* The 68k libm's frexp() never returns for a subnormal argument, which hangs
+    hash(), float.hex(), and compiling a constant such as 5e-324.  Scale a
+-   subnormal up by 2**54 (exact) and read the exponent from the bit pattern. */
++   subnormal up by 2**54 (exact) and read the exponent from the bit pattern.
++   The union is volatile and read as 32-bit words (the 68k is big-endian): the
++   native compiler read the exponent of the unscaled value otherwise. */
+ double
+ frexp(double x, int *e)
+ {
+-    union { double d; unsigned long long i; } u;
++    volatile union { double d; unsigned int w[2]; } u;
+     int ex, bias = 0;
+ 
+     u.d = x;
+-    ex = (int) ((u.i >> 52) & 0x7ff);
+-    if (ex == 0x7ff || (u.i << 1) == 0) {
++    ex = (int) ((u.w[0] >> 20) & 0x7ff);
++    if (ex == 0x7ff || ((u.w[0] & 0x7fffffffU) | u.w[1]) == 0) {
+         *e = 0;
+         return x;
+     }
+     if (ex == 0) {
+         u.d = x * 18014398509481984.0;
+-        ex = (int) ((u.i >> 52) & 0x7ff);
++        ex = (int) ((u.w[0] >> 20) & 0x7ff);
+         bias = 54;
+     }
+     *e = ex - 1022 - bias;
+-    u.i = (u.i & 0x800fffffffffffffULL) | (1022ULL << 52);
++    u.w[0] = (u.w[0] & 0x800fffffU) | (1022U << 20);
+     return u.d;
+ }
+ #endif
