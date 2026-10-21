@@ -1358,6 +1358,39 @@ DEOF
 /bin/mv proc.c.new proc.c
 /usr/local/bin/grep -c 'ostep_diag' proc.c > /dev/null
 
+# Each lost connection to fishd made fish start another copy (up to 32 times a
+# process), and a copy that starts while another runs takes over its socket and
+# leaves the old one running: with the connection failing, that piled up hundreds of
+# processes.  Start fishd at most once per fish process.
+/usr/local/bin/sed -e 's/^static int get_socket( int fork_ok )/static int ostep_fishd_tried = 0;\
+\
+&/' \
+    -e 's/if( fork_ok && start_fishd )/if( fork_ok \&\& start_fishd \&\& !ostep_fishd_tried++ )/' \
+    env_universal.c > env_universal.c.new
+/bin/mv env_universal.c.new env_universal.c
+/usr/local/bin/grep 'ostep_fishd_tried++' env_universal.c > /dev/null
+
+# fish talks to fishd in UTF-8 and converts with iconv to and from the wide
+# character set.  libiconv's plain "UCS-2"/"UCS-4"/"UTF-16"/"UTF-32" are big endian,
+# which is wrong for wchar_t on a little-endian machine (every message came out as
+# garbage); name the little-endian forms there, and not the system's "WCHAR_T",
+# whose size and byte order libiconv takes from its own build.
+if [ "$PKG_ARCH" = i386 ]; then
+    /usr/local/bin/sed \
+        -e 's/"ucs-4"/"ucs-4le"/' -e 's/"UCS-4"/"UCS-4LE"/' \
+        -e 's/"ucs4"/"ucs-4le"/' -e 's/"UCS4"/"UCS-4LE"/' \
+        -e 's/"utf-32"/"utf-32le"/' -e 's/"UTF-32"/"UTF-32LE"/' \
+        -e 's/"utf32"/"utf-32le"/' -e 's/"UTF32"/"UTF-32LE"/' \
+        -e 's/"ucs-2"/"ucs-2le"/' -e 's/"UCS-2"/"UCS-2LE"/' \
+        -e 's/"ucs2"/"ucs-2le"/' -e 's/"UCS2"/"UCS-2LE"/' \
+        -e 's/"utf-16"/"utf-16le"/' -e 's/"UTF-16"/"UTF-16LE"/' \
+        -e 's/"utf16"/"utf-16le"/' -e 's/"UTF16"/"UTF-16LE"/' \
+        -e '/"wchar_t", "WCHAR_T"/d' -e '/"wchar", "WCHAR"/d' \
+        env_universal_common.c > env_universal_common.c.new
+    /bin/mv env_universal_common.c.new env_universal_common.c
+    /usr/local/bin/grep 'UCS-4LE' env_universal_common.c > /dev/null
+fi
+
 # fishd.c #defines FILE to a file-name prefix, which fights with stdio's FILE here.
 /usr/local/bin/sed -e 's/^#define FILE "fishd\."/#define FISHD_FILE "fishd."/' \
     -e 's/strlen(FILE)/strlen(FISHD_FILE)/' -e 's/strcat( name, FILE )/strcat( name, FISHD_FILE )/' \
