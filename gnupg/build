@@ -11,6 +11,13 @@ CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
 if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
     CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
 fi
+# gnupg's multi-precision code divides with a SPARC v8 udiv instruction only when
+# __sparc_v8__ is defined; otherwise it calls a v7 routine (__udiv_qrnnd) that is
+# supplied as assembly, which the generic (--disable-asm) build does not have.
+# These machines are v8, so say so.
+if [ "$PKG_ARCH" = sparc ]; then
+    CC="$CC -mcpu=v8"
+fi
 CONFIG_SHELL=/usr/local/bin/ksh
 GREP=/usr/local/bin/grep
 EGREP='/usr/local/bin/grep -E'
