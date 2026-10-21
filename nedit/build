@@ -81,8 +81,8 @@ done
 # getcwd(), putenv() and the POSIX <dirent.h>, and <sys/stat.h> has no S_IS*
 # macros.  A compat header, forced into every compile, supplies them as static
 # functions renamed by macros, so nothing needs linking and nothing can clash.
-/usr/local/bin/mkdir -p openstep
-/bin/cat > openstep/dirent.h <<'SEOF'
+/usr/local/bin/mkdir -p ostep-inc
+/bin/cat > ostep-inc/dirent.h <<'SEOF'
 #ifndef OPENSTEP_DIRENT_H
 #define OPENSTEP_DIRENT_H
 #include <sys/types.h>
@@ -90,7 +90,7 @@ done
 #define dirent direct
 #endif
 SEOF
-/bin/cat > openstep/nedit-compat.h <<'SEOF'
+/bin/cat > ostep-inc/nedit-compat.h <<'SEOF'
 #ifndef OPENSTEP_NEDIT_COMPAT_H
 #define OPENSTEP_NEDIT_COMPAT_H
 #include <sys/types.h>
@@ -216,12 +216,12 @@ ostep_putenv(char *string)
 #endif
 SEOF
 # snprintf() and vsnprintf() as static functions (the same shim pkgconf uses).
-/bin/cp snprintf-shim.h openstep/snprintf-shim.h
-compat=`pwd`/openstep
+/bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+compat=`pwd`/ostep-inc
 # The BSD <sys/wait.h> defines WIFEXITED() and friends for "union wait", not the int
 # status that waitpid() and POSIX programs use; redefine them for an int.
-/usr/local/bin/mkdir -p openstep/sys
-/bin/cat > openstep/sys/wait.h <<'SEOF'
+/usr/local/bin/mkdir -p ostep-inc/sys
+/bin/cat > ostep-inc/sys/wait.h <<'SEOF'
 #ifndef OPENSTEP_SYS_WAIT_H
 #define OPENSTEP_SYS_WAIT_H
 #include_next <sys/wait.h>
