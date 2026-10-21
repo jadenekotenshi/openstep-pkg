@@ -7,12 +7,12 @@ test -x "$HACKDIR/slashem"
 test -f "$HACKDIR/dungeon"
 test -x "$LOCAL_ROOT/bin/slashem"
 cd "$HACKDIR"
-# "-s" prints the score list and exits; with an empty record file it reports
-# that there are no entries.  A game that cannot find its data files stops with
-# a different message.
+# "-s" prints the score list and exits; with an empty record file it says
+# "Cannot find any current entries" (and the usage).  A game that cannot open its
+# data files stops with a different message.
 out=`./slashem -s all 2>&1 < /dev/null || :`
 case "$out" in
-*[Pp]anic*|*"Cannot"*|*"cannot"*)
+*[Pp]anic*|*"annot open"*|*"annot find the"*|*"annot find file"*|*"not found"*)
     echo "slashem: $out" >&2
     exit 1;;
 esac
