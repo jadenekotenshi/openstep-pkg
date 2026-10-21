@@ -102,6 +102,13 @@ strdup_obj=`pwd`/openstep_strdup.o
 
 /bin/sh sys/unix/setup.sh
 
+# The distribution carries pre-generated lex and yacc output for the level and
+# dungeon compilers; use it instead of depending on the system's yacc and lex (copied
+# after the makefiles are set up, so they are newer than the .y and .l sources and
+# make leaves them alone).
+/bin/cp sys/share/lev_comp.h sys/share/dgn_comp.h include/
+/bin/cp sys/share/lev_lex.c sys/share/lev_yacc.c sys/share/dgn_lex.c sys/share/dgn_yacc.c util/
+
 # Build everything, then install into DESTDIR by overriding the install
 # locations on the command line (the game itself looks in /usr/local/slashemdir).
 # The Guidebook is not formatted (it needs nroff); install builds what is needed.
