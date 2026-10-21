@@ -112,7 +112,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
 | nano | validated | validated 2.9.8 | — |
 | ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | — |
-| nedit | — (new 2026-10-24: 5.7; needs Motif 1.2 or newer, which the build checks for under X11_PREFIX and /usr/local; not built yet) | — | — |
+| nedit | validated 5.7 (2026-10-27; builds, installs, test passes and the editor runs under CubXWindow; Motif comes from /usr/X11R5 or /usr/X11R6, whichever has it; needs a handful of header stand-ins and no glob()) | — | — |
 | nethack | validated (tty and X11) | validated 3.6.7 (`pkg test` passes, game starts; a stray "pkg: Stock: not found" after the install was a script replaced mid-run, fixed in pkg; rebootstrap, 2026-10-08) | — |
 | netsurf-buildsystem | validated | validated 1.10 (rebootstrap, 2026-10-08) | — |
 | netsurf-openstep | validated 3.12-dev.20261002 (2026-10-22; builds from turbolent/netsurf-openstep at 5fd3476, installs NetSurf.app into /usr/local/Apps, test passes; connects to slashdot.org over TLS) | n/a (i386 only) | n/a (i386 only) |
