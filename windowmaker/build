@@ -1,0 +1,241 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them ("no table of contents").  A gcc42 built after
+# the cctools package links with the cctools ld by itself; an older one needs the
+# specs file that selects it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+
+# Window Maker needs the X11 development files, including libXpm.  X11_PREFIX in
+# pkg.conf says where they live (default /usr/X11R6, where CubXWindow installs).
+x11_prefix=
+for d in $X11_PREFIX /usr/X11R6; do
+    if test -n "$d" && test -f "$d/include/X11/Xlib.h"; then
+        x11_prefix=$d
+        break
+    fi
+done
+if test -z "$x11_prefix"; then
+    echo "windowmaker: cannot find X11/Xlib.h; install the X11 development files" >&2
+    echo "windowmaker: and set X11_PREFIX in pkg.conf to the directory holding include/ and lib/" >&2
+    exit 1
+fi
+if test ! -f "$x11_prefix/include/X11/xpm.h"; then
+    echo "windowmaker: $x11_prefix/include/X11/xpm.h is missing; Window Maker needs libXpm" >&2
+    exit 1
+fi
+echo "windowmaker: using X11 under $x11_prefix"
+CFLAGS='-O2'
+CPPFLAGS="-I$x11_prefix/include -I/usr/local/include"
+LDFLAGS="-L$x11_prefix/lib -L/usr/local/lib"
+# The cctools ar/ranlib on i386 (they keep long member names), the stock ones elsewhere.
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
+if test -d "WindowMaker-$VERSION"; then cd "WindowMaker-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+patch -p1 < "windowmaker-$VERSION-openstep.patch"
+
+/usr/local/bin/mkdir -p openstep
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#undef _POSIX_SOURCE
+#ifndef _NEXT_SOURCE
+# define _NEXT_SOURCE 1
+#endif
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+/bin/cat > openstep/afterstep-compat.h <<'SEOF'
+#ifndef OPENSTEP_AFTERSTEP_COMPAT_H
+#define OPENSTEP_AFTERSTEP_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#ifndef O_NONBLOCK
+# ifdef FNDELAY
+#  define O_NONBLOCK FNDELAY
+# else
+#  define O_NONBLOCK 0x0004
+# endif
+#endif
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRWXU 0000700
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IRWXG 0000070
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+# define S_IRWXO 0000007
+#endif
+#ifdef OSTEP_NEED_MODE_T
+typedef unsigned short mode_t;
+#endif
+#ifdef OSTEP_NEED_SSIZE_T
+typedef int ssize_t;
+#endif
+#ifdef OSTEP_NEED_PID_T
+typedef int pid_t;
+#endif
+#ifdef OSTEP_NEED_UID_T
+typedef unsigned short uid_t;
+#endif
+#ifdef OSTEP_NEED_GID_T
+typedef unsigned short gid_t;
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef R_OK
+# define F_OK 0
+# define X_OK 1
+# define W_OK 2
+# define R_OK 4
+#endif
+#ifndef SEEK_SET
+# define SEEK_SET 0
+# define SEEK_CUR 1
+# define SEEK_END 2
+#endif
+#define alloca __builtin_alloca
+extern char **environ;
+extern int wait4();
+static int
+ostep_waitpid(int pid, int *status, int options)
+{
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != NULL)
+        memcpy(p, s, n);
+    return p;
+}
+static int
+ostep_putenv(char *string)
+{
+    char *eq = strchr(string, '=');
+    size_t n, count;
+    char **e, **newenv;
+
+    if (eq == 0)
+        return -1;
+    n = eq - string;
+    count = 0;
+    for (e = environ; e != 0 && *e != 0; e++) {
+        if (strncmp(*e, string, n) == 0 && (*e)[n] == '=') {
+            *e = string;
+            return 0;
+        }
+        count++;
+    }
+    newenv = (char **) malloc((count + 2) * sizeof(char *));
+    if (newenv == 0)
+        return -1;
+    for (count = 0; environ != 0 && environ[count] != 0; count++)
+        newenv[count] = environ[count];
+    newenv[count++] = string;
+    newenv[count] = 0;
+    environ = newenv;
+    return 0;
+}
+#define waitpid ostep_waitpid
+#define strdup ostep_strdup
+#define putenv ostep_putenv
+#endif
+SEOF
+# Types this <sys/types.h> may lack (probed, since a typedef cannot be tested for).
+OSTEP_DEFS=
+for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
+    printf '#include <sys/types.h>\n%s probe_var;\nint main(void) { return 0; }\n' "$ostep_type" > type-probe.c
+    if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+        ostep_upper=`echo $ostep_type | tr 'a-z' 'A-Z'`
+        OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
+    fi
+done
+rm -f type-probe.c type-probe.o
+echo "afterstep: missing types:$OSTEP_DEFS"
+# -fno-strict-aliasing: the sources dereference type-punned pointers.
+CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h"
+export CFLAGS
+
+# Static libraries only; GIF and TIFF support (libraries this system does not have)
+# and the Hermes assembler blitters are left out.
+run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
+    --disable-shared --enable-static \
+    --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
+    --disable-gif --disable-tiff --disable-hermes
+
+# The Makefiles run their sub-makes in "for ... (cd dir; make || exit 1)" loops,
+# which the stock sh does not stop on a failure: a compile error then looked like
+# success.  Run each directory's make here, so a failure stops the build.
+MKDIRP="/usr/local/bin/mkdir -p"
+subdirs="wrlib WINGs src util WindowMaker WPrefs.app doc"
+for dir in $subdirs; do
+    (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP") || exit 1
+done
+test -f src/wmaker || { echo "windowmaker: src/wmaker was not built" >&2; exit 1; }
+
+for dir in $subdirs; do
+    (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP" install DESTDIR="$DESTDIR") || exit 1
+done
+test -x "$DESTDIR$PREFIX/bin/wmaker" || { echo "windowmaker: the window manager was not installed" >&2; exit 1; }
+
+# NeXT-like defaults for this system: no Dock and no Clip (the Dock is Window
+# Maker's version of NeXT's), aterm in place of xterm in the menu.
+WMETC="$DESTDIR$PREFIX/etc/WindowMaker"
+for f in WindowMaker; do
+    sed -e 's/^\([ 	]*DisableDock[ 	]*=[ 	]*\)NO;/\1YES;/' \
+        -e 's/^\([ 	]*DisableClip[ 	]*=[ 	]*\)NO;/\1YES;/' \
+        "$WMETC/$f" > "$WMETC/$f.openstep"
+    mv "$WMETC/$f.openstep" "$WMETC/$f"
+done
+for f in WMRootMenu WMState; do
+    sed -e 's/xterm -sb/aterm/' -e 's/xterm/aterm/g' "$WMETC/$f" > "$WMETC/$f.openstep"
+    mv "$WMETC/$f.openstep" "$WMETC/$f"
+done
+
+# A default ~/.xinitrc: post-install copies it for the installing user if there is
+# none.
+/bin/cat > "$DESTDIR$PREFIX/share/WindowMaker/xinitrc" <<'XEOF'
+#!/bin/sh
+# Default .xinitrc for Window Maker: a terminal, then the window manager.  When the
+# window manager exits, so does the X session.
+PATH=/usr/local/bin:$PATH
+export PATH
+aterm &
+exec wmaker
+XEOF
+chmod 755 "$DESTDIR$PREFIX/share/WindowMaker/xinitrc"
