@@ -443,7 +443,7 @@ export LIBS
 CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/dash-compat.h -include `pwd`/openstep-sig.h"
 export CFLAGS
 
-run_configure --build=$PKG_TARGET --prefix="$PREFIX" --without-libedit
+run_configure --build=$PKG_TARGET --prefix="$PREFIX" --without-libedit --disable-dependency-tracking
 /usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p"
 test -x src/dash || { echo "dash: src/dash was not built" >&2; exit 1; }
 /usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
