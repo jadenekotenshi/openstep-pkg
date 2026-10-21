@@ -181,7 +181,7 @@ SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
 CFLAGS=-O2 -I../include -I$inc -DNeXT -include $inc/nethack5-compat.h
 CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
 CFLAGS+=-DHACKDIR=\\"\$(HACKDIR)\\"
-SYSCFLAGS=-I$inc -DNeXT -DLUA_USE_POSIX
+SYSCFLAGS=-DNeXT -DLUA_USE_POSIX
 LINK=\$(CC)
 
 WINSRC = \$(WINTTYSRC)
@@ -217,8 +217,10 @@ HEOF
 
 # Build and install; "make all" would also format the Guidebook with nroff.
 # GAME names the binary and the data directory.  The archives Lua is put in are made
-# by the same ar and ranlib as the rest.
-luaflags="CC='$CC' SYSCFLAGS='-I$inc -DNeXT -DLUA_USE_POSIX' AR='$AR_CMD rcu' RANLIB='$RANLIB_CMD'"
+# by the same ar and ranlib as the rest.  Lua is built without the private include
+# directory: its patch reads wait status as a "union wait", which the private
+# <sys/wait.h> (an int status, for NetHack) would contradict.
+luaflags="CC='$CC' SYSCFLAGS='-DNeXT -DLUA_USE_POSIX' AR='$AR_CMD rcu' RANLIB='$RANLIB_CMD'"
 /bin/gnumake CC="$CC" AR="$AR_CMD" RANLIB="$RANLIB_CMD" GAME=nethack5 \
     LUAMAKEFLAGS="$luaflags" install DESTDIR="$DESTDIR"
 
