@@ -28,6 +28,36 @@ if test -d "dash-$VERSION"; then cd "dash-$VERSION"; fi
 # or strtoll().  Private headers and a small library supply them; every function is
 # renamed by a macro, so it cannot clash with a libc that has it.
 /usr/local/bin/mkdir -p openstep
+# The BSD <sys/wait.h> defines WIFEXITED() and friends for "union wait", not the int
+# status that waitpid() and POSIX programs use; redefine them for an int.
+/usr/local/bin/mkdir -p openstep/sys
+/bin/cat > openstep/sys/wait.h <<'SEOF'
+#ifndef OPENSTEP_SYS_WAIT_H
+#define OPENSTEP_SYS_WAIT_H
+#include_next <sys/wait.h>
+#undef WIFEXITED
+#undef WEXITSTATUS
+#undef WIFSIGNALED
+#undef WTERMSIG
+#undef WIFSTOPPED
+#undef WSTOPSIG
+#undef WCOREDUMP
+#define WIFEXITED(s) ((((int) (s)) & 0xff) == 0)
+#define WEXITSTATUS(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSTOPPED(s) ((((int) (s)) & 0xff) == 0x7f)
+#define WSTOPSIG(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSIGNALED(s) ((((int) (s)) & 0xff) != 0 && (((int) (s)) & 0xff) != 0x7f)
+#define WTERMSIG(s) (((int) (s)) & 0x7f)
+#define WCOREDUMP(s) (((int) (s)) & 0x80)
+#ifndef WNOHANG
+# define WNOHANG 1
+#endif
+#ifndef WUNTRACED
+# define WUNTRACED 2
+#endif
+#endif
+SEOF
+
 # histedit.c includes <getopt.h> though its body is compiled out (SMALL); an empty
 # header does.
 echo '/* empty: not needed here */' > openstep/getopt.h

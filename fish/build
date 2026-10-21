@@ -33,6 +33,36 @@ if test -d "fish-$VERSION"; then cd "fish-$VERSION"; fi
 # the rest.  Only single-byte (Latin-1) text is supported.
 /usr/local/bin/mkdir -p openstep
 shimdir=`pwd`/openstep
+# The BSD <sys/wait.h> defines WIFEXITED() and friends for "union wait", not the int
+# status that waitpid() and POSIX programs use; redefine them for an int.
+/usr/local/bin/mkdir -p "$shimdir"/sys
+/bin/cat > "$shimdir"/sys/wait.h <<'SEOF'
+#ifndef OPENSTEP_SYS_WAIT_H
+#define OPENSTEP_SYS_WAIT_H
+#include_next <sys/wait.h>
+#undef WIFEXITED
+#undef WEXITSTATUS
+#undef WIFSIGNALED
+#undef WTERMSIG
+#undef WIFSTOPPED
+#undef WSTOPSIG
+#undef WCOREDUMP
+#define WIFEXITED(s) ((((int) (s)) & 0xff) == 0)
+#define WEXITSTATUS(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSTOPPED(s) ((((int) (s)) & 0xff) == 0x7f)
+#define WSTOPSIG(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSIGNALED(s) ((((int) (s)) & 0xff) != 0 && (((int) (s)) & 0xff) != 0x7f)
+#define WTERMSIG(s) (((int) (s)) & 0x7f)
+#define WCOREDUMP(s) (((int) (s)) & 0x80)
+#ifndef WNOHANG
+# define WNOHANG 1
+#endif
+#ifndef WUNTRACED
+# define WUNTRACED 2
+#endif
+#endif
+SEOF
+
 
 # Types the system's <sys/types.h> may lack (probed: a typedef cannot be tested for).
 OSTEP_DEFS=
