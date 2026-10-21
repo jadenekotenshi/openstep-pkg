@@ -344,7 +344,13 @@ sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
 SIGEOF
 $CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
 
-LIBS="`pwd`/openstep_sig.o $LIBS"
+# Link the object as a library: libtool refuses a bare .o on the link line when
+# it builds a libtool library ("cannot build libtool library from non-libtool
+# objects").
+/bin/rm -f libopenstepsig.a
+"$AR" rc libopenstepsig.a openstep_sig.o
+"$RANLIB" libopenstepsig.a
+LIBS="-L`pwd` -lopenstepsig $LIBS"
 export LIBS
 CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h -include `pwd`/openstep-sig.h"
 export CFLAGS
