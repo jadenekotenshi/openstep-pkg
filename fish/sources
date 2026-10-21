@@ -1,1 +1,2 @@
 https://archive.debian.org/debian/pool/main/f/fish/fish_1.23.1.orig.tar.gz
+snprintf-shim.h fish-1.23.1
