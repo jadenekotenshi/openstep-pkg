@@ -69,6 +69,9 @@ SEOF
 #include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef FD_CLOEXEC
+# define FD_CLOEXEC 1
+#endif
 #ifndef O_NONBLOCK
 # ifdef FNDELAY
 #  define O_NONBLOCK FNDELAY
@@ -188,7 +191,162 @@ done
 rm -f type-probe.c type-probe.o
 echo "afterstep: missing types:$OSTEP_DEFS"
 # -fno-strict-aliasing: the sources dereference type-punned pointers.
-CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h"
+# OPENSTEP's libc has no sigaction(), sigprocmask() or sigemptyset() and friends,
+# and its <signal.h> may lack the types.  Probe what is missing, complete it in a
+# header forced into every compile, and supply the functions on top of BSD
+# sigvec(2)/sigblock(2)/sigsetmask(2) in an object linked into every program (as
+# the tcsh package does).
+sig_h=`pwd`/openstep-sig.h
+/bin/cat > "$sig_h" <<'SIGEOF'
+#include <sys/types.h>
+#include <signal.h>
+SIGEOF
+probe_sig() {
+    { echo "#include \"$sig_h\""; echo "$1"; } > probe_sig.c
+    $CC $CFLAGS -c probe_sig.c -o probe_sig.o > /dev/null 2>&1
+}
+probe_sig 'sigset_t probe_set;' || echo 'typedef unsigned int sigset_t;' >> "$sig_h"
+probe_sig 'int probe_how[3] = { SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK };' || /bin/cat >> "$sig_h" <<'SIGEOF'
+#define SIG_BLOCK	1
+#define SIG_UNBLOCK	2
+#define SIG_SETMASK	3
+SIGEOF
+probe_sig 'struct sigaction probe_sa; int probe_f(void) { probe_sa.sa_handler = 0; probe_sa.sa_mask = 0; probe_sa.sa_flags = 0; return 0; }' || /bin/cat >> "$sig_h" <<'SIGEOF'
+struct sigaction {
+    void (*sa_handler)();
+    sigset_t sa_mask;
+    int sa_flags;
+};
+SIGEOF
+/bin/cat >> "$sig_h" <<'SIGEOF'
+#ifndef SA_RESTART
+# define SA_RESTART	0x10000
+#endif
+#ifndef SA_NOCLDSTOP
+# define SA_NOCLDSTOP	0x20000
+#endif
+SIGEOF
+/bin/rm -f probe_sig.c probe_sig.o
+
+/bin/cat > openstep_sig.c <<'SIGEOF'
+#include "openstep-sig.h"
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+extern int sigvec();
+extern int sigblock();
+extern int sigsetmask();
+extern int sigpause();
+
+#define SIGBIT(sig)	(1 << ((sig) - 1))
+
+int
+sigemptyset(sigset_t *set)
+{
+    *set = 0;
+    return 0;
+}
+
+int
+sigfillset(sigset_t *set)
+{
+    *set = ~0;
+    return 0;
+}
+
+int
+sigaddset(sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    *set |= SIGBIT(sig);
+    return 0;
+}
+
+int
+sigdelset(sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    *set &= ~SIGBIT(sig);
+    return 0;
+}
+
+int
+sigismember(const sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    return (*set & SIGBIT(sig)) != 0;
+}
+
+int
+sigprocmask(int how, const sigset_t *set, sigset_t *oset)
+{
+    int old;
+
+    if (set == 0)
+	old = sigblock(0);
+    else switch (how) {
+    case SIG_BLOCK:
+	old = sigblock((int)*set);
+	break;
+    case SIG_UNBLOCK:
+	old = sigsetmask(sigblock(0) & ~(int)*set);
+	break;
+    case SIG_SETMASK:
+	old = sigsetmask((int)*set);
+	break;
+    default:
+	errno = EINVAL;
+	return -1;
+    }
+    if (oset)
+	*oset = (sigset_t)old;
+    return 0;
+}
+
+int
+sigsuspend(const sigset_t *mask)
+{
+    return sigpause((int)*mask);
+}
+
+/* POSIX handlers are not restarted unless SA_RESTART; BSD sigvec() restarts
+   unless SV_INTERRUPT, so the sense of the flag is reversed. */
+int
+sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+{
+    struct sigvec nsv, osv;
+    int r;
+
+    if (act) {
+	nsv.sv_handler = (void (*)())act->sa_handler;
+	nsv.sv_mask = (int)act->sa_mask;
+	nsv.sv_flags = (act->sa_flags & SA_RESTART) ? 0 : SV_INTERRUPT;
+    }
+    r = sigvec(sig, act ? &nsv : (struct sigvec *)0, &osv);
+    if (r == 0 && oact) {
+	oact->sa_handler = (void (*)())osv.sv_handler;
+	oact->sa_mask = (sigset_t)osv.sv_mask;
+	oact->sa_flags = (osv.sv_flags & SV_INTERRUPT) ? 0 : SA_RESTART;
+    }
+    return r;
+}
+SIGEOF
+$CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
+
+LIBS="`pwd`/openstep_sig.o $LIBS"
+export LIBS
+CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h -include `pwd`/openstep-sig.h"
 export CFLAGS
 
 # Static libraries only; GIF and TIFF support (libraries this system does not have)
