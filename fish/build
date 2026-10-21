@@ -615,6 +615,128 @@ fi
 # mmap() here has no munmap() to go with it.  fish only maps its history file
 # read-only, so a <sys/mman.h> that reads the file into malloc'd memory will do.
 /usr/local/bin/mkdir -p openstep/sys
+# <fnmatch.h> is missing too (the MIME glob code matches file names with it); this
+# one was checked against the C library's fnmatch() on 2200 pattern/string/flag cases.
+/bin/cat > openstep/fnmatch.h <<'MEOF'
+#ifndef OPENSTEP_FNMATCH_H
+#define OPENSTEP_FNMATCH_H
+#ifndef FNM_NOMATCH
+#define FNM_NOMATCH 1
+#endif
+#ifndef FNM_NOESCAPE
+#define FNM_NOESCAPE 0x02
+#endif
+#ifndef FNM_PATHNAME
+#define FNM_PATHNAME 0x01
+#endif
+#ifndef FNM_PERIOD
+#define FNM_PERIOD 0x04
+#endif
+/* A plain recursive matcher: * ? [set] [!set] [a-z] and backslash quoting. */
+static int
+ostep_fnmatch_here(const char *p, const char *s, int flags, int start)
+{
+    for (;;) {
+	char c = *p++;
+
+	switch (c) {
+	case 0:
+	    return *s == 0 ? 0 : FNM_NOMATCH;
+	case '?':
+	    if (*s == 0 || ((flags & FNM_PATHNAME) && *s == '/') ||
+		((flags & FNM_PERIOD) && *s == '.' && start))
+		return FNM_NOMATCH;
+	    s++;
+	    start = 0;
+	    break;
+	case '*':
+	    if ((flags & FNM_PERIOD) && *s == '.' && start)
+		return FNM_NOMATCH;
+	    while (*p == '*')
+		p++;
+	    if (*p == 0) {
+		if (flags & FNM_PATHNAME) {
+		    const char *t;
+		    for (t = s; *t != 0; t++)
+			if (*t == '/')
+			    return FNM_NOMATCH;
+		}
+		return 0;
+	    }
+	    for (;; s++) {
+		if (ostep_fnmatch_here(p, s, flags, 0) == 0)
+		    return 0;
+		if (*s == 0 || ((flags & FNM_PATHNAME) && *s == '/'))
+		    return FNM_NOMATCH;
+	    }
+	case '[': {
+	    int neg = 0, ok = 0, first = 1;
+	    const char *q = p;
+
+	    if (*s == 0 || ((flags & FNM_PATHNAME) && *s == '/') ||
+		((flags & FNM_PERIOD) && *s == '.' && start))
+		return FNM_NOMATCH;
+	    if (*q == '!' || *q == '^') {
+		neg = 1;
+		q++;
+	    }
+	    for (;;) {
+		unsigned char lo, hi;
+
+		if (*q == 0) {
+		    /* no closing bracket: the '[' stands for itself */
+		    if (*s != '[')
+			return FNM_NOMATCH;
+		    ok = 1;
+		    neg = 0;
+		    q = p;
+		    break;
+		}
+		if (*q == ']' && !first) {
+		    q++;
+		    break;
+		}
+		first = 0;
+		if (*q == '\\' && !(flags & FNM_NOESCAPE) && q[1] != 0)
+		    q++;
+		lo = hi = (unsigned char) *q++;
+		if (*q == '-' && q[1] != 0 && q[1] != ']') {
+		    q++;
+		    if (*q == '\\' && !(flags & FNM_NOESCAPE) && q[1] != 0)
+			q++;
+		    hi = (unsigned char) *q++;
+		}
+		if ((unsigned char) *s >= lo && (unsigned char) *s <= hi)
+		    ok = 1;
+	    }
+	    if (ok == neg)
+		return FNM_NOMATCH;
+	    p = q;
+	    s++;
+	    start = 0;
+	    break;
+	}
+	case '\\':
+	    if (!(flags & FNM_NOESCAPE) && *p != 0)
+		c = *p++;
+	    /* fall through */
+	default:
+	    if (*s != c)
+		return FNM_NOMATCH;
+	    s++;
+	    start = 0;
+	    break;
+	}
+    }
+}
+static int
+ostep_fnmatch(const char *pattern, const char *string, int flags)
+{
+    return ostep_fnmatch_here(pattern, string, flags, 1);
+}
+#define fnmatch ostep_fnmatch
+#endif
+MEOF
 # There is no POSIX <regex.h> here.  Only mimedb uses it, to pull the description
 # of a MIME type out of the shared-mime-info XML; with this stand-in no pattern ever
 # matches, so mimedb still maps names and files to MIME types but gives no
