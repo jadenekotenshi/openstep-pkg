@@ -242,6 +242,12 @@ $CC $CFLAGS -c openstep_sig.c -o openstep_sig.o
 #include <termios.h>
 #include <time.h>
 
+#ifdef OSTEP_NEED_TIMESPEC
+struct timespec {
+    time_t tv_sec;
+    long tv_nsec;
+};
+#endif
 extern int getpid();
 extern int chdir();
 extern int readlink();
