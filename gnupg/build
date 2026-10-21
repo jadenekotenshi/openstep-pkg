@@ -171,8 +171,33 @@ ostep_putenv(char *string)
     environ = newenv;
     return 0;
 }
+/* System V sighold()/sigrelse()/sigpause(sig) on top of the BSD signal mask calls
+   (BSD sigpause() takes a mask, not a signal). */
+extern int sigblock();
+extern int sigsetmask();
+extern int sigpause();
+static int
+ostep_sighold(int sig)
+{
+    sigblock(1 << (sig - 1));
+    return 0;
+}
+static int
+ostep_sigrelse(int sig)
+{
+    sigsetmask(sigblock(0) & ~(1 << (sig - 1)));
+    return 0;
+}
+static int
+ostep_sigpause(int sig)
+{
+    return sigpause(sigblock(0) & ~(1 << (sig - 1)));
+}
 #define strdup ostep_strdup
 #define putenv ostep_putenv
+#define sighold ostep_sighold
+#define sigrelse ostep_sigrelse
+#define sigpause ostep_sigpause
 #define fseeko(f, o, w) fseek((f), (long) (o), (w))
 #define ftello(f) ((off_t) ftell(f))
 #ifndef WEXITSTATUS
