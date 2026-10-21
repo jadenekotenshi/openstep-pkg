@@ -99,6 +99,13 @@ typedef unsigned short gid_t;
 #ifndef FD_CLOEXEC
 # define FD_CLOEXEC 1
 #endif
+#ifndef O_NONBLOCK
+# ifdef FNDELAY
+#  define O_NONBLOCK FNDELAY
+# else
+#  define O_NONBLOCK 0x0004
+# endif
+#endif
 #ifndef NAME_MAX
 # define NAME_MAX 255
 #endif
