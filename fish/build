@@ -226,7 +226,7 @@ sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
     return r;
 }
 SIGEOF
-$CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
+$CC $CFLAGS -c openstep_sig.c -o openstep_sig.o
 
 # The remaining POSIX functions under renamed symbols, plus the wide-character
 # functions under their own names (nothing else on the system defines them).
@@ -507,7 +507,7 @@ fail:
     return 0;
 }
 MEOF
-$CC $CFLAGS $OSTEP_DEFS -I. -c openstep_posix.c -o openstep_posix.o
+$CC $CFLAGS $OSTEP_DEFS -c openstep_posix.c -o openstep_posix.o
 
 # Wide-character support: the headers go in the private directory, the functions in
 # openstep_wchar.c.
