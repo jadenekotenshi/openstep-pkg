@@ -929,6 +929,11 @@ struct timespec {
 #endif
 #include <sys/resource.h>
 #include <errno.h>
+#include <locale.h>
+#ifndef LC_MESSAGES
+/* no message-catalog category here; fish only asks for it by name */
+# define LC_MESSAGES LC_CTYPE
+#endif
 #ifdef OSTEP_NEED_RLIM_T
 typedef long rlim_t;
 #endif
