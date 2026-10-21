@@ -1997,7 +1997,7 @@ diff --git a/Python/pymath.c b/Python/pymath.c
 index c874c82..98b3e7b 100644
 --- a/Python/pymath.c
 +++ b/Python/pymath.c
-@@ -34,3 +34,75 @@ round(double x)
+@@ -34,3 +34,92 @@ round(double x)
      return copysign(integral, x);
  }
  #endif
@@ -2047,29 +2047,46 @@ index c874c82..98b3e7b 100644
 +
 +#if defined(NeXT) && defined(__m68k__)
 +/* The 68k libm's frexp() never returns for a subnormal argument, which hangs
-+   hash(), float.hex(), and compiling a constant such as 5e-324.  Scale a
-+   subnormal up by 2**54 (exact) and read the exponent from the bit pattern.
-+   The union is volatile and read as 32-bit words (the 68k is big-endian): the
-+   native compiler read the exponent of the unscaled value otherwise. */
++   hash(), float.hex(), and compiling a constant such as 5e-324.  The FPU also
++   flushes a subnormal operand to zero in a multiply, so the exponent and fraction
++   of a subnormal are found by shifting its bit pattern (the 68k is big-endian,
++   so word 0 holds the sign, exponent and top of the fraction).  The union is
++   volatile: the native compiler read the exponent of the unscaled value otherwise. */
 +double
 +frexp(double x, int *e)
 +{
 +    volatile union { double d; unsigned int w[2]; } u;
-+    int ex, bias = 0;
++    unsigned int hi, lo, sign;
++    int ex;
 +
 +    u.d = x;
-+    ex = (int) ((u.w[0] >> 20) & 0x7ff);
-+    if (ex == 0x7ff || ((u.w[0] & 0x7fffffffU) | u.w[1]) == 0) {
++    hi = u.w[0];
++    lo = u.w[1];
++    ex = (int) ((hi >> 20) & 0x7ff);
++    if (ex == 0x7ff || ((hi & 0x7fffffffU) | lo) == 0) {
 +        *e = 0;
 +        return x;
 +    }
++    sign = hi & 0x80000000U;
++    hi &= 0x000fffffU;
 +    if (ex == 0) {
-+        u.d = x * 18014398509481984.0;
-+        ex = (int) ((u.w[0] >> 20) & 0x7ff);
-+        bias = 54;
++        /* Subnormal: value = (hi:lo) * 2**-1074.  The FPU flushes subnormals
++           here, so no arithmetic: shift the 52-bit fraction left until the
++           implicit bit (bit 20 of hi) is set, counting the shifts. */
++        int k = 0;
++
++        while (!(hi & 0x00100000U)) {
++            hi = (hi << 1) | (lo >> 31);
++            lo <<= 1;
++            k++;
++        }
++        *e = -1021 - k;
++        hi &= 0x000fffffU;
++    } else {
++        *e = ex - 1022;
 +    }
-+    *e = ex - 1022 - bias;
-+    u.w[0] = (u.w[0] & 0x800fffffU) | (1022U << 20);
++    u.w[0] = sign | (1022U << 20) | hi;
++    u.w[1] = lo;
 +    return u.d;
 +}
 +#endif
