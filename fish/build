@@ -1345,10 +1345,11 @@ run_configure \
   --without-gettext
 
 # The stock sh does not stop a failed sub-make in a loop, so check for the results.
-gnumake
+gnumake HAVE_GETTEXT=0
 test -f fish
 test -f fishd
 test -f fish_pager
-gnumake install DESTDIR="$DESTDIR"
+# --without-gettext leaves HAVE_GETTEXT empty, and the stock sh dies on "test  = 1".
+gnumake install HAVE_GETTEXT=0 DESTDIR="$DESTDIR"
 test -x "$DESTDIR$PREFIX/bin/fish"
 test -x "$DESTDIR$PREFIX/bin/fishd"
