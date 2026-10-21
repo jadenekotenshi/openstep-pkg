@@ -242,6 +242,34 @@ for dir in $subdirs; do
 done
 test -x "$DESTDIR$PREFIX/bin/afterstep" || { echo "afterstep: the window manager was not installed" >&2; exit 1; }
 
+# The default look is AfterStep 1.8's five-button title bar.  Make it NeXT-like:
+# the miniaturize button (iconize) on the left, the close button on the right, and
+# nothing else (no switch-window, menu or shade buttons).  The system defaults are
+# in looks/look.DEFAULT, feels/feel.DEFAULT and the non-configurable copies the
+# window manager reads when a user has no files of their own.
+ASDATA="$DESTDIR$PREFIX/share/afterstep"
+nextish_files=`find "$ASDATA/looks" "$ASDATA/non-configurable" -type f -print`
+for f in $nextish_files; do
+    case $f in
+        */look.DEFAULT|*_look.*)
+            sed -e '/^TitleButton[ 	]*[346][ 	]/d' \
+                -e 's/^TitleButton[ 	]*1[ 	].*/TitleButton 1 as-iconize.xpm as-iconize-pressed.xpm/' \
+                "$f" > "$f.openstep"
+            mv "$f.openstep" "$f"
+        ;;
+    esac
+done
+nextish_files=`find "$ASDATA/feels" "$ASDATA/non-configurable" -type f -print`
+for f in $nextish_files; do
+    case $f in
+        */feel.DEFAULT|*_feel.*)
+            sed -e 's/^\(Mouse[ 	]*[123][ 	]*1[ 	]*A[ 	]*\).*/\1Iconify/' \
+                "$f" > "$f.openstep"
+            mv "$f.openstep" "$f"
+        ;;
+    esac
+done
+
 # A default ~/.xinitrc: post-install copies it for the installing user if there is
 # none.
 /bin/cat > "$DESTDIR$PREFIX/share/afterstep/xinitrc" <<'XEOF'
