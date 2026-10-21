@@ -28,6 +28,15 @@ if test -d "dash-$VERSION"; then cd "dash-$VERSION"; fi
 # or strtoll().  Private headers and a small library supply them; every function is
 # renamed by a macro, so it cannot clash with a libc that has it.
 /usr/local/bin/mkdir -p openstep
+# <dirent.h> is the BSD <sys/dir.h> here (struct direct, no POSIX names).
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
 /bin/cat > openstep/stdint.h <<'SEOF'
 #ifndef OPENSTEP_STDINT_H
 #define OPENSTEP_STDINT_H
@@ -89,6 +98,16 @@ typedef unsigned short gid_t;
 #endif
 #ifndef FD_CLOEXEC
 # define FD_CLOEXEC 1
+#endif
+#ifndef O_NONBLOCK
+# ifdef FNDELAY
+#  define O_NONBLOCK FNDELAY
+# else
+#  define O_NONBLOCK 0x0004
+# endif
+#endif
+#ifndef NAME_MAX
+# define NAME_MAX 255
 #endif
 #ifndef S_ISDIR
 # define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
