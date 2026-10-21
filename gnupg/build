@@ -125,6 +125,10 @@ typedef unsigned short gid_t;
 # define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
 extern char **environ;
+/* getopt() is in the libc but no header declares it or its variables. */
+extern char *optarg;
+extern int optind, opterr, optopt;
+extern int getopt();
 static char *
 ostep_strdup(const char *s)
 {
