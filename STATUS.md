@@ -141,8 +141,8 @@ SPARC `test world` of 2026-10-14 covers every row.
 | vim | validated | validated 9.2.1091 (rebuilt 2026-10-09) | — |
 | vlc | 0.9.10 validated (runs as root) | validated (2026-10-10; the i386-only flags and Mach-O subtype fix are skipped, the audio test expects host byte order) | — |
 | wget | 1.25.0 validated on x86 (HTTPS via OpenSSL) | 1.25.0 validated (2026-10-10) | — |
-| windowmaker | — (new 2026-10-21: Window Maker 0.80.0, the last release before Xft became mandatory; NeXT-style, Dock and Clip off by default; needs HAVE_X11 and libXpm; build and test hooks checked on Linux only) | — | — |
 | wget-bootstrap | 1.19.5 validated | validated 1.19.5 (needs the localtime and unsigned-compare fixes; rebootstrap, 2026-10-08) | validated (2026-10-19; m68k-only workarounds) |
+| windowmaker | — (new 2026-10-21: Window Maker 0.80.0, the last release before Xft became mandatory; NeXT-style, Dock and Clip off by default; needs HAVE_X11 and libXpm; build and test hooks checked on Linux only) | — | — |
 | xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | — |
 | xz | validated | validated 5.8.4 | — |
 | zip | validated | validated 3.0 (2026-10-09) | — |
