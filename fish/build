@@ -606,6 +606,8 @@ fi
 # mmap() here has no munmap() to go with it.  fish only maps its history file
 # read-only, so a <sys/mman.h> that reads the file into malloc'd memory will do.
 /usr/local/bin/mkdir -p openstep/sys
+# reader.c includes <sys/poll.h> without using poll().
+echo '/* empty: not needed here */' > openstep/sys/poll.h
 /bin/cat > openstep/sys/mman.h <<'MEOF'
 #ifndef OPENSTEP_SYS_MMAN_H
 #define OPENSTEP_SYS_MMAN_H
