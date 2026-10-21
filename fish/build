@@ -1331,6 +1331,30 @@ ac_cv_search_iconv_open=-liconv
 export ac_cv_search_nanosleep ac_cv_search_connect ac_cv_search_iconv_open
 export CPPFLAGS LDFLAGS LIBS
 
+# Diagnostics for the wait loop in job_continue(): report (at most five times each) a
+# waitpid() or select() that fails there.  Silent when they work.
+/bin/cat > proc-diag.sed <<'DEOF'
+/pid_t pid = waitpid(-1, &status, WUNTRACED );/a\
+\
+							if( pid < 0 )\
+							{\
+								static int ostep_diag_n = 0;\
+								if( ostep_diag_n++ < 5 )\
+									fprintf( stderr, "fish: waitpid returned %d, errno %d\\n", (int) pid, errno );\
+							}
+/retval =select( maxfd+1, &fds, 0, 0, &tv );/a\
+\
+		if( retval < 0 )\
+		{\
+			static int ostep_diag_s = 0;\
+			if( ostep_diag_s++ < 5 )\
+				fprintf( stderr, "fish: select returned %d, errno %d\\n", retval, errno );\
+		}
+DEOF
+/usr/local/bin/sed -f proc-diag.sed proc.c > proc.c.new
+/bin/mv proc.c.new proc.c
+/usr/local/bin/grep -c 'ostep_diag' proc.c > /dev/null
+
 # fishd.c #defines FILE to a file-name prefix, which fights with stdio's FILE here.
 /usr/local/bin/sed -e 's/^#define FILE "fishd\."/#define FISHD_FILE "fishd."/' \
     -e 's/strlen(FILE)/strlen(FISHD_FILE)/' -e 's/strcat( name, FILE )/strcat( name, FISHD_FILE )/' \
