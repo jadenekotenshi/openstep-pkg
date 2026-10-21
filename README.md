@@ -127,6 +127,10 @@ adapt to them.
 | `STRIP_BINARIES` | `0` | `1` strips the symbols from every executable as it is installed or put in a binary package (see "Stripping") |
 | `STRIP_PROGRAM` | `/bin/strip` | the strip to run |
 | `STRIP_FLAGS` | `-x` | what it is given; `-x` keeps the global symbols that programs loading code at run time look up |
+| `LINK_APPS` | `0` | `1` links each `.app` bundle a package installs in `/usr/local/Apps` from `APPS_LINK_DIR` (see "Native applications") |
+| `APPS_LINK_DIR` | `/LocalApps` | the directory for those links |
+| `NEXT_PACKAGES` | `0` | `1` also makes a NeXT package of the packages that can (see "Native applications"); `--next-packages` does it for one run |
+| `NEXT_PACKAGES_DIR` | `/usr/local/var/pkg/NeXTpackages` | where they are put |
 
 An environment variable of the same name sets the default, and the file overrides it.
 
@@ -310,6 +314,7 @@ Optional:
 - `test`
 - `verify-ignore` (paths `pkg verify` skips for this package; see "Verifying installed files")
 - `nostrip` (paths `pkg strip` leaves alone; see "Stripping")
+- `nextpkg` (makes a NeXT package; see "Native applications")
 
 ## Upgrading
 
@@ -393,6 +398,42 @@ name paths under the root that `verify` skips, whether they are edited or gone:
 Files that a post-install hook creates from a `.dist` template (`ntpd.conf`, `sudoers`) are not in
 the package image, so they are never checked.  `pkg-world verify world` runs `pkg verify` on every
 installed package and logs each result (`-q` for `--quick`, `-o "a b"` for just those).
+
+## Native applications
+
+Packages for native GUI programs install their `.app` bundles in `/usr/local/Apps`, like
+any other file of the package.  Two options connect them to the rest of the system.
+
+**Links in `/LocalApps`.**  With `LINK_APPS=1`, installing a package also makes a symbolic link
+`/LocalApps/<name>.app` -> `/usr/local/Apps/<name>.app` for every bundle at the top level of
+`/usr/local/Apps` that the package installed (`APPS_LINK_DIR` changes the directory).  The links
+are recorded in the package's manifest and file list, so `pkg verify` checks them and `pkg remove`
+deletes them, including when `LINK_APPS` has been turned off since.  A name that is already
+taken, whether by a file, a directory, or a link pointing somewhere else, is never replaced: it is
+left alone with a warning, and the package is installed without that link.  The link is made
+by `pkg install` and `pkg installpkg` alike, so a binary package picks it up on the machine
+it is installed on, according to that machine's setting.
+
+**NeXT packages.**  A NeXT package is the `.pkg` bundle the Installer application installs.
+(Not to be confused with the `.binpkg.tar.gz` files `pkg binpkg` writes, which only `pkg` installs.)
+With `NEXT_PACKAGES=1`, or `pkg --next-packages install NAME` for one run, a package that has a
+`nextpkg` script also gets one made.  Whether and how that is possible depends on how the package
+is built, so the package says: `nextpkg` is run right after `build`, in the same build tree and with
+the same environment and shell:
+
+```text
+nextpkg <image-dir> <version> <output-dir>
+```
+
+The arguments are also in the environment as `DESTDIR`, `PKG_VERSION` and `PKG_NEXTPKG_DIR`;
+`<output-dir>` is `NEXT_PACKAGES_DIR`, `/usr/local/var/pkg/NeXTpackages` unless it is set.  The
+script puts its package in that directory and lists what it made, one name per line, in the file named
+by `PKG_NEXTPKG_LIST` (if it does not, any entry that was not in the directory before counts).
+`pkg` notes the packages in the package's database entry, `nextpackages`.  A script that fails is a
+warning, not an error: the package is installed anyway.  Packages without a `nextpkg` script are
+unaffected, and so is a package installed from a reused staged image (`--preserve-install-tree`)
+or a binary package, since the build tree is needed; reinstall to make the NeXT package.  The
+NeXT packages are not removed when the package is: they exist to be installed elsewhere.
 
 ## Stripping
 
