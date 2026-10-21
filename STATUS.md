@@ -69,7 +69,6 @@ SPARC `test world` of 2026-10-14 covers every row.
 | expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
 | findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | — |
-| fish | — (new 2026-10-24: 1.23.1, the last all-C release; a small wide-character library (single-byte text only) and POSIX shims for signals, termios, waitpid, setsid, nanosleep and realpath; the shim functions and the test are checked on Linux only) | — | — |
 | flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | freetype | validated | validated 2.14.3 (2026-10-09) | — |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | — |
@@ -178,3 +177,18 @@ SPARC `test world` of 2026-10-14 covers every row.
   replacements: the SPARC libc compares bytes as signed, which corrupted pack
   indexes.  Packages that rely on byte-order comparisons use `pkg_cmp_shim`
   (see `README.md`); their SPARC rebuilds are still pending.
+
+## Removed packages
+
+**fish 1.23.1** (October 2026): tried and dropped.  It is the last all-C release, but this
+libc has no wide-character functions or `<wchar.h>`, no POSIX signals, termios or
+`regex.h`, and `fnmatch`, `mmap`/`munmap` and `wait4(-1, ...)` are missing or broken, so
+the build needed a small wide-character library and about a dozen shims.  It built and
+ran simple commands from `fish -c`, but its universal-variable server (`fishd`) never
+stayed up, interactive use was never tried, and getting there cost two machine
+resets: fish's fallback `getopt_long()` ignored long options, so `fish --version` started
+an interactive shell, and a connection failing to `fishd` respawned it without end.  The NeXTcommunity users
+did not want it, so it was removed.  The last commit that still has the package is
+`2b25054` on `claude/happy-volta-ng35dy` (`git show 2b25054:fish/build`); the findings that
+apply elsewhere are already in the other packages' shims (`wait3()` for "any child",
+`EAGAIN`/`EWOULDBLOCK`, `sys/wait.h` for an int status).  `ulimit -u` does nothing on OPENSTEP.
