@@ -1,3 +1,14 @@
+--- a/WINGs/wwindow.c	2001-04-20 00:07:26.000000000 +0000
++++ b/WINGs/wwindow.c	2026-10-21 00:34:15.532589218 +0000
+@@ -608,7 +608,7 @@
+     int result;
+ 
+     if ((win->miniTitle && !title) || (!win->miniTitle && title)
+-	|| (title && win->miniTitle && strcoll(title, win->miniTitle)!=0)) {
++	|| (title && win->miniTitle && strcmp(title, win->miniTitle)!=0)) {
+ 	if (win->miniTitle)
+ 	    wfree(win->miniTitle);
+ 	
 --- a/wrlib/png.c	2001-04-20 16:36:13.000000000 +0000
 +++ b/wrlib/png.c	2026-10-21 00:04:40.124209848 +0000
 @@ -97,7 +97,7 @@
