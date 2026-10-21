@@ -42,8 +42,12 @@ compat=`pwd`/openstep-slashem.h
 /bin/sed \
     -e 's|"/usr/bin/compress"|"/usr/local/bin/gzip"|' \
     -e 's|"\.Z"|".gz"|' \
+    -e 's|^#define USE_REGEX_MATCH|/* #define USE_REGEX_MATCH */|' \
     include/config.h > include/config.h.new
 /bin/mv include/config.h.new include/config.h
+# Menu colors match with POSIX regular expressions by default and there is no
+# <regex.h> here; plain string matching is used instead.
+/bin/grep '^/\* #define USE_REGEX_MATCH \*/' include/config.h > /dev/null
 # The old Bourne /bin/sh treats an unquoted ^ as a pipe (see the nethack package).
 for mk in sys/unix/Makefile.dat sys/unix/Makefile.src sys/unix/Makefile.top sys/unix/Makefile.utl; do
     /bin/sed -e "s/grep ^#define/grep '^#define'/" -e "s/grep -v ^#define/grep -v '^#define'/" $mk > $mk.new
