@@ -154,3 +154,24 @@
  
  /*
  ** By default, Lua on Windows use (some) specific Windows features
+--- a/src/lvm.c
++++ b/src/lvm.c
+@@ -378,13 +378,17 @@
+ ** of the strings. Note that segments can compare equal but still
+ ** have different lengths.
+ */
++#if !defined(l_strcoll)
++#define l_strcoll	strcoll
++#endif
++
+ static int l_strcmp (const TString *ts1, const TString *ts2) {
+   const char *s1 = getstr(ts1);
+   size_t rl1 = tsslen(ts1);  /* real length */
+   const char *s2 = getstr(ts2);
+   size_t rl2 = tsslen(ts2);
+   for (;;) {  /* for each segment */
+-    int temp = strcoll(s1, s2);
++    int temp = l_strcoll(s1, s2);
+     if (temp != 0)  /* not equal? */
+       return temp;  /* done */
+     else {  /* strings are equal up to a '\0' */
