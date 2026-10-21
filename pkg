@@ -155,6 +155,19 @@ load_config() {
     STRIP_PROGRAM=${STRIP_PROGRAM-/bin/strip}
     STRIP_FLAGS=${STRIP_FLAGS--x}
 
+    # LINK_APPS: 1 to symlink every .app bundle a package installs in
+    # /usr/local/Apps from APPS_LINK_DIR, the directory the Workspace Manager
+    # lists as the local applications (/LocalApps).  The links are recorded with
+    # the package, so remove deletes them and verify checks them.
+    LINK_APPS=${LINK_APPS-0}
+    APPS_LINK_DIR=${APPS_LINK_DIR-/LocalApps}
+
+    # NEXT_PACKAGES: 1 to also make a NeXT package (.pkg) of a package that knows
+    # how (it has a "nextpkg" script), and put it in NEXT_PACKAGES_DIR
+    # (default /usr/local/var/pkg/NeXTpackages).
+    NEXT_PACKAGES=${NEXT_PACKAGES-0}
+    NEXT_PACKAGES_DIR=${NEXT_PACKAGES_DIR-}
+
     if [ -f "$conf_file" ]; then
         . "$conf_file"
     fi
@@ -183,12 +196,42 @@ load_config() {
         ;;
     esac
 
+    case $LINK_APPS in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: LINK_APPS must be 0 or 1, not '$LINK_APPS'"
+        ;;
+    esac
+
+    case $APPS_LINK_DIR in
+        /?*)
+        ;;
+        *)
+            die "$conf_file: APPS_LINK_DIR must be an absolute directory such as /LocalApps, not '$APPS_LINK_DIR'"
+        ;;
+    esac
+
+    case $NEXT_PACKAGES in
+        0|1)
+        ;;
+        *)
+            die "$conf_file: NEXT_PACKAGES must be 0 or 1, not '$NEXT_PACKAGES'"
+        ;;
+    esac
+
+    # --next-packages (or PKG_NEXT_PACKAGES=1) turns it on for one run.
+    if [ "x$PKG_NEXT_PACKAGES" = x1 ]; then
+        NEXT_PACKAGES=1
+    fi
+
     # --strip (or PKG_STRIP=1) turns it on for one run.
     if [ "x$PKG_STRIP" = x1 ]; then
         STRIP_BINARIES=1
     fi
 
     export PKG_CONF_FILE HAVE_X11 X11_PREFIX WITH_PYTHON STRIP_BINARIES STRIP_PROGRAM STRIP_FLAGS
+    export LINK_APPS APPS_LINK_DIR NEXT_PACKAGES NEXT_PACKAGES_DIR
 }
 
 # A package's optional `requires` file names the pkg.conf options it needs:
@@ -388,6 +431,8 @@ options (before the action; each also works as an environment variable set to 1)
   --strip                  strip the executables of every package this run
                            installs or writes as a binary package, like
                            STRIP_BINARIES=1 in the configuration (PKG_STRIP)
+  --next-packages          make NeXT packages for the packages that can, like
+                           NEXT_PACKAGES=1 in the configuration (PKG_NEXT_PACKAGES)
   --download-only          with install, reinstall, binpkg or build: fetch the
                            sources of the package and of the dependencies that
                            would be built (those not installed) into the cache
@@ -486,6 +531,23 @@ configuration:
                (where CubXWindow installs)
     WITH_PYTHON 1 (default) builds optional Python support (git-p4 in git) and
                depends on python311; 0 leaves it out
+    LINK_APPS  1 links each .app bundle a package installs in /usr/local/Apps from
+               APPS_LINK_DIR; default 0 (see "applications")
+    APPS_LINK_DIR directory for those links; default /LocalApps
+    NEXT_PACKAGES 1 also makes a NeXT package (.pkg) of packages that can; default 0
+    NEXT_PACKAGES_DIR where they go; default /usr/local/var/pkg/NeXTpackages
+
+applications (NeXT .app bundles):
+  A package puts a bundle in /usr/local/Apps.  With LINK_APPS=1, installing it
+  also makes /LocalApps/<name>.app, a symbolic link to /usr/local/Apps/<name>.app,
+  for every bundle at the top of that directory.  The links belong to the package:
+  they are in its file list, so pkg verify checks them and pkg remove deletes them.
+  A name that is already taken (by a file, a directory or a link elsewhere) is
+  left alone, with a warning.
+  With NEXT_PACKAGES=1 (or --next-packages), a package that has a "nextpkg"
+  script also gets a NeXT package made right after its build; see the README.
+  The packages are kept in NEXT_PACKAGES_DIR, listed in the package's database
+  entry (nextpackages), and left there when the package is removed.
 
 architecture:
   pkg detects the machine with arch(1) (override with PKG_ARCH=i386|sparc|m68k|hppa)
@@ -501,6 +563,7 @@ package layout:
   build         required build script
   version       required, contains version
   arch          optional, the architectures the package builds for (i386 sparc ...); without it, all
+  nextpkg       optional script that makes a NeXT package (see "applications")
   depends       optional, one package name per line (?OPTION:name = only when OPTION is 1;
                 a trailing "build" marks a build-time-only dependency, which installpkg
                 does not require; "runtime", the default, is needed to build and to run)
@@ -1212,6 +1275,8 @@ run_build() {
         log "keeping the build tree $BUILD_ROOT (the next build of $PKG_NAME replaces it, unless PKG_RESUME is set)"
         exit $build_rc
     }
+
+    make_next_packages
 
     release_build_lock
     clean_work_cache
@@ -2611,6 +2676,7 @@ install_pkg() {
         discard_image_cache
     fi
 
+    NEXTPKG_NEW=
     build_or_reuse_image
 
     HOOK_DIR=$PKG_DIR
@@ -2649,8 +2715,136 @@ build_or_reuse_image() {
         log "built $PKG_NAME $PKG_VERSION"
     else
         log "using existing staged image $IMAGE_DIR"
+        if [ "$NEXT_PACKAGES" = 1 ] && [ -f "$PKG_DIR/nextpkg" ]; then
+            log "note: no NeXT package is made from a reused staged image (the build tree is gone); reinstall $PKG_NAME to make one"
+        fi
         log "built $PKG_NAME $PKG_VERSION (existing staged image)"
     fi
+}
+
+# Native applications (NeXT .app bundles).  A package that installs a bundle puts
+# it in /usr/local/Apps.  With LINK_APPS=1 each bundle at the top of that
+# directory is also linked from APPS_LINK_DIR (/LocalApps by default).  The link
+# points at /usr/local/Apps/<name>.app as seen from the installed system; it is
+# added to the package's manifest, so remove, verify and the file list treat it
+# like any other file of the package.  Nothing already there is replaced: an
+# existing file, directory or other link of that name is left alone with a warning.
+link_apps() {
+    [ "$LINK_APPS" = 1 ] || return 0
+    la_apps=`sed -n 's#^\(/usr/local/Apps/[^/][^/]*\.app\)$#\1#p' "$INST_DIR/manifest"`
+    [ -n "$la_apps" ] || return 0
+
+    la_dir=`trim_slash "$APPS_LINK_DIR"`
+    la_root=`root_join "$la_dir"`
+    if [ ! -d "$la_root" ]; then
+        if ensure_dir "$la_root"; then
+            log "created $la_root"
+        else
+            log "warning: could not create $la_root; the .app bundles of $PKG_NAME are not linked"
+            return 0
+        fi
+    fi
+
+    la_new=
+    for la_app in $la_apps; do
+        la_name=`echo "$la_app" | sed 's#.*/##'`
+        la_link=$la_root/$la_name
+        la_target=/usr/local/Apps/$la_name
+        if [ -h "$la_link" ]; then
+            la_now=`ls -ld "$la_link" | sed 's/.* -> //'`
+            if [ "$la_now" = "$la_target" ]; then
+                la_new="$la_new $la_dir/$la_name"
+                continue
+            fi
+            log "warning: $la_link is a link to $la_now; leaving it alone"
+        elif [ -f "$la_link" ] || [ -d "$la_link" ]; then
+            log "warning: $la_link exists; leaving it alone"
+        elif ln -s "$la_target" "$la_link"; then
+            log "linked $la_dir/$la_name -> $la_target"
+            la_new="$la_new $la_dir/$la_name"
+        else
+            log "warning: could not link $la_link"
+        fi
+    done
+
+    if [ -n "$la_new" ]; then
+        {
+            cat "$INST_DIR/manifest"
+            for la_path in $la_new; do
+                echo "$la_path"
+            done
+        } | sort > "$INST_DIR/manifest.new"
+        mv "$INST_DIR/manifest.new" "$INST_DIR/manifest"
+    fi
+}
+
+# NeXT packages.  With NEXT_PACKAGES=1 (or --next-packages), a package that has a
+# "nextpkg" script gets a NeXT package made right after its build (by run_build,
+# so also by "pkg build"), while the build tree is still there.  The script is run like "build", in the build tree, with the staged
+# image, the version and the output directory as its arguments:
+#     nextpkg <image-dir> <version> <output-dir>
+# (also in the environment as DESTDIR, PKG_VERSION and PKG_NEXTPKG_DIR), and leaves
+# the package (a NAME.pkg) in the output directory, NEXT_PACKAGES_DIR, which is
+# /usr/local/var/pkg/NeXTpackages unless set.  It names what it made, one per line,
+# in the file $PKG_NEXTPKG_LIST (without it, whatever is new in the directory counts).
+# The packages are listed in the package's database entry (nextpackages).  They are kept when the package is
+# removed: they are for installing elsewhere.  A script that fails only produces a
+# warning; the install carries on.
+make_next_packages() {
+    NEXTPKG_NEW=
+    [ "$NEXT_PACKAGES" = 1 ] || return 0
+    [ -f "$PKG_DIR/nextpkg" ] || return 0
+    np_dir=`default_value "$NEXT_PACKAGES_DIR" "$LOCAL_ROOT/var/pkg/NeXTpackages"`
+    if ensure_dir "$np_dir"; then
+        :
+    else
+        log "warning: could not create $np_dir; no NeXT package is made for $PKG_NAME"
+        return 0
+    fi
+    np_shell=`build_shell_path "$PKG_NAME"`
+    np_list=${TMPDIR:-/tmp}/pkg-nextpkg-list-$$
+    np_before=${TMPDIR:-/tmp}/pkg-nextpkg-before-$$
+    : > "$np_list"
+    ls -1 "$np_dir" 2>/dev/null | sort > "$np_before"
+
+    log "making the NeXT package of $PKG_NAME in $np_dir"
+    if (
+        cd "$BUILD_CWD" || exit 1
+        DESTDIR=$IMAGE_DIR \
+        PKG_VERSION=$PKG_VERSION \
+        PKG_NEXTPKG_DIR=$np_dir \
+        PKG_NEXTPKG_LIST=$np_list \
+        PKG_BUILD_HELPERS=$PKG_DIR/../build-helpers.sh \
+        "$np_shell" "$PKG_DIR/nextpkg" "$IMAGE_DIR" "$PKG_VERSION" "$np_dir"
+    ); then
+        # The script names what it made in $PKG_NEXTPKG_LIST; failing that, any
+        # entry that was not in the directory before is taken to be its work.
+        np_names=`sed 's#.*/##' "$np_list" | sort`
+        if [ -z "$np_names" ]; then
+            np_names=`ls -1 "$np_dir" 2>/dev/null | sort | comm -13 "$np_before" -`
+        fi
+        for np_base in $np_names; do
+            if [ -f "$np_dir/$np_base" ] || [ -d "$np_dir/$np_base" ]; then
+                NEXTPKG_NEW="$NEXTPKG_NEW $np_base"
+                log "made the NeXT package $np_dir/$np_base"
+            fi
+        done
+        if [ -z "$NEXTPKG_NEW" ]; then
+            log "warning: the nextpkg script of $PKG_NAME ran but left no package in $np_dir"
+        fi
+    else
+        log "warning: the nextpkg script of $PKG_NAME failed; no NeXT package was made"
+    fi
+    rm -f "$np_list" "$np_before"
+}
+
+# Record the NeXT packages made for PKG_NAME in its database entry.
+record_next_packages() {
+    rm -f "$INST_DIR/nextpackages"
+    [ -n "$NEXTPKG_NEW" ] || return 0
+    for rn_pkg in $NEXTPKG_NEW; do
+        echo "$rn_pkg"
+    done > "$INST_DIR/nextpackages"
 }
 
 # Install the staged image of PKG_NAME into ROOT_DIR, replacing any installed
@@ -2674,6 +2868,8 @@ commit_install() {
     install_preflight
     copy_tree "$IMAGE_DIR" "$ROOT_DIR"
     write_manifest
+    link_apps
+    record_next_packages
     log "recorded package database in $INST_DIR"
 
     if [ -f "$INST_DIR/post-install" ]; then
@@ -3114,9 +3310,11 @@ PKG_PRESERVE_BUILD_TREE=${PKG_PRESERVE_BUILD_TREE-0}
 PKG_PRESERVE_INSTALL_TREE=${PKG_PRESERVE_INSTALL_TREE-0}
 PKG_NO_DEPS=${PKG_NO_DEPS-0}
 PKG_STRIP=${PKG_STRIP-0}
+PKG_NEXT_PACKAGES=${PKG_NEXT_PACKAGES-0}
 PKG_STRIP_ONE=0
 STRIP_INSTALL=0
 STRIP_THIS=0
+NEXTPKG_NEW=
 PKG_DOWNLOAD_ONLY=${PKG_DOWNLOAD_ONLY-0}
 PKG_DOWNLOAD_RETRIES=${PKG_DOWNLOAD_RETRIES-3}
 while [ $# -gt 0 ]; do
@@ -3139,6 +3337,10 @@ while [ $# -gt 0 ]; do
         ;;
         --strip)
             PKG_STRIP=1
+            shift
+        ;;
+        --next-packages)
+            PKG_NEXT_PACKAGES=1
             shift
         ;;
         --download-only)
@@ -3167,7 +3369,7 @@ while [ $# -gt 0 ]; do
         ;;
     esac
 done
-export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE PKG_NO_DEPS PKG_STRIP PKG_DOWNLOAD_ONLY PKG_DOWNLOAD_RETRIES
+export PKG_PRESERVE_DOWNLOAD PKG_PRESERVE_BUILD_TREE PKG_PRESERVE_INSTALL_TREE PKG_NO_DEPS PKG_STRIP PKG_NEXT_PACKAGES PKG_DOWNLOAD_ONLY PKG_DOWNLOAD_RETRIES
 
 # "pkg <action> --help" (or -h) prints the usage too, rather than being taken
 # for a package name.
@@ -3227,6 +3429,10 @@ case $ACTION in
         echo "STRIP_BINARIES=$STRIP_BINARIES"
         echo "STRIP_PROGRAM=$STRIP_PROGRAM"
         echo "STRIP_FLAGS=$STRIP_FLAGS"
+        echo "LINK_APPS=$LINK_APPS"
+        echo "APPS_LINK_DIR=$APPS_LINK_DIR"
+        echo "NEXT_PACKAGES=$NEXT_PACKAGES"
+        echo "NEXT_PACKAGES_DIR=$NEXT_PACKAGES_DIR"
     ;;
 
     download)
