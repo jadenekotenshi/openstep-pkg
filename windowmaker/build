@@ -124,6 +124,23 @@ typedef unsigned short gid_t;
 #ifndef S_ISLNK
 # define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
+#ifndef S_ISFIFO
+# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#endif
+#ifndef S_ISSOCK
+# define S_ISSOCK(m) (((m) & S_IFMT) == S_IFSOCK)
+#endif
+#ifndef S_ISCHR
+# define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+#endif
+#ifndef S_ISBLK
+# define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
+#endif
+/* <sys/wait.h> here describes the status as a "union wait" and has no
+   WEXITSTATUS; the sources use an int status. */
+#ifndef WEXITSTATUS
+# define WEXITSTATUS(s) ((int) (((s) >> 8) & 0xff))
+#endif
 #ifndef R_OK
 # define F_OK 0
 # define X_OK 1
