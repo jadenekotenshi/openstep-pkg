@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+HACKDIR=$LOCAL_ROOT/lib/nethack5dir
+export HACKDIR
+
+test -x "$HACKDIR/nethack5"
+test -f "$HACKDIR/data"
+test -f "$HACKDIR/sysconf"
+test -f "$HACKDIR/Arc-strt.lua"
+test -x "$LOCAL_ROOT/bin/nethack5"
+cd "$HACKDIR"
+./nethack5 --version | /usr/local/bin/grep 'NetHack Version 5.0.0' > /dev/null
+echo "nethack5 ok"
