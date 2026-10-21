@@ -101,11 +101,41 @@ typedef unsigned short gid_t;
 #endif
 SEOF
 compat=`pwd`/openstep/gnupg-compat.h
+# The BSD <sys/wait.h> defines WIFEXITED() and friends for "union wait", not the int
+# status that waitpid() and POSIX programs use; redefine them for an int.
+/usr/local/bin/mkdir -p openstep/sys
+/bin/cat > openstep/sys/wait.h <<'SEOF'
+#ifndef OPENSTEP_SYS_WAIT_H
+#define OPENSTEP_SYS_WAIT_H
+#include_next <sys/wait.h>
+#undef WIFEXITED
+#undef WEXITSTATUS
+#undef WIFSIGNALED
+#undef WTERMSIG
+#undef WIFSTOPPED
+#undef WSTOPSIG
+#undef WCOREDUMP
+#define WIFEXITED(s) ((((int) (s)) & 0xff) == 0)
+#define WEXITSTATUS(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSTOPPED(s) ((((int) (s)) & 0xff) == 0x7f)
+#define WSTOPSIG(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSIGNALED(s) ((((int) (s)) & 0xff) != 0 && (((int) (s)) & 0xff) != 0x7f)
+#define WTERMSIG(s) (((int) (s)) & 0x7f)
+#define WCOREDUMP(s) (((int) (s)) & 0x80)
+#ifndef WNOHANG
+# define WNOHANG 1
+#endif
+#ifndef WUNTRACED
+# define WUNTRACED 2
+#endif
+#endif
+SEOF
+
 # The compat header is forced in only for the compile, not for configure: its
 # function checks declare each function themselves, which clashes with the
 # prototypes in the header's includes and makes the checks wrongly fail.
 CFLAGS="-O2 -I/usr/local/include $OSTEP_DEFS"
-MAKE_CFLAGS="$CFLAGS -include $compat"
+MAKE_CFLAGS="$CFLAGS -I`pwd`/openstep -include $compat"
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
