@@ -6,7 +6,7 @@ LR=${LOCAL_ROOT-/usr/local}
 work=${TMPDIR-/tmp}/darkhttpd-pkg-test-$$
 mkdir "$work"
 pid=
-trap '[ -z "$pid" ] || kill $pid 2>/dev/null; rm -rf "$work"' 0
+trap '[ -z "$pid" ] || kill $pid 2>/dev/null || :; rm -rf "$work"' 0
 trap 'exit 1' 1 2 3 15
 
 "$LR/bin/darkhttpd" --help > "$work/help" 2>&1 || :
@@ -55,3 +55,10 @@ done
 grep '^HTTP/1.1 200' "$work/reply" > /dev/null
 grep 'hello from darkhttpd' "$work/reply" > /dev/null
 echo "darkhttpd serves files (HTTP/1.1 200)"
+
+# The server must still be running and answer a second request (it once died after
+# the first one if the log line could not be written), and a missing file is a 404.
+kill -0 $pid
+"$work/get" $port > "$work/reply2" 2>/dev/null
+grep '^HTTP/1.1 200' "$work/reply2" > /dev/null
+echo "darkhttpd still serving after the first request"
