@@ -159,10 +159,18 @@ SEOF
     -e 's|^#define TERMINFO |#undef TERMINFO |' \
     -e 's|^#define POSIX_JOB_CONTROL |#undef POSIX_JOB_CONTROL |' \
     -e 's|^#define POSIX_TYPES |#undef POSIX_TYPES |' \
+    -e 's|^#define memcpy(d, s, n) bcopy(s, d, n)|/* memcpy is a real function here */|' \
+    -e 's|^#define memcmp(s1, s2, n) bcmp(s2, s1, n)|/* memcmp is a real function here */|' \
     include/unixconf.h > include/unixconf.h.new
 /bin/mv include/unixconf.h.new include/unixconf.h
 /bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+# (The BSD settings rename memcpy and memcmp to bcopy and bcmp, which return void or
+# take their arguments the other way round; the code uses the return values.)
+if /bin/grep '^#define memcpy' include/unixconf.h > /dev/null; then
+    echo "nethack5: unixconf.h still defines memcpy as a macro" >&2
+    exit 1
+fi
 
 # The hints file for this system.  The game goes in /usr/local/lib/nethack5dir with
 # a launcher in /usr/local/bin/nethack5, so it can sit beside the 3.6.7 package.
