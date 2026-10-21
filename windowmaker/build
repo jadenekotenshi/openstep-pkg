@@ -405,7 +405,12 @@ export CFLAGS
 # configure's atexit() test fails here, and WINGs then calls on_exit(), which this
 # libc lacks.  atexit() exists.
 ac_cv_func_atexit=yes
-export ac_cv_func_atexit
+# The same for strcasecmp() and strncasecmp(): configure's test fails with the
+# forced headers, and WINGs then defines its own strcasecmp, which the linker
+# refuses next to the one in the System framework ("multiple definitions").
+ac_cv_func_strcasecmp=yes
+ac_cv_func_strncasecmp=yes
+export ac_cv_func_atexit ac_cv_func_strcasecmp ac_cv_func_strncasecmp
 run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
     --disable-shared --enable-static \
     --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
