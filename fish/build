@@ -1391,6 +1391,36 @@ if [ "$PKG_ARCH" = i386 ]; then
     /usr/local/bin/grep 'UCS-4LE' env_universal_common.c > /dev/null
 fi
 
+# Safety net while fish is being brought up here: a runaway of forked fish processes
+# once wedged the machine (and "ulimit -u" does nothing).  exec_fork() now refuses
+# to fork from a process more than 3 forks deep, or more than 30 times from a
+# forked child, and says so.  Real use needs neither: the shell itself may fork as
+# often as it likes, but its children exec or exit.
+/bin/cat > fork-limit.sed <<'DEOF'
+/^static pid_t exec_fork()/,/^}/{
+s/^	pid_t pid;$/	pid_t pid;\
+	static int ostep_fork_depth = 0;\
+	static int ostep_fork_count = 0;/
+s/^	int i;$/	int i;\
+\
+	if( ostep_fork_depth > 3 || ( ostep_fork_depth > 0 \&\& ostep_fork_count >= 30 ) )\
+	{\
+		fprintf( stderr, "fish: fork limit reached (depth %d, count %d), pid %d; not forking\\n", ostep_fork_depth, ostep_fork_count, (int) getpid() );\
+		_exit( 1 );\
+	}\
+	ostep_fork_count++;/
+s/^		if( pid >= 0)$/		if( pid == 0 )\
+		{\
+			ostep_fork_depth++;\
+			ostep_fork_count = 0;\
+		}\
+		if( pid >= 0)/
+}
+DEOF
+/usr/local/bin/sed -f fork-limit.sed exec.c > exec.c.new
+/bin/mv exec.c.new exec.c
+/usr/local/bin/grep -c 'ostep_fork_depth' exec.c > /dev/null
+
 # fishd.c #defines FILE to a file-name prefix, which fights with stdio's FILE here.
 /usr/local/bin/sed -e 's/^#define FILE "fishd\."/#define FISHD_FILE "fishd."/' \
     -e 's/strlen(FILE)/strlen(FISHD_FILE)/' -e 's/strcat( name, FILE )/strcat( name, FISHD_FILE )/' \
