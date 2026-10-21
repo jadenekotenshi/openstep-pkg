@@ -28,6 +28,9 @@ if test -d "dash-$VERSION"; then cd "dash-$VERSION"; fi
 # or strtoll().  Private headers and a small library supply them; every function is
 # renamed by a macro, so it cannot clash with a libc that has it.
 /usr/local/bin/mkdir -p openstep
+# histedit.c includes <getopt.h> though its body is compiled out (SMALL); an empty
+# header does.
+echo '/* empty: not needed here */' > openstep/getopt.h
 # <dirent.h> is the BSD <sys/dir.h> here (struct direct, no POSIX names).
 /bin/cat > openstep/dirent.h <<'SEOF'
 #ifndef OPENSTEP_DIRENT_H
