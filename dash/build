@@ -165,12 +165,14 @@ extern int ostep_setpgid(int, int);
 extern int ostep_tcgetpgrp(int);
 extern int ostep_tcsetpgrp(int, int);
 extern char *ostep_getcwd(char *, int);
+extern char *ostep_strsignal(int);
 extern long long ostep_strtoll(const char *, char **, int);
 #define waitpid ostep_waitpid
 #define setpgid ostep_setpgid
 #define tcgetpgrp ostep_tcgetpgrp
 #define tcsetpgrp ostep_tcsetpgrp
 #define getcwd ostep_getcwd
+#define strsignal ostep_strsignal
 #define strtoll ostep_strtoll
 #endif
 SEOF
@@ -352,6 +354,7 @@ $CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
 # The other missing functions, under renamed symbols.
 /bin/cat > openstep_misc.c <<'MEOF'
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -501,6 +504,30 @@ ostep_strtoumax(const char *s, char **end, int base)
     }
     return neg ? 0 - v : v;
 }
+
+/* strsignal(): the libc has no sys_siglist that headers declare; BSD signal numbers. */
+char *
+ostep_strsignal(int sig)
+{
+    static char buf[32];
+    static const char *names[] = {
+	0, "Hangup", "Interrupt", "Quit", "Illegal instruction",
+	"Trace/BPT trap", "Abort trap", "EMT trap", "Floating point exception",
+	"Killed", "Bus error", "Segmentation fault", "Bad system call",
+	"Broken pipe", "Alarm clock", "Terminated", "Urgent I/O condition",
+	"Suspended (signal)", "Suspended", "Continued", "Child exited",
+	"Stopped (tty input)", "Stopped (tty output)", "I/O possible",
+	"Cputime limit exceeded", "Filesize limit exceeded",
+	"Virtual timer expired", "Profiling timer expired",
+	"Window size changes", "Information request",
+	"User defined signal 1", "User defined signal 2"
+    };
+
+    if (sig > 0 && sig < (int) (sizeof(names) / sizeof(names[0])))
+	return (char *) names[sig];
+    sprintf(buf, "Unknown signal %d", sig);
+    return buf;
+}
 MEOF
 $CC $CFLAGS -c openstep_misc.c -o openstep_misc.o
 /bin/rm -f libopenstepdash.a
@@ -516,7 +543,8 @@ ac_cv_func_strtod=yes
 ac_cv_func_sigsetmask=yes
 ac_cv_func_strtoimax=yes
 ac_cv_func_strtoumax=yes
-export ac_cv_func_bsearch ac_cv_func_strtod ac_cv_func_sigsetmask ac_cv_func_strtoimax ac_cv_func_strtoumax
+ac_cv_func_strsignal=yes
+export ac_cv_func_strsignal ac_cv_func_bsearch ac_cv_func_strtod ac_cv_func_sigsetmask ac_cv_func_strtoimax ac_cv_func_strtoumax
 CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/dash-compat.h -include `pwd`/openstep-sig.h"
 export CFLAGS
 
