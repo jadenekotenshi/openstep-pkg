@@ -170,6 +170,12 @@ CFLAGS="-O2 -I/usr/local/include $OSTEP_DEFS"
 MAKE_CFLAGS="$CFLAGS -I`pwd`/openstep -include $compat"
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
+# This libc has mmap() but no munmap(); without mmap gpg takes its secure-memory
+# pool from malloc() (and warns about insecure memory at start-up unless the
+# no-secmem-warning option is set).
+ac_cv_func_mmap=no
+ac_cv_func_munmap=no
+export ac_cv_func_mmap ac_cv_func_munmap
 export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
 . "$PKG_BUILD_HELPERS"
 
