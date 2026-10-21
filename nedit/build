@@ -221,6 +221,42 @@ compat=`pwd`/ostep-inc
 # The BSD <sys/wait.h> defines WIFEXITED() and friends for "union wait", not the int
 # status that waitpid() and POSIX programs use; redefine them for an int.
 /usr/local/bin/mkdir -p ostep-inc/sys
+# More headers NEdit includes that this system lacks: <sys/select.h> (select() is
+# declared in <sys/types.h> here), <inttypes.h> (only for intptr_t) and
+# <sys/utsname.h> (nc and the server use uname() for the host name).
+echo '/* empty: select() and fd_set come with <sys/types.h> here */' > ostep-inc/sys/select.h
+/bin/cat > ostep-inc/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <sys/types.h>
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#endif
+SEOF
+/bin/cat > ostep-inc/sys/utsname.h <<'SEOF'
+#ifndef OPENSTEP_UTSNAME_H
+#define OPENSTEP_UTSNAME_H
+#include <string.h>
+struct utsname {
+    char sysname[64];
+    char nodename[256];
+    char release[64];
+    char version[64];
+    char machine[64];
+};
+extern int gethostname();
+static int
+ostep_uname(struct utsname *u)
+{
+    memset(u, 0, sizeof(*u));
+    strcpy(u->sysname, "OPENSTEP");
+    if (gethostname(u->nodename, sizeof(u->nodename) - 1) < 0)
+        strcpy(u->nodename, "unknown");
+    return 0;
+}
+#define uname ostep_uname
+#endif
+SEOF
 /bin/cat > ostep-inc/sys/wait.h <<'SEOF'
 #ifndef OPENSTEP_SYS_WAIT_H
 #define OPENSTEP_SYS_WAIT_H
@@ -277,7 +313,7 @@ ar_wrapper=`pwd`/ostep-ar
 /bin/cat > makefiles/Makefile.openstep <<MEOF
 CC=$CC
 AR=$ar_wrapper
-CFLAGS=-O2 -I$compat -I$x11_prefix/include -I$motif_inc -DUSE_DIRENT -DUSE_LPR_PRINT_CMD -DEDITRES $OSTEP_DEFS $inc
+CFLAGS=-O2 -I$compat -I$x11_prefix/include -I$motif_inc -DUSE_DIRENT -DDONT_HAVE_GLOB -DUSE_LPR_PRINT_CMD -DEDITRES $OSTEP_DEFS $inc
 ARFLAGS=cr
 BIGGER_STRINGS=
 LIBS=$libs
