@@ -135,6 +135,21 @@ typedef unsigned short gid_t;
 #ifndef S_ISLNK
 # define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
+#if defined(__sparc__) && !defined(__sparc_v8__)
+/* longlong.h calls __udiv_qrnnd() on SPARC unless it knows the CPU has a udiv
+   instruction, and ships it only as assembly, which this build does not use.  Here
+   it is in C, as a static function in every file (longlong.h's later "extern"
+   declaration of it keeps the internal linkage).  The divisor is above the high
+   word of the numerator, so the quotient fits in 32 bits. */
+static unsigned int
+__udiv_qrnnd(unsigned int *rp, unsigned int n1, unsigned int n0, unsigned int d)
+{
+    unsigned long long n = ((unsigned long long) n1 << 32) | n0;
+
+    *rp = (unsigned int) (n % d);
+    return (unsigned int) (n / d);
+}
+#endif
 extern char **environ;
 /* getopt() is in the libc but no header declares it or its variables. */
 extern char *optarg;
