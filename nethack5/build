@@ -182,6 +182,9 @@ CFLAGS=-O2 -I../include -I$inc -DNeXT -include $inc/nethack5-compat.h
 # gcc 4.2 does not allow #pragma GCC diagnostic inside a function, which the
 # warning-suppression macros use; this makes them no-ops.
 CFLAGS+=-DDISABLE_WARNING_PRAGMAS
+# There is no <term.h> or curses here, only the termcap functions (-ltermcap):
+# wintty.h declares them itself with this.
+CFLAGS+=-DNO_TERMCAP_HEADERS
 CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
 CFLAGS+=-DHACKDIR=\\"\$(HACKDIR)\\"
 SYSCFLAGS=-DNeXT -DLUA_USE_POSIX
