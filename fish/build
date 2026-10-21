@@ -75,6 +75,8 @@ for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
 done
 printf '#include <sys/types.h>\n#include <time.h>\nstruct timespec probe_ts;\nint main(void) { return 0; }\n' > type-probe.c
 $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 || OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_TIMESPEC"
+printf '#include <sys/types.h>\n#include <sys/time.h>\n#include <sys/resource.h>\nrlim_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
+$CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 || OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_RLIM_T"
 printf '#include <stddef.h>\n#include <stdlib.h>\nwint_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
 $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 && OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_HAVE_WINT_T"
 /bin/rm -f type-probe.c type-probe.o
@@ -924,6 +926,17 @@ struct timespec {
     time_t tv_sec;
     long tv_nsec;
 };
+#endif
+#include <sys/resource.h>
+#include <errno.h>
+#ifdef OSTEP_NEED_RLIM_T
+typedef long rlim_t;
+#endif
+#ifndef RLIMIT_NOFILE
+# define RLIMIT_NOFILE 8
+#endif
+#ifndef EILSEQ
+# define EILSEQ 86
 #endif
 #ifndef S_ISDIR
 # define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
