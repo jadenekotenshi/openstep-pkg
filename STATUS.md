@@ -48,7 +48,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 
 | Package | x86 | SPARC | M68k |
 |---|---|---|---|
-| afterstep | — (new 2026-10-22: AfterStep 1.8.11 (default title bar changed to NeXT-style: iconize left, close right); needs HAVE_X11 and libXpm; build and test hooks checked on Linux only) | — | — |
+| afterstep | validated 1.8.11 (2026-10-23; builds with the NeXT-style default title bar, installs, test passes, runs under CubXWindow; needs libXpm) | — | — |
 | aterm | validated 0.4.2 (2026-10-23; builds with the termios/waitpid/setsid/putenv shims, installs, test passes, runs under CubXWindow) | validated 0.4.2 (2026-10-23; builds, installs, tests and runs) | — |
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | validated (2026-10-21; built with gcc42, tests pass) |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
@@ -142,7 +142,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | vlc | 0.9.10 validated (runs as root) | validated (2026-10-10; the i386-only flags and Mach-O subtype fix are skipped, the audio test expects host byte order) | — |
 | wget | 1.25.0 validated on x86 (HTTPS via OpenSSL) | 1.25.0 validated (2026-10-10) | — |
 | wget-bootstrap | 1.19.5 validated | validated 1.19.5 (needs the localtime and unsigned-compare fixes; rebootstrap, 2026-10-08) | validated (2026-10-19; m68k-only workarounds) |
-| windowmaker | — (new 2026-10-21: Window Maker 0.80.0, the last release before Xft became mandatory; NeXT-style, Dock and Clip off by default; needs HAVE_X11 and libXpm; build and test hooks checked on Linux only) | — | — |
+| windowmaker | validated 0.80.0 (2026-10-24; builds, installs, test passes, runs under CubXWindow; Dock and Clip off by default) | — | — |
 | xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | — |
 | xz | validated | validated 5.8.4 | — |
 | zip | validated | validated 3.0 (2026-10-09) | — |
