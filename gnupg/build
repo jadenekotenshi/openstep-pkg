@@ -124,6 +124,49 @@ typedef unsigned short gid_t;
 #ifndef S_ISLNK
 # define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
 #endif
+extern char **environ;
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != NULL)
+        memcpy(p, s, n);
+    return p;
+}
+static int
+ostep_putenv(char *string)
+{
+    char *eq = strchr(string, '=');
+    size_t n, count;
+    char **e, **newenv;
+
+    if (eq == 0)
+        return -1;
+    n = eq - string;
+    count = 0;
+    for (e = environ; e != 0 && *e != 0; e++) {
+        if (strncmp(*e, string, n) == 0 && (*e)[n] == '=') {
+            *e = string;
+            return 0;
+        }
+        count++;
+    }
+    newenv = (char **) malloc((count + 2) * sizeof(char *));
+    if (newenv == 0)
+        return -1;
+    for (count = 0; environ != 0 && environ[count] != 0; count++)
+        newenv[count] = environ[count];
+    newenv[count++] = string;
+    newenv[count] = 0;
+    environ = newenv;
+    return 0;
+}
+#define strdup ostep_strdup
+#define putenv ostep_putenv
+#define fseeko(f, o, w) fseek((f), (long) (o), (w))
+#define ftello(f) ((off_t) ftell(f))
 #ifndef WEXITSTATUS
 # define WEXITSTATUS(s) ((int) (((s) >> 8) & 0xff))
 #endif
@@ -167,7 +210,7 @@ SEOF
 # function checks declare each function themselves, which clashes with the
 # prototypes in the header's includes and makes the checks wrongly fail.
 CFLAGS="-O2 -I/usr/local/include $OSTEP_DEFS"
-MAKE_CFLAGS="$CFLAGS -I`pwd`/openstep -include $compat"
+MAKE_CFLAGS="$CFLAGS -I`pwd`/openstep -include $compat -include `pwd`/snprintf-shim.h"
 CPPFLAGS=-I/usr/local/include
 LDFLAGS=-L/usr/local/lib
 # This libc has mmap() but no munmap(); without mmap gpg takes its secure-memory
