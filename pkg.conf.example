@@ -23,3 +23,19 @@ STRIP_BINARIES=0
 # that load code at run time (python, emacs) need.
 #STRIP_PROGRAM=/bin/strip
 #STRIP_FLAGS=-x
+
+# 1 symlinks every .app bundle a package installs in /usr/local/Apps from
+# APPS_LINK_DIR, so that the Workspace Manager lists it with the local
+# applications.  The links are part of the package: "pkg remove" deletes them.
+LINK_APPS=0
+
+# The directory the links go in.
+#APPS_LINK_DIR=/LocalApps
+
+# 1 also makes a NeXT package (.pkg) of every package that knows how (it has a
+# "nextpkg" script) when it is built.  The packages go in NEXT_PACKAGES_DIR and are
+# kept when the package is removed.  "pkg --next-packages install NAME" does it once.
+NEXT_PACKAGES=0
+
+# Where the NeXT packages are put.
+#NEXT_PACKAGES_DIR=/usr/local/var/pkg/NeXTpackages
