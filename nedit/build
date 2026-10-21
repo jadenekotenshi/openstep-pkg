@@ -349,7 +349,7 @@ ar_wrapper=`pwd`/ostep-ar
 /bin/cat > makefiles/Makefile.openstep <<MEOF
 CC=$CC
 AR=$ar_wrapper
-CFLAGS=-O2 -I$compat -I$x11_prefix/include -I$motif_inc -DUSE_DIRENT -DDONT_HAVE_GLOB -DUSE_LPR_PRINT_CMD -DEDITRES $OSTEP_DEFS $inc
+CFLAGS=-O2 -I$compat -I$x11_prefix/include -I$motif_inc -DUSE_DIRENT -DDONT_HAVE_GLOB -DYYMALLOC=malloc -DYYFREE=free -DUSE_LPR_PRINT_CMD -DEDITRES $OSTEP_DEFS $inc
 ARFLAGS=cr
 BIGGER_STRINGS=
 LIBS=$libs
