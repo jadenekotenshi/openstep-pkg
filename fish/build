@@ -973,6 +973,10 @@ $RANLIB libostepfish.a
 CPPFLAGS="-I$shimdir -I/usr/local/include/ncurses -I/usr/local/include $OSTEP_DEFS -include $sig_h -include $shimdir/fish-compat.h"
 LDFLAGS=-L/usr/local/lib
 LIBS="-L`pwd` -lostepfish"
+# configure insists on finding nanosleep() in libc or librt; the shim's version is
+# renamed by the compat header, so tell it there is nothing to link.
+ac_cv_search_nanosleep='none required'
+export ac_cv_search_nanosleep
 export CPPFLAGS LDFLAGS LIBS
 
 run_configure \
