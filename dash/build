@@ -178,6 +178,7 @@ extern int ostep_tcgetpgrp(int);
 extern int ostep_tcsetpgrp(int, int);
 extern char *ostep_getcwd(char *, int);
 extern char *ostep_strsignal(int);
+extern int ostep_getpgrp();
 extern char *ostep_strdup(const char *);
 extern char *ostep_stpncpy(char *, const char *, unsigned long);
 extern long long ostep_strtoll(const char *, char **, int);
@@ -187,6 +188,7 @@ extern long long ostep_strtoll(const char *, char **, int);
 #define tcsetpgrp ostep_tcsetpgrp
 #define getcwd ostep_getcwd
 #define strsignal ostep_strsignal
+#define getpgrp ostep_getpgrp
 #define strdup ostep_strdup
 #define stpncpy ostep_stpncpy
 #define strtoll ostep_strtoll
@@ -378,12 +380,20 @@ $CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
 
 extern int wait4();
 extern int setpgrp();
+extern int getpgrp();
 extern char *getwd();
 
 int
 ostep_waitpid(int pid, int *status, int options)
 {
     return wait4(pid, (void *) status, options, (void *) 0);
+}
+
+/* BSD getpgrp() takes a pid; POSIX getpgrp() takes none and means the caller. */
+int
+ostep_getpgrp(void)
+{
+    return getpgrp(0);
 }
 
 int
