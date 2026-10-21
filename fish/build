@@ -1331,16 +1331,15 @@ ac_cv_search_iconv_open=-liconv
 export ac_cv_search_nanosleep ac_cv_search_connect ac_cv_search_iconv_open
 export CPPFLAGS LDFLAGS LIBS
 
-# Diagnostics for the wait loop in job_continue(): report (at most five times each) a
-# waitpid() or select() that fails there.  Silent when they work.
+# Diagnostics for the wait loop in job_continue(): report the first five waitpid()
+# results there, and (at most five times) a failing select().
 /bin/cat > proc-diag.sed <<'DEOF'
 /pid_t pid = waitpid(-1, &status, WUNTRACED );/a\
 \
-							if( pid < 0 )\
 							{\
 								static int ostep_diag_n = 0;\
 								if( ostep_diag_n++ < 5 )\
-									fprintf( stderr, "fish: waitpid returned %d, errno %d\\n", (int) pid, errno );\
+									fprintf( stderr, "fish: waitpid returned %d (status 0x%x, errno %d); job pgid %d, first process pid %d\\n", (int) pid, status, errno, (int) j->pgid, j->first_process ? (int) j->first_process->pid : -1 );\
 							}
 /retval =select( maxfd+1, &fds, 0, 0, &tv );/a\
 \
