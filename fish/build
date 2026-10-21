@@ -1177,6 +1177,20 @@ typedef long rlim_t;
 #ifndef ENOSYS
 # define ENOSYS 78
 #endif
+#include <stdio.h>
+/* no stdio locking here, so the _unlocked variants are the plain ones */
+#ifndef getc_unlocked
+# define getc_unlocked(f) getc(f)
+#endif
+#ifndef putc_unlocked
+# define putc_unlocked(c, f) putc((c), (f))
+#endif
+#ifndef getchar_unlocked
+# define getchar_unlocked() getchar()
+#endif
+#ifndef putchar_unlocked
+# define putchar_unlocked(c) putchar(c)
+#endif
 #ifndef O_NONBLOCK
 # ifdef FNDELAY
 #  define O_NONBLOCK FNDELAY
