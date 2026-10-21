@@ -75,8 +75,12 @@ SEOF
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#ifndef ENOSYS
+# define ENOSYS 78	/* function not implemented (BSD numbering) */
+#endif
 #ifdef OSTEP_NEED_MODE_T
 typedef unsigned short mode_t;
 #endif
