@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+DASH=/usr/local/bin/dash
+test -x $DASH
+test "`$DASH -c 'echo ok'`" = ok
+test "`$DASH -c 'echo $((6*7))'`" = 42
+test "`$DASH -c 'x=abc; echo ${x%c}${#x}'`" = ab3
+test "`$DASH -c 'echo a b c | (read x y z; echo $z$y$x)'`" = cba
+test "`$DASH -c 'for i in 1 2 3; do echo $i; done | tail -1'`" = 3
+test "`$DASH -c 'f() { return 3; }; f; echo $?'`" = 3
+test "`$DASH -c 'cd /tmp && pwd'`" = /tmp
+$DASH -c 'exit 7' || test $? = 7
+$DASH -c 'false || true'
+echo "dash: all tests passed"

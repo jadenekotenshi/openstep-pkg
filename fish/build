@@ -1,0 +1,947 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them.  A gcc42 built after the cctools package links
+# with the cctools ld by itself; an older one needs the specs file selecting it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+CFLAGS='-O2'
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+export PATH CC CFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
+if test -d "fish-$VERSION"; then cd "fish-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+
+# fish 1.23.1 is the last release written in plain C with fallbacks for systems
+# lacking wide-character and POSIX functions (it was made for NetBSD and Solaris);
+# later versions need C++ and Rust.  Even so this libc has no <wchar.h>/<wctype.h>
+# and wcscmp() and friends, no POSIX signals (sigaction and the sigset functions),
+# tcgetattr()/tcsetattr(), waitpid(), setsid(), getpgid(), nanosleep(), realpath(),
+# <libgen.h> or the POSIX <dirent.h>.  Private headers and a small library supply
+# them; fish's own fallbacks cover wcslen, wcsdup, wcwidth, wcstol, fwprintf and
+# the rest.  Only single-byte (Latin-1) text is supported.
+/usr/local/bin/mkdir -p openstep
+shimdir=`pwd`/openstep
+
+# Types the system's <sys/types.h> may lack (probed: a typedef cannot be tested for).
+OSTEP_DEFS=
+for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
+    printf '#include <sys/types.h>\n%s probe_var;\nint main(void) { return 0; }\n' "$ostep_type" > type-probe.c
+    if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+        ostep_upper=`echo $ostep_type | tr 'a-z' 'A-Z'`
+        OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
+    fi
+done
+printf '#include <sys/types.h>\n#include <time.h>\nstruct timespec probe_ts;\nint main(void) { return 0; }\n' > type-probe.c
+$CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 || OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_TIMESPEC"
+printf '#include <stddef.h>\n#include <stdlib.h>\nwint_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
+$CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 && OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_HAVE_WINT_T"
+/bin/rm -f type-probe.c type-probe.o
+echo "fish: type defines:$OSTEP_DEFS"
+
+sig_h=`pwd`/openstep-sig.h
+/bin/cat > "$sig_h" <<'SIGEOF'
+#include <sys/types.h>
+#include <signal.h>
+SIGEOF
+probe_sig() {
+    { echo "#include \"$sig_h\""; echo "$1"; } > probe_sig.c
+    $CC $CFLAGS -c probe_sig.c -o probe_sig.o > /dev/null 2>&1
+}
+probe_sig 'sigset_t probe_set;' || echo 'typedef unsigned int sigset_t;' >> "$sig_h"
+probe_sig 'int probe_how[3] = { SIG_BLOCK, SIG_UNBLOCK, SIG_SETMASK };' || /bin/cat >> "$sig_h" <<'SIGEOF'
+#define SIG_BLOCK	1
+#define SIG_UNBLOCK	2
+#define SIG_SETMASK	3
+SIGEOF
+probe_sig 'struct sigaction probe_sa; int probe_f(void) { probe_sa.sa_handler = 0; probe_sa.sa_mask = 0; probe_sa.sa_flags = 0; return 0; }' || /bin/cat >> "$sig_h" <<'SIGEOF'
+struct sigaction {
+    void (*sa_handler)();
+    sigset_t sa_mask;
+    int sa_flags;
+};
+SIGEOF
+/bin/cat >> "$sig_h" <<'SIGEOF'
+#ifndef SA_RESTART
+# define SA_RESTART	0x10000
+#endif
+#ifndef SA_NOCLDSTOP
+# define SA_NOCLDSTOP	0x20000
+#endif
+SIGEOF
+/bin/rm -f probe_sig.c probe_sig.o
+
+/bin/cat > openstep_sig.c <<'SIGEOF'
+#include "openstep-sig.h"
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
+
+extern int sigvec();
+extern int sigblock();
+extern int sigsetmask();
+extern int sigpause();
+
+#define SIGBIT(sig)	(1 << ((sig) - 1))
+
+int
+sigemptyset(sigset_t *set)
+{
+    *set = 0;
+    return 0;
+}
+
+int
+sigfillset(sigset_t *set)
+{
+    *set = ~0;
+    return 0;
+}
+
+int
+sigaddset(sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    *set |= SIGBIT(sig);
+    return 0;
+}
+
+int
+sigdelset(sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    *set &= ~SIGBIT(sig);
+    return 0;
+}
+
+int
+sigismember(const sigset_t *set, int sig)
+{
+    if (sig <= 0 || sig > 31) {
+	errno = EINVAL;
+	return -1;
+    }
+    return (*set & SIGBIT(sig)) != 0;
+}
+
+int
+sigprocmask(int how, const sigset_t *set, sigset_t *oset)
+{
+    int old;
+
+    if (set == 0)
+	old = sigblock(0);
+    else switch (how) {
+    case SIG_BLOCK:
+	old = sigblock((int)*set);
+	break;
+    case SIG_UNBLOCK:
+	old = sigsetmask(sigblock(0) & ~(int)*set);
+	break;
+    case SIG_SETMASK:
+	old = sigsetmask((int)*set);
+	break;
+    default:
+	errno = EINVAL;
+	return -1;
+    }
+    if (oset)
+	*oset = (sigset_t)old;
+    return 0;
+}
+
+int
+sigsuspend(const sigset_t *mask)
+{
+    return sigpause((int)*mask);
+}
+
+/* POSIX handlers are not restarted unless SA_RESTART; BSD sigvec() restarts
+   unless SV_INTERRUPT, so the sense of the flag is reversed. */
+int
+sigaction(int sig, const struct sigaction *act, struct sigaction *oact)
+{
+    struct sigvec nsv, osv;
+    int r;
+
+    if (act) {
+	nsv.sv_handler = (void (*)())act->sa_handler;
+	nsv.sv_mask = (int)act->sa_mask;
+	nsv.sv_flags = (act->sa_flags & SA_RESTART) ? 0 : SV_INTERRUPT;
+    }
+    r = sigvec(sig, act ? &nsv : (struct sigvec *)0, &osv);
+    if (r == 0 && oact) {
+	oact->sa_handler = (void (*)())osv.sv_handler;
+	oact->sa_mask = (sigset_t)osv.sv_mask;
+	oact->sa_flags = (osv.sv_flags & SV_INTERRUPT) ? 0 : SA_RESTART;
+    }
+    return r;
+}
+SIGEOF
+$CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
+
+# The remaining POSIX functions under renamed symbols, plus the wide-character
+# functions under their own names (nothing else on the system defines them).
+/bin/cat > openstep_posix.c <<'MEOF'
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/stat.h>
+#include <sys/time.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <time.h>
+
+extern int getpid();
+extern int chdir();
+extern int readlink();
+extern int wait4();
+extern int setpgrp();
+extern int getpgrp();
+extern char *getwd();
+extern int select();
+
+int
+ostep_waitpid(int pid, int *status, int options)
+{
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+
+int
+ostep_setpgid(int pid, int pgrp)
+{
+    return setpgrp(pid, pgrp);
+}
+
+int
+ostep_getpgid(int pid)
+{
+    if (pid == 0 || pid == getpid())
+	return getpgrp(0);
+    return getpgrp(pid);
+}
+
+int
+ostep_setsid(void)
+{
+    int pid = getpid();
+
+    if (setpgrp(pid, pid) < 0)
+	return -1;
+    return pid;
+}
+
+int
+ostep_tcgetpgrp(int fd)
+{
+    int pgrp;
+
+    if (ioctl(fd, TIOCGPGRP, (char *) &pgrp) < 0)
+	return -1;
+    return pgrp;
+}
+
+int
+ostep_tcsetpgrp(int fd, int pgrp)
+{
+    return ioctl(fd, TIOCSPGRP, (char *) &pgrp);
+}
+
+int
+ostep_tcgetattr(int fd, struct termios *t)
+{
+    return ioctl(fd, TIOCGETA, (char *) t);
+}
+
+int
+ostep_tcsetattr(int fd, int how, const struct termios *t)
+{
+    unsigned long req;
+
+    switch (how) {
+    case TCSADRAIN:
+	req = TIOCSETAW;
+	break;
+    case TCSAFLUSH:
+	req = TIOCSETAF;
+	break;
+    default:
+	req = TIOCSETA;
+	break;
+    }
+    return ioctl(fd, req, (char *) t);
+}
+
+char *
+ostep_getcwd(char *buf, int size)
+{
+    char tmp[MAXPATHLEN + 1];
+
+    if (buf == 0 || size <= 0) {
+	errno = EINVAL;
+	return 0;
+    }
+    if (getwd(tmp) == 0)
+	return 0;
+    if ((int) strlen(tmp) >= size) {
+	errno = ERANGE;
+	return 0;
+    }
+    strcpy(buf, tmp);
+    return buf;
+}
+
+char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != 0)
+	memcpy(p, s, n);
+    return p;
+}
+
+int
+ostep_nanosleep(const struct timespec *req, struct timespec *rem)
+{
+    struct timeval tv;
+
+    tv.tv_sec = req->tv_sec;
+    tv.tv_usec = req->tv_nsec / 1000;
+    select(0, (void *) 0, (void *) 0, (void *) 0, &tv);
+    if (rem != 0) {
+	rem->tv_sec = 0;
+	rem->tv_nsec = 0;
+    }
+    return 0;
+}
+
+/* dirname() and basename() as in <libgen.h>; both may modify their argument. */
+char *
+ostep_dirname(char *path)
+{
+    static char dot[] = ".";
+    char *end;
+
+    if (path == 0 || *path == 0)
+	return dot;
+    end = path + strlen(path);
+    while (end > path + 1 && end[-1] == '/')
+	*--end = 0;
+    while (end > path && end[-1] != '/')
+	end--;
+    if (end == path)
+	return dot;
+    while (end > path + 1 && end[-1] == '/')
+	end--;
+    *end = 0;
+    return path;
+}
+
+char *
+ostep_basename(char *path)
+{
+    static char dot[] = ".";
+    char *end, *p;
+
+    if (path == 0 || *path == 0)
+	return dot;
+    end = path + strlen(path);
+    while (end > path + 1 && end[-1] == '/')
+	*--end = 0;
+    if (end == path + 1 && *path == '/')
+	return path;
+    p = strrchr(path, '/');
+    return p == 0 ? path : p + 1;
+}
+
+/* realpath(): the directory part is resolved with chdir()/getwd(), a symbolic link
+   at the end is followed.  A null result buffer is allocated. */
+char *
+ostep_realpath(const char *path, char *resolved)
+{
+    char start[MAXPATHLEN + 1], work[MAXPATHLEN + 1], dir[MAXPATHLEN + 1];
+    char link[MAXPATHLEN + 1], out[MAXPATHLEN + 1];
+    char *base, *slash;
+    int links = 0, n;
+    struct stat st;
+
+    if (path == 0 || *path == 0) {
+	errno = ENOENT;
+	return 0;
+    }
+    if (getwd(start) == 0)
+	return 0;
+    if (strlen(path) > MAXPATHLEN) {
+	errno = ENAMETOOLONG;
+	return 0;
+    }
+    strcpy(work, path);
+    for (;;) {
+	if (stat(work, &st) < 0)
+	    goto fail;
+	slash = strrchr(work, '/');
+	if (slash == 0) {
+	    strcpy(dir, ".");
+	    base = work;
+	} else if (slash == work) {
+	    strcpy(dir, "/");
+	    base = work + 1;
+	} else {
+	    *slash = 0;
+	    strcpy(dir, work);
+	    base = slash + 1;
+	}
+	if (chdir(dir) < 0)
+	    goto fail;
+	if (getwd(out) == 0)
+	    goto fail;
+	if (*base != 0 && strcmp(base, ".") != 0) {
+	    if (strcmp(base, "..") == 0) {
+		if (chdir("..") < 0 || getwd(out) == 0)
+		    goto fail;
+	    } else {
+		struct stat lst;
+
+		if (lstat(base, &lst) == 0 && (lst.st_mode & S_IFMT) == S_IFLNK) {
+		    if (++links > 20) {
+			errno = ELOOP;
+			goto fail;
+		    }
+		    n = readlink(base, link, MAXPATHLEN);
+		    if (n < 0)
+			goto fail;
+		    link[n] = 0;
+		    if (link[0] == '/') {
+			strcpy(work, link);
+		    } else {
+			if (strlen(out) + n + 2 > MAXPATHLEN) {
+			    errno = ENAMETOOLONG;
+			    goto fail;
+			}
+			strcpy(work, out);
+			strcat(work, "/");
+			strcat(work, link);
+		    }
+		    chdir(start);
+		    continue;
+		}
+		if (strlen(out) + strlen(base) + 2 > MAXPATHLEN) {
+		    errno = ENAMETOOLONG;
+		    goto fail;
+		}
+		if (strcmp(out, "/") != 0)
+		    strcat(out, "/");
+		strcat(out, base);
+	    }
+	}
+	break;
+    }
+    chdir(start);
+    if (resolved == 0) {
+	resolved = (char *) malloc(strlen(out) + 1);
+	if (resolved == 0)
+	    return 0;
+    }
+    strcpy(resolved, out);
+    return resolved;
+fail:
+    chdir(start);
+    return 0;
+}
+MEOF
+$CC $CFLAGS $OSTEP_DEFS -I. -c openstep_posix.c -o openstep_posix.o
+
+# Wide-character support: the headers go in the private directory, the functions in
+# openstep_wchar.c.
+printf '#include <wchar.h>\n#include <wctype.h>\nint main(void) { return wcscmp(L"a", L"b") + iswspace(32); }\n' > wide-probe.c
+if $CC -c wide-probe.c -o wide-probe.o > /dev/null 2>&1 && $CC wide-probe.o -o wide-probe > /dev/null 2>&1; then
+    echo "fish: the system has <wchar.h> and the wide string functions; not using the shim headers"
+else
+/bin/cat > openstep/wchar.h <<'MEOF'
+#ifndef OPENSTEP_WCHAR_H
+#define OPENSTEP_WCHAR_H
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <string.h>
+#ifndef OSTEP_HAVE_WINT_T
+typedef int wint_t;
+#endif
+typedef int mbstate_t;
+#ifndef WEOF
+#define WEOF ((wint_t) -1)
+#endif
+extern int wcscmp(const wchar_t *, const wchar_t *);
+extern int wcsncmp(const wchar_t *, const wchar_t *, size_t);
+extern wchar_t *wcschr(const wchar_t *, wchar_t);
+extern wchar_t *wcsrchr(const wchar_t *, wchar_t);
+extern wchar_t *wcscpy(wchar_t *, const wchar_t *);
+extern wchar_t *wcsncpy(wchar_t *, const wchar_t *, size_t);
+extern wchar_t *wcscat(wchar_t *, const wchar_t *);
+extern wchar_t *wcsncat(wchar_t *, const wchar_t *, size_t);
+extern wchar_t *wcsstr(const wchar_t *, const wchar_t *);
+extern size_t wcsspn(const wchar_t *, const wchar_t *);
+extern size_t wcscspn(const wchar_t *, const wchar_t *);
+extern wchar_t *wcspbrk(const wchar_t *, const wchar_t *);
+extern int wcscoll(const wchar_t *, const wchar_t *);
+extern size_t mbrtowc(wchar_t *, const char *, size_t, mbstate_t *);
+extern size_t wcrtomb(char *, wchar_t, mbstate_t *);
+extern size_t mbstowcs(wchar_t *, const char *, size_t);
+extern size_t wcstombs(char *, const wchar_t *, size_t);
+#endif
+MEOF
+/bin/cat > openstep/wctype.h <<'MEOF'
+#ifndef OPENSTEP_WCTYPE_H
+#define OPENSTEP_WCTYPE_H
+#include <wchar.h>
+extern int iswalnum(wint_t);
+extern int iswalpha(wint_t);
+extern int iswcntrl(wint_t);
+extern int iswdigit(wint_t);
+extern int iswgraph(wint_t);
+extern int iswlower(wint_t);
+extern int iswprint(wint_t);
+extern int iswpunct(wint_t);
+extern int iswspace(wint_t);
+extern int iswupper(wint_t);
+extern int iswxdigit(wint_t);
+extern wint_t towlower(wint_t);
+extern wint_t towupper(wint_t);
+#endif
+MEOF
+fi
+/bin/rm -f wide-probe.c wide-probe.o wide-probe
+/bin/cat > openstep/dirent.h <<'MEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+MEOF
+/bin/cat > openstep/libgen.h <<'MEOF'
+#ifndef OPENSTEP_LIBGEN_H
+#define OPENSTEP_LIBGEN_H
+extern char *ostep_dirname(char *);
+extern char *ostep_basename(char *);
+#define dirname ostep_dirname
+#define basename ostep_basename
+#endif
+MEOF
+
+wide_c=openstep_wchar.c
+/bin/cat > openstep_wchar.c <<'WEOF'
+/*
+ * The wide-character functions fish needs and this libc lacks: wcscmp and the
+ * other wcs* string functions, the isw* and tow* classification functions, and
+ * mbrtowc/wcrtomb/mbstowcs/wcstombs.  Only the single-byte case is supported:
+ * a multibyte character is one byte, taken as Latin-1 (the system has no
+ * multibyte locales).  fish supplies its own wcslen, wcsdup, wcwidth, wcstol,
+ * fwprintf and the rest, so those are left out.
+ */
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include "wchar.h"
+
+int
+wcscmp(const wchar_t *a, const wchar_t *b)
+{
+    while (*a != 0 && *a == *b) {
+	a++;
+	b++;
+    }
+    return (int) *a - (int) *b;
+}
+
+int
+wcsncmp(const wchar_t *a, const wchar_t *b, size_t n)
+{
+    while (n > 0 && *a != 0 && *a == *b) {
+	a++;
+	b++;
+	n--;
+    }
+    if (n == 0)
+	return 0;
+    return (int) *a - (int) *b;
+}
+
+wchar_t *
+wcschr(const wchar_t *s, wchar_t c)
+{
+    for (;; s++) {
+	if (*s == c)
+	    return (wchar_t *) s;
+	if (*s == 0)
+	    return 0;
+    }
+}
+
+wchar_t *
+wcsrchr(const wchar_t *s, wchar_t c)
+{
+    const wchar_t *last = 0;
+
+    for (;; s++) {
+	if (*s == c)
+	    last = s;
+	if (*s == 0)
+	    return (wchar_t *) last;
+    }
+}
+
+wchar_t *
+wcscpy(wchar_t *d, const wchar_t *s)
+{
+    wchar_t *r = d;
+
+    while ((*d++ = *s++) != 0)
+	;
+    return r;
+}
+
+wchar_t *
+wcsncpy(wchar_t *d, const wchar_t *s, size_t n)
+{
+    wchar_t *r = d;
+
+    while (n > 0 && *s != 0) {
+	*d++ = *s++;
+	n--;
+    }
+    while (n-- > 0)
+	*d++ = 0;
+    return r;
+}
+
+wchar_t *
+wcscat(wchar_t *d, const wchar_t *s)
+{
+    wchar_t *r = d;
+
+    while (*d != 0)
+	d++;
+    while ((*d++ = *s++) != 0)
+	;
+    return r;
+}
+
+wchar_t *
+wcsncat(wchar_t *d, const wchar_t *s, size_t n)
+{
+    wchar_t *r = d;
+
+    while (*d != 0)
+	d++;
+    while (n-- > 0 && *s != 0)
+	*d++ = *s++;
+    *d = 0;
+    return r;
+}
+
+wchar_t *
+wcsstr(const wchar_t *h, const wchar_t *n)
+{
+    size_t i;
+
+    if (*n == 0)
+	return (wchar_t *) h;
+    for (; *h != 0; h++) {
+	for (i = 0; n[i] != 0 && h[i] == n[i]; i++)
+	    ;
+	if (n[i] == 0)
+	    return (wchar_t *) h;
+	if (h[i] == 0)
+	    return 0;
+    }
+    return 0;
+}
+
+size_t
+wcsspn(const wchar_t *s, const wchar_t *accept)
+{
+    const wchar_t *p = s;
+
+    while (*p != 0 && wcschr(accept, *p) != 0)
+	p++;
+    return p - s;
+}
+
+size_t
+wcscspn(const wchar_t *s, const wchar_t *reject)
+{
+    const wchar_t *p = s;
+
+    while (*p != 0 && wcschr(reject, *p) == 0)
+	p++;
+    return p - s;
+}
+
+wchar_t *
+wcspbrk(const wchar_t *s, const wchar_t *accept)
+{
+    for (; *s != 0; s++)
+	if (wcschr(accept, *s) != 0)
+	    return (wchar_t *) s;
+    return 0;
+}
+
+int
+wcscoll(const wchar_t *a, const wchar_t *b)
+{
+    return wcscmp(a, b);
+}
+
+/* Character classes: the "C" locale, with Latin-1 treated as plain bytes. */
+#define CLASS(name, test) \
+    int name(wint_t c) { return c >= 0 && c < 128 && test((int) c); }
+CLASS(iswalnum, isalnum)
+CLASS(iswalpha, isalpha)
+CLASS(iswcntrl, iscntrl)
+CLASS(iswdigit, isdigit)
+CLASS(iswgraph, isgraph)
+CLASS(iswlower, islower)
+CLASS(iswprint, isprint)
+CLASS(iswpunct, ispunct)
+CLASS(iswspace, isspace)
+CLASS(iswupper, isupper)
+CLASS(iswxdigit, isxdigit)
+
+wint_t
+towlower(wint_t c)
+{
+    return (c >= 0 && c < 128) ? (wint_t) tolower((int) c) : c;
+}
+
+wint_t
+towupper(wint_t c)
+{
+    return (c >= 0 && c < 128) ? (wint_t) toupper((int) c) : c;
+}
+
+size_t
+mbrtowc(wchar_t *pwc, const char *s, size_t n, mbstate_t *ps)
+{
+    if (s == 0)
+	return 0;
+    if (n == 0)
+	return (size_t) -2;
+    if (pwc != 0)
+	*pwc = (unsigned char) *s;
+    return *s != 0 ? 1 : 0;
+}
+
+size_t
+wcrtomb(char *s, wchar_t wc, mbstate_t *ps)
+{
+    if (s == 0)
+	return 1;
+    if (wc < 0 || wc > 255)
+	return (size_t) -1;
+    *s = (char) wc;
+    return 1;
+}
+
+size_t
+mbstowcs(wchar_t *dst, const char *src, size_t n)
+{
+    size_t i = 0;
+
+    if (dst == 0)
+	return strlen(src);
+    while (i < n) {
+	dst[i] = (unsigned char) src[i];
+	if (src[i] == 0)
+	    return i;
+	i++;
+    }
+    return i;
+}
+
+size_t
+wcstombs(char *dst, const wchar_t *src, size_t n)
+{
+    size_t i = 0;
+
+    if (dst == 0) {
+	while (src[i] != 0) {
+	    if (src[i] < 0 || src[i] > 255)
+		return (size_t) -1;
+	    i++;
+	}
+	return i;
+    }
+    while (i < n) {
+	if (src[i] < 0 || src[i] > 255)
+	    return (size_t) -1;
+	dst[i] = (char) src[i];
+	if (src[i] == 0)
+	    return i;
+	i++;
+    }
+    return i;
+}
+WEOF
+$CC $CFLAGS $OSTEP_DEFS -I"$shimdir" -c openstep_wchar.c -o openstep_wchar.o
+
+# The compat header, forced into every compile: missing types and macros, and the
+# renames for the functions above.  The archive is searched after fish's objects.
+/bin/cat > openstep/fish-compat.h <<'MEOF'
+#ifndef OPENSTEP_FISH_COMPAT_H
+#define OPENSTEP_FISH_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>
+#include <sys/time.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#include <termios.h>
+#include <time.h>
+#ifdef OSTEP_NEED_MODE_T
+typedef unsigned short mode_t;
+#endif
+#ifdef OSTEP_NEED_SSIZE_T
+typedef int ssize_t;
+#endif
+#ifdef OSTEP_NEED_PID_T
+typedef int pid_t;
+#endif
+#ifdef OSTEP_NEED_UID_T
+typedef unsigned short uid_t;
+#endif
+#ifdef OSTEP_NEED_GID_T
+typedef unsigned short gid_t;
+#endif
+#ifdef OSTEP_NEED_TIMESPEC
+struct timespec {
+    time_t tv_sec;
+    long tv_nsec;
+};
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef S_ISCHR
+# define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+#endif
+#ifndef S_ISBLK
+# define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
+#endif
+#ifndef S_ISFIFO
+# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#endif
+#ifndef R_OK
+# define F_OK 0
+# define X_OK 1
+# define W_OK 2
+# define R_OK 4
+#endif
+#ifndef PATH_MAX
+# define PATH_MAX 1024
+#endif
+#ifndef WEXITSTATUS
+# define WEXITSTATUS(s) ((int) (((s) >> 8) & 0xff))
+#endif
+#ifndef WIFEXITED
+# define WIFEXITED(s) (((s) & 0xff) == 0)
+#endif
+#ifndef WIFSIGNALED
+# define WIFSIGNALED(s) (((s) & 0xff) != 0 && ((s) & 0xff) != 0x7f)
+#endif
+#ifndef WTERMSIG
+# define WTERMSIG(s) ((s) & 0x7f)
+#endif
+#ifndef WIFSTOPPED
+# define WIFSTOPPED(s) (((s) & 0xff) == 0x7f)
+#endif
+#ifndef WSTOPSIG
+# define WSTOPSIG(s) (((s) >> 8) & 0xff)
+#endif
+#ifndef WUNTRACED
+# define WUNTRACED 2
+#endif
+extern int ostep_waitpid(int, int *, int);
+extern int ostep_setpgid(int, int);
+extern int ostep_getpgid(int);
+extern int ostep_setsid(void);
+extern int ostep_tcgetpgrp(int);
+extern int ostep_tcsetpgrp(int, int);
+extern int ostep_tcgetattr(int, struct termios *);
+extern int ostep_tcsetattr(int, int, const struct termios *);
+extern char *ostep_getcwd(char *, int);
+extern char *ostep_strdup(const char *);
+extern int ostep_nanosleep(const struct timespec *, struct timespec *);
+extern char *ostep_realpath(const char *, char *);
+#define waitpid ostep_waitpid
+#define setpgid ostep_setpgid
+#define getpgid ostep_getpgid
+#define setsid ostep_setsid
+#define tcgetpgrp ostep_tcgetpgrp
+#define tcsetpgrp ostep_tcsetpgrp
+#define tcgetattr ostep_tcgetattr
+#define tcsetattr ostep_tcsetattr
+#define getcwd ostep_getcwd
+#define strdup ostep_strdup
+#define nanosleep ostep_nanosleep
+#define realpath ostep_realpath
+#endif
+MEOF
+
+# openstep_sig.c and the posix pieces share one archive; the signal functions keep
+# their standard names (the system has none), the rest are renamed above.
+/bin/rm -f libostepfish.a
+$AR cr libostepfish.a openstep_sig.o openstep_posix.o openstep_wchar.o
+$RANLIB libostepfish.a
+
+# ncurses comes from the ncurses package.
+CPPFLAGS="-I$shimdir -I/usr/local/include/ncurses -I/usr/local/include $OSTEP_DEFS -include $sig_h -include $shimdir/fish-compat.h"
+LDFLAGS=-L/usr/local/lib
+LIBS="-L`pwd` -lostepfish"
+export CPPFLAGS LDFLAGS LIBS
+
+run_configure \
+  --build=$PKG_TARGET \
+  --prefix=/usr/local \
+  --without-xsel \
+  --without-gettext
+
+# The stock sh does not stop a failed sub-make in a loop, so check for the results.
+gnumake
+test -f fish
+test -f fishd
+test -f fish_pager
+gnumake install DESTDIR="$DESTDIR"
+test -x "$DESTDIR$PREFIX/bin/fish"
+test -x "$DESTDIR$PREFIX/bin/fishd"
