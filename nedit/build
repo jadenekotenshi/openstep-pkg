@@ -139,11 +139,15 @@ typedef unsigned short gid_t;
 #endif
 extern char **environ;
 extern int wait4();
+extern int wait3();
 extern int setpgrp();
 extern char *getwd();
 static int
 ostep_waitpid(int pid, int *status, int options)
 {
+    /* wait4() reports ECHILD for pid -1 here; wait3() is "any child" */
+    if (pid == -1)
+        return wait3((void *) status, options, (void *) 0);
     return wait4(pid, (void *) status, options, (void *) 0);
 }
 static char *

@@ -379,6 +379,7 @@ $CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
 #include <sys/ioctl.h>
 
 extern int wait4();
+extern int wait3();
 extern int setpgrp();
 extern int getpgrp();
 extern char *getwd();
@@ -386,6 +387,9 @@ extern char *getwd();
 int
 ostep_waitpid(int pid, int *status, int options)
 {
+    /* wait4() reports ECHILD for pid -1 here; wait3() is "any child" */
+    if (pid == -1)
+        return wait3((void *) status, options, (void *) 0);
     return wait4(pid, (void *) status, options, (void *) 0);
 }
 
