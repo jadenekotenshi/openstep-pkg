@@ -1184,6 +1184,12 @@ typedef int socklen_t;
 #ifndef EILSEQ
 # define EILSEQ 86
 #endif
+#if defined(EWOULDBLOCK) && defined(EAGAIN) && EWOULDBLOCK != EAGAIN
+/* A non-blocking read or write that has nothing to do fails with EWOULDBLOCK here,
+   which is a different number from EAGAIN, and fish only tests for EAGAIN. */
+# undef EAGAIN
+# define EAGAIN EWOULDBLOCK
+#endif
 #ifndef ENOSYS
 # define ENOSYS 78
 #endif
