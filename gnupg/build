@@ -1,0 +1,131 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them.  A gcc42 built after the cctools package links
+# with the cctools ld by itself; an older one needs the specs file selecting it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+CONFIG_SHELL=/usr/local/bin/ksh
+GREP=/usr/local/bin/grep
+EGREP='/usr/local/bin/grep -E'
+AWK=/usr/local/bin/gawk
+SED=/usr/local/bin/sed
+AR=$PKG_AR
+RANLIB=$PKG_RANLIB
+if test -d "gnupg-$VERSION"; then cd "gnupg-$VERSION"; fi
+
+# GnuPG 1.4 is the classic single-binary gpg, which needs no libgcrypt, npth or
+# other libraries (2.x needs POSIX threads).  Network keyserver helpers, LDAP,
+# readline, NLS, the agent and photo viewers are left out; zlib and bzip2 are used.
+# configure checks for the missing functions itself (sigaction, waitpid, mkdtemp,
+# timegm, memrchr, strsep and so on) and uses its own replacements or fallbacks.
+# The compat header supplies what <sys/stat.h> and <sys/types.h> lack: the S_I*
+# mode macros and the POSIX types, the latter probed since a typedef cannot be tested.
+/usr/local/bin/mkdir -p openstep
+OSTEP_DEFS=
+for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
+    printf '#include <sys/types.h>\n%s probe_var;\nint main(void) { return 0; }\n' "$ostep_type" > type-probe.c
+    if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+        ostep_upper=`echo $ostep_type | tr 'a-z' 'A-Z'`
+        OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
+    fi
+done
+/bin/rm -f type-probe.c type-probe.o
+/bin/cat > openstep/gnupg-compat.h <<'SEOF'
+#ifndef OPENSTEP_GNUPG_COMPAT_H
+#define OPENSTEP_GNUPG_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef OSTEP_NEED_MODE_T
+typedef unsigned short mode_t;
+#endif
+#ifdef OSTEP_NEED_SSIZE_T
+typedef int ssize_t;
+#endif
+#ifdef OSTEP_NEED_PID_T
+typedef int pid_t;
+#endif
+#ifdef OSTEP_NEED_UID_T
+typedef unsigned short uid_t;
+#endif
+#ifdef OSTEP_NEED_GID_T
+typedef unsigned short gid_t;
+#endif
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRWXU 0000700
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IRWXG 0000070
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+# define S_IRWXO 0000007
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISCHR
+# define S_ISCHR(m) (((m) & S_IFMT) == S_IFCHR)
+#endif
+#ifndef S_ISBLK
+# define S_ISBLK(m) (((m) & S_IFMT) == S_IFBLK)
+#endif
+#ifndef S_ISFIFO
+# define S_ISFIFO(m) (((m) & S_IFMT) == S_IFIFO)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef WEXITSTATUS
+# define WEXITSTATUS(s) ((int) (((s) >> 8) & 0xff))
+#endif
+#ifndef WIFEXITED
+# define WIFEXITED(s) (((s) & 0xff) == 0)
+#endif
+#endif
+SEOF
+compat=`pwd`/openstep/gnupg-compat.h
+CFLAGS="-O2 -I/usr/local/include $OSTEP_DEFS -include $compat"
+CPPFLAGS=-I/usr/local/include
+LDFLAGS=-L/usr/local/lib
+export PATH CC CFLAGS CPPFLAGS LDFLAGS CONFIG_SHELL GREP EGREP AWK SED AR RANLIB
+. "$PKG_BUILD_HELPERS"
+
+run_configure \
+  --build=$PKG_TARGET \
+  --prefix=/usr/local \
+  --disable-nls \
+  --disable-asm \
+  --without-readline \
+  --disable-keyserver-helpers \
+  --disable-dns-srv \
+  --disable-agent-support \
+  --disable-card-support \
+  --disable-photo-viewers \
+  --disable-gnupg-iconv \
+  --with-zlib=/usr/local \
+  --with-bzip2=/usr/local
+
+# The stock sh does not stop a failed sub-make in a loop, so check for the results.
+gnumake
+test -f g10/gpg
+test -f g10/gpgv
+gnumake install DESTDIR="$DESTDIR"
+test -x "$DESTDIR$PREFIX/bin/gpg"
+test -x "$DESTDIR$PREFIX/bin/gpgv"

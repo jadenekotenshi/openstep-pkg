@@ -1,0 +1,44 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+FISH=$LR/bin/fish
+work=${TMPDIR-/tmp}/fish-pkg-test-$$
+mkdir "$work"
+trap 'rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+# fish keeps its configuration and a universal variable daemon (fishd) under HOME.
+HOME=$work
+export HOME
+
+test -x "$FISH"
+test -x "$LR/bin/fishd"
+"$FISH" --version 2>&1 | grep 'fish, version 1\.23' > /dev/null
+
+# (fish complains on stderr when fishd cannot be reached; only stdout is checked.)
+check() {
+    got=`"$FISH" -c "$1" 2>/dev/null`
+    if test "$got" != "$2"; then
+        echo "fish: '$1' printed '$got', expected '$2'" >&2
+        exit 1
+    fi
+}
+check 'echo hello' hello
+check 'set x 5; echo $x' 5
+check 'for i in 1 2 3; echo $i; end | tail -n 1' 3
+check 'function f; echo in f $argv; end; f a b' 'in f a b'
+check 'echo (echo sub)' sub
+check 'false; or echo or-ok' or-ok
+check 'true; and echo and-ok' and-ok
+check 'if test 3 -gt 2; echo gt; else; echo le; end' gt
+check 'switch foo; case foo; echo matched; case "*"; echo no; end' matched
+check 'echo a b c | wc -w | tr -d " "' 3
+check 'echo text > '"$work"'/out; cat '"$work"'/out' text
+check 'set -l y 1 2 3; echo $y[2]' 2
+check 'echo "quoted  string"' 'quoted  string'
+check 'echo {a,b}c' 'ac bc'
+echo x > "$work/g1"
+check "echo $work/g*" "$work/g1"
+check 'false; echo $status' 1
+echo "fish ok"

@@ -1,0 +1,4 @@
+# darkhttpd 1.13, a single-file web server.  The later releases need poll(), which
+# is unreliable here; 1.13 uses select().  (MacPorts' distfile of the 1.13 commit.)
+https://distfiles.macports.org/darkhttpd/darkhttpd-1.13.tar.gz
+snprintf-shim.h emikulic-darkhttpd-afeb474

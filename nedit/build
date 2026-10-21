@@ -1,0 +1,274 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin:$PATH
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them.  A gcc42 built after the cctools package links
+# with the cctools ld by itself; an older one needs the specs file that selects it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+export PATH
+if test -d "nedit-$VERSION"; then cd "nedit-$VERSION"; fi
+
+# NEdit is a Motif program (5.7 wants Motif 1.2 or newer; it is known to work
+# with OpenMotif 2.1).  Motif comes with CubXWindow.  X11_PREFIX in pkg.conf says
+# where the X11 install lives (default /usr/X11R6); Motif is looked for there and
+# in a few other places.
+x11_prefix=
+motif_inc=
+motif_lib=
+for d in $X11_PREFIX /usr/X11R6; do
+    if test -n "$d" && test -f "$d/include/X11/Xlib.h"; then
+        x11_prefix=$d
+        break
+    fi
+done
+if test -z "$x11_prefix"; then
+    echo "nedit: cannot find X11/Xlib.h; install the X11 development files" >&2
+    echo "nedit: and set X11_PREFIX in pkg.conf to the directory holding include/ and lib/" >&2
+    exit 1
+fi
+for d in "$x11_prefix" /usr/local /usr/Motif /usr/OpenMotif; do
+    if test -z "$motif_inc" && test -f "$d/include/Xm/Xm.h"; then
+        motif_inc=$d/include
+    fi
+    if test -z "$motif_lib" && ls "$d"/lib/libXm.* > /dev/null 2>&1; then
+        motif_lib=$d/lib
+    fi
+done
+if test -z "$motif_inc" || test -z "$motif_lib"; then
+    echo "nedit: cannot find Motif (Xm/Xm.h and libXm) under $x11_prefix or /usr/local" >&2
+    echo "nedit: NEdit needs Motif 1.2 or newer" >&2
+    exit 1
+fi
+# Stop here, with a clear message, if the Motif headers are older than 1.2.
+/bin/cat > motif-probe.c <<'PEOF'
+#include <X11/Intrinsic.h>
+#include <Xm/Xm.h>
+#if XmVersion < 1002
+#error NEdit needs Motif 1.2 or newer
+#endif
+int main(void) { return 0; }
+PEOF
+if $CC -I"$x11_prefix/include" -I"$motif_inc" -c motif-probe.c -o motif-probe.o > motif-probe.log 2>&1; then :; else
+    /bin/cat motif-probe.log >&2
+    echo "nedit: the Motif headers in $motif_inc do not compile, or are older than Motif 1.2" >&2
+    exit 1
+fi
+/bin/rm -f motif-probe.c motif-probe.o motif-probe.log
+echo "nedit: using X11 under $x11_prefix, Motif under $motif_inc and $motif_lib"
+
+# Types the system's <sys/types.h> may lack (probed: a typedef cannot be tested for).
+OSTEP_DEFS=
+for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
+    printf '#include <sys/types.h>\n%s probe_var;\nint main(void) { return 0; }\n' "$ostep_type" > type-probe.c
+    if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+        ostep_upper=`echo $ostep_type | tr 'a-z' 'A-Z'`
+        OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
+    fi
+done
+/bin/rm -f type-probe.c type-probe.o
+
+# OPENSTEP's libc and headers lack snprintf(), strdup(), waitpid(), setsid(),
+# getcwd(), putenv() and the POSIX <dirent.h>, and <sys/stat.h> has no S_IS*
+# macros.  A compat header, forced into every compile, supplies them as static
+# functions renamed by macros, so nothing needs linking and nothing can clash.
+/usr/local/bin/mkdir -p openstep
+/bin/cat > openstep/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+/bin/cat > openstep/nedit-compat.h <<'SEOF'
+#ifndef OPENSTEP_NEDIT_COMPAT_H
+#define OPENSTEP_NEDIT_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <string.h>
+#ifdef OSTEP_NEED_MODE_T
+typedef unsigned short mode_t;
+#endif
+#ifdef OSTEP_NEED_SSIZE_T
+typedef int ssize_t;
+#endif
+#ifdef OSTEP_NEED_PID_T
+typedef int pid_t;
+#endif
+#ifdef OSTEP_NEED_UID_T
+typedef unsigned short uid_t;
+#endif
+#ifdef OSTEP_NEED_GID_T
+typedef unsigned short gid_t;
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef S_ISLNK
+# define S_ISLNK(m) (((m) & S_IFMT) == S_IFLNK)
+#endif
+#ifndef R_OK
+# define F_OK 0
+# define X_OK 1
+# define W_OK 2
+# define R_OK 4
+#endif
+#ifndef SEEK_SET
+# define SEEK_SET 0
+# define SEEK_CUR 1
+# define SEEK_END 2
+#endif
+#ifndef PATH_MAX
+# define PATH_MAX 1024
+#endif
+#ifndef WEXITSTATUS
+# define WEXITSTATUS(s) ((int) (((s) >> 8) & 0xff))
+#endif
+extern char **environ;
+extern int wait4();
+extern int setpgrp();
+extern char *getwd();
+static int
+ostep_waitpid(int pid, int *status, int options)
+{
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != NULL)
+        memcpy(p, s, n);
+    return p;
+}
+static int
+ostep_setsid(void)
+{
+    int pid = getpid();
+
+    /* A new process group is as close as this system comes; the controlling
+       terminal is not detached. */
+    return setpgrp(pid, pid) < 0 ? -1 : pid;
+}
+static char *
+ostep_getcwd(char *buf, size_t size)
+{
+    if (buf == NULL || size < MAXPATHLEN)
+        return NULL;
+    return getwd(buf);
+}
+static int
+ostep_putenv(char *string)
+{
+    char *eq = strchr(string, '=');
+    size_t n, count;
+    char **e, **newenv;
+
+    if (eq == 0)
+        return -1;
+    n = eq - string;
+    count = 0;
+    for (e = environ; e != 0 && *e != 0; e++) {
+        if (strncmp(*e, string, n) == 0 && (*e)[n] == '=') {
+            *e = string;
+            return 0;
+        }
+        count++;
+    }
+    newenv = (char **) malloc((count + 2) * sizeof(char *));
+    if (newenv == 0)
+        return -1;
+    for (count = 0; environ != 0 && environ[count] != 0; count++)
+        newenv[count] = environ[count];
+    newenv[count++] = string;
+    newenv[count] = 0;
+    environ = newenv;
+    return 0;
+}
+#define waitpid ostep_waitpid
+#define strdup ostep_strdup
+#define setsid ostep_setsid
+#define getcwd ostep_getcwd
+#define putenv ostep_putenv
+#endif
+SEOF
+# snprintf() and vsnprintf() as static functions (the same shim pkgconf uses).
+/bin/cp snprintf-shim.h openstep/snprintf-shim.h
+compat=`pwd`/openstep
+inc="-include $compat/nedit-compat.h -include $compat/snprintf-shim.h"
+
+libs="-L$x11_prefix/lib -L$motif_lib -lXm"
+if ls "$x11_prefix"/lib/libXpm.* > /dev/null 2>&1; then libs="$libs -lXpm"; fi
+libs="$libs -lXmu -lXt"
+if ls "$x11_prefix"/lib/libSM.* > /dev/null 2>&1 && ls "$x11_prefix"/lib/libICE.* > /dev/null 2>&1; then
+    libs="$libs -lSM -lICE"
+fi
+libs="$libs -lXext -lX11 -lm"
+
+# The makefiles run "$(AR) $(ARFLAGS) lib.a objects" and never ranlib: wrap that so
+# the archive gets its table of contents (and never the -u or -s options).
+/bin/cat > ostep-ar <<AEOF
+#!/bin/sh
+shift
+lib=\$1
+shift
+$PKG_AR cr "\$lib" "\$@" || exit 1
+$PKG_RANLIB "\$lib"
+AEOF
+/bin/chmod 755 ostep-ar
+ar_wrapper=`pwd`/ostep-ar
+
+# A makefile for this system, in the form the others in makefiles/ take.  Files
+# are listed with the lpr print command; <dirent.h> comes from the private
+# directory.
+/bin/cat > makefiles/Makefile.openstep <<MEOF
+CC=$CC
+AR=$ar_wrapper
+CFLAGS=-O2 -I$compat -I$x11_prefix/include -I$motif_inc -DUSE_DIRENT -DUSE_LPR_PRINT_CMD -DEDITRES $OSTEP_DEFS $inc
+ARFLAGS=cr
+BIGGER_STRINGS=
+LIBS=$libs
+include Makefile.common
+verify_config:
+MEOF
+
+# The stock mkdir lacks -p and the stock sh does not stop a failed sub-make in a
+# loop, so build the pieces one by one and check the results.
+/bin/gnumake openstep
+test -f source/nedit
+test -f source/nc
+
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
+/bin/cp source/nedit "$DESTDIR$PREFIX/bin/nedit"
+/bin/cp source/nc "$DESTDIR$PREFIX/bin/nc"
+/bin/chmod 755 "$DESTDIR$PREFIX/bin/nedit" "$DESTDIR$PREFIX/bin/nc"
+# The man pages are written as pod; install them when the tool to render them
+# (pod2man, from perl) is around, otherwise skip them.
+if test -x /usr/local/bin/pod2man; then
+    for p in nedit nc; do
+        /usr/local/bin/pod2man --section=1 --center="NEdit" --release="NEdit $VERSION" doc/$p.pod > "$DESTDIR$PREFIX/man/man1/$p.1" || /bin/rm -f "$DESTDIR$PREFIX/man/man1/$p.1"
+    done
+fi
+# Resource defaults, for those who want to adapt the look.
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/share/nedit"
+/bin/cp doc/NEdit.ad "$DESTDIR$PREFIX/share/nedit/NEdit.ad"
+/bin/cp doc/README.FAQ doc/faq.txt "$DESTDIR$PREFIX/share/nedit/" 2>/dev/null || :
+/bin/cp ReleaseNotes COPYRIGHT "$DESTDIR$PREFIX/share/nedit/"
+
+test -x "$DESTDIR$PREFIX/bin/nedit"
+test -x "$DESTDIR$PREFIX/bin/nc"

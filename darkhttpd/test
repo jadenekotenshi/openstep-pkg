@@ -1,0 +1,57 @@
+#!/bin/sh
+set -e
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+export PATH
+LR=${LOCAL_ROOT-/usr/local}
+work=${TMPDIR-/tmp}/darkhttpd-pkg-test-$$
+mkdir "$work"
+pid=
+trap '[ -z "$pid" ] || kill $pid 2>/dev/null; rm -rf "$work"' 0
+trap 'exit 1' 1 2 3 15
+
+"$LR/bin/darkhttpd" --help > "$work/help" 2>&1 || :
+grep -i 'usage' "$work/help" > /dev/null
+
+# Serve a directory on a local port and fetch from it with a tiny client.
+mkdir "$work/www"
+echo "hello from darkhttpd" > "$work/www/index.html"
+port=18080
+"$LR/bin/darkhttpd" "$work/www" --port $port --addr 127.0.0.1 > "$work/log" 2>&1 &
+pid=$!
+cat > "$work/get.c" <<'GEOF'
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+int main(int argc, char **argv)
+{
+    struct sockaddr_in a;
+    char buf[4096];
+    int s, n, total = 0;
+    const char *req = "GET /index.html HTTP/1.0\r\n\r\n";
+    s = socket(AF_INET, SOCK_STREAM, 0);
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_port = htons(atoi(argv[1]));
+    a.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if (connect(s, (struct sockaddr *) &a, sizeof a) < 0) return 2;
+    write(s, req, strlen(req));
+    while ((n = read(s, buf + total, sizeof buf - 1 - total)) > 0) total += n;
+    buf[total] = 0;
+    fputs(buf, stdout);
+    return 0;
+}
+GEOF
+"$LR/bin/gcc-4.2" -I/NextDeveloper/Headers/bsd "$work/get.c" -o "$work/get"
+n=0
+while [ $n -lt 20 ]; do
+    if "$work/get" $port > "$work/reply" 2>/dev/null; then break; fi
+    sleep 1
+    n=`expr $n + 1`
+done
+grep '^HTTP/1.1 200' "$work/reply" > /dev/null
+grep 'hello from darkhttpd' "$work/reply" > /dev/null
+echo "darkhttpd serves files (HTTP/1.1 200)"

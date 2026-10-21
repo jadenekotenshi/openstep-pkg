@@ -1,0 +1,11 @@
+gcc42
+make
+coreutils
+sed
+grep
+gawk
+pdksh
+zlib
+bzip2
+tar
+@i386:cctools

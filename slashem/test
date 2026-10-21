@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+HACKDIR=$LOCAL_ROOT/slashemdir
+export HACKDIR
+
+test -x "$HACKDIR/slashem"
+test -f "$HACKDIR/dungeon"
+test -x "$LOCAL_ROOT/bin/slashem"
+cd "$HACKDIR"
+# "-s" prints the score list and exits; with an empty record file it reports
+# that there are no entries.  A game that cannot find its data files stops with
+# a different message.
+out=`./slashem -s all 2>&1 < /dev/null || :`
+case "$out" in
+*[Pp]anic*|*"Cannot"*|*"cannot"*)
+    echo "slashem: $out" >&2
+    exit 1;;
+esac
+echo "slashem ok"
