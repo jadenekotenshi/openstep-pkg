@@ -126,6 +126,9 @@ typedef unsigned short uid_t;
 #ifdef OSTEP_NEED_GID_T
 typedef unsigned short gid_t;
 #endif
+#ifdef OSTEP_NEED_RLIM_T
+typedef long rlim_t;
+#endif
 #ifndef PATH_MAX
 # define PATH_MAX 1024
 #endif
@@ -181,6 +184,11 @@ for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
         OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_$ostep_upper"
     fi
 done
+rm -f type-probe.c type-probe.o
+printf '#include <sys/types.h>\n#include <sys/time.h>\n#include <sys/resource.h>\nrlim_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
+if $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1; then :; else
+    OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_RLIM_T"
+fi
 rm -f type-probe.c type-probe.o
 echo "dash: missing types:$OSTEP_DEFS"
 
