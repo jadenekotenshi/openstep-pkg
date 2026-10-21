@@ -993,6 +993,16 @@ typedef long rlim_t;
 #ifndef EILSEQ
 # define EILSEQ 86
 #endif
+#ifndef O_NONBLOCK
+# ifdef FNDELAY
+#  define O_NONBLOCK FNDELAY
+# else
+#  define O_NONBLOCK 0x0004
+# endif
+#endif
+#ifndef FD_CLOEXEC
+# define FD_CLOEXEC 1
+#endif
 #ifndef S_IRUSR
 # define S_IRUSR 0000400
 # define S_IWUSR 0000200
