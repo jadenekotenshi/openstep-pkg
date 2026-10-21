@@ -15,36 +15,40 @@ export PATH
 if test -d "nedit-$VERSION"; then cd "nedit-$VERSION"; fi
 
 # NEdit is a Motif program (5.7 wants Motif 1.2 or newer; it is known to work
-# with OpenMotif 2.1).  Motif comes with CubXWindow.  X11_PREFIX in pkg.conf says
-# where the X11 install lives (default /usr/X11R6); Motif is looked for there and
-# in a few other places.
+# with OpenMotif 2.1).  Motif comes with CubXWindow, which keeps it in /usr/X11R5
+# (and has a /usr/X11R6 as well).  The directories searched are X11_PREFIX from
+# pkg.conf, then /usr/X11R5, /usr/X11R6 and a few others.  Headers from two X11
+# releases must not be mixed, so the prefix that has Motif decides: X11 is taken from
+# the same prefix when it has the X11 headers and libX11 as well, and from the first
+# other prefix that does if not.
+cands="$X11_PREFIX /usr/X11R5 /usr/X11R6 /usr/Motif /usr/OpenMotif /usr/local"
+motif_prefix=
+for d in $cands; do
+    if test -n "$d" && test -f "$d/include/Xm/Xm.h" && ls "$d"/lib/libXm.* > /dev/null 2>&1; then
+        motif_prefix=$d
+        break
+    fi
+done
+if test -z "$motif_prefix"; then
+    echo "nedit: cannot find Motif (include/Xm/Xm.h and lib/libXm) under:" >&2
+    echo "nedit:   $cands" >&2
+    echo "nedit: NEdit needs Motif 1.2 or newer; set X11_PREFIX in pkg.conf to the" >&2
+    echo "nedit: directory that holds it" >&2
+    exit 1
+fi
 x11_prefix=
-motif_inc=
-motif_lib=
-for d in $X11_PREFIX /usr/X11R6; do
-    if test -n "$d" && test -f "$d/include/X11/Xlib.h"; then
+for d in $motif_prefix $cands; do
+    if test -n "$d" && test -f "$d/include/X11/Xlib.h" && ls "$d"/lib/libX11.* > /dev/null 2>&1; then
         x11_prefix=$d
         break
     fi
 done
 if test -z "$x11_prefix"; then
-    echo "nedit: cannot find X11/Xlib.h; install the X11 development files" >&2
-    echo "nedit: and set X11_PREFIX in pkg.conf to the directory holding include/ and lib/" >&2
+    echo "nedit: cannot find X11 (include/X11/Xlib.h and lib/libX11) under: $cands" >&2
     exit 1
 fi
-for d in "$x11_prefix" /usr/local /usr/Motif /usr/OpenMotif; do
-    if test -z "$motif_inc" && test -f "$d/include/Xm/Xm.h"; then
-        motif_inc=$d/include
-    fi
-    if test -z "$motif_lib" && ls "$d"/lib/libXm.* > /dev/null 2>&1; then
-        motif_lib=$d/lib
-    fi
-done
-if test -z "$motif_inc" || test -z "$motif_lib"; then
-    echo "nedit: cannot find Motif (Xm/Xm.h and libXm) under $x11_prefix or /usr/local" >&2
-    echo "nedit: NEdit needs Motif 1.2 or newer" >&2
-    exit 1
-fi
+motif_inc=$motif_prefix/include
+motif_lib=$motif_prefix/lib
 # Stop here, with a clear message, if the Motif headers are older than 1.2.
 /bin/cat > motif-probe.c <<'PEOF'
 #include <X11/Intrinsic.h>
@@ -60,7 +64,7 @@ if $CC -I"$x11_prefix/include" -I"$motif_inc" -c motif-probe.c -o motif-probe.o 
     exit 1
 fi
 /bin/rm -f motif-probe.c motif-probe.o motif-probe.log
-echo "nedit: using X11 under $x11_prefix, Motif under $motif_inc and $motif_lib"
+echo "nedit: using X11 under $x11_prefix, Motif under $motif_prefix"
 
 # Types the system's <sys/types.h> may lack (probed: a typedef cannot be tested for).
 OSTEP_DEFS=
