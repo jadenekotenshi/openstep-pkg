@@ -62,7 +62,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | cowsay | validated 3.03+dfsg2 (2026-10-21; build, install and test pass; `fortune \| cowsay` works) | validated 3.03+dfsg2 (2026-10-22; build, install and test pass) | — |
 | curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | validated (2026-10-21; built with gcc42, tests pass) |
 | darkhttpd | — (new 2026-10-24: 1.13, the last select()-based release, with an snprintf() shim; the test serves a directory and fetches from it; passes on Linux) | — | — |
-| dash | — (new 2026-10-24: 0.5.12, the Debian ash; private stdint/inttypes, a sigaction-on-sigvec shim and waitpid/setpgid/tcgetpgrp/getcwd/strtoll shims; `sh -n build` and the test script are checked on Linux only) | — | — |
+| dash | validated 0.5.12 on x86 (2026-10-25; builds, installs, tests, and an interactive session with job control works; private stdint/inttypes, <dirent.h> and <sys/wait.h>, a sigaction-on-sigvec shim and waitpid/setpgid/getpgrp/tcgetpgrp/getcwd/strtoll/strsignal/vsnprintf shims) | — | — |
 | diffutils | validated | validated 2.8.1 (2026-10-09) | — |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
 | emacs | validated | validated (2026-10-10; needed the pdumper alignment fixes for the 64-bit wide-int Lisp_Object, and a SPARC `netinet/in.h` big-endian branch) | — |
