@@ -111,6 +111,7 @@ run_configure \
   --build=$PKG_TARGET \
   --prefix=/usr/local \
   --disable-nls \
+  --disable-dependency-tracking \
   --disable-asm \
   --without-readline \
   --disable-keyserver-helpers \
