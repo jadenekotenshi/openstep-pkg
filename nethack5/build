@@ -18,6 +18,15 @@ export PATH CC
 if test -d "NetHack-$VERSION"; then cd "NetHack-$VERSION"; fi
 . "$PKG_BUILD_HELPERS"
 
+# NetHack's makefiles run Lua's build with a bare "make", which here is the BSD make
+# (it rejects the GNU-style arguments).  A directory with "make" linked to gnumake
+# goes first in the PATH, so that any such call gets GNU make.
+/usr/local/bin/mkdir -p ostep-bin
+/bin/rm -f ostep-bin/make
+/bin/ln -s /bin/gnumake ostep-bin/make
+PATH=`pwd`/ostep-bin:$PATH
+export PATH
+
 # Lua 5.4.8 comes in lib/lua-5.4.8 (the sources file puts it there); it needs the
 # same OPENSTEP fixes as the lua package (wait macros, popen, frexp, strtod).
 (cd lib/lua-5.4.8 && patch -p1 < ../../lua-5.4.8-openstep.patch)
