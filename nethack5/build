@@ -194,12 +194,15 @@ VARDIRPERM = 0777
 VARFILEPERM = 0666
 HEOF
 
-# GNU make 3.81 (the system's gnumake) takes "target: VAR:=value", with no space
-# before :=, for the start of a static pattern rule ("target pattern contains no
-# %"); the fetch-lua targets in Makefile.top are written that way.
-/bin/sed -e 's/: LUA_URL_list:=/: LUA_URL_list :=/' sys/unix/Makefile.top > sys/unix/Makefile.top.new
+# GNU make 3.81 (the system's gnumake) cannot read the target-specific variables of
+# the fetch-lua-mirror and fetch-lua-nhd targets in Makefile.top ("target pattern
+# contains no %").  They only choose where to download Lua from, which this package
+# does not do (the sources file stages it), so comment those two lines out.
+/bin/sed -e 's/^\(fetch-lua-mirror: LUA_URL_list\)/#\1/' -e 's/^\(fetch-lua-nhd: LUA_URL_list\)/#\1/' \
+    sys/unix/Makefile.top > sys/unix/Makefile.top.new
 /bin/mv sys/unix/Makefile.top.new sys/unix/Makefile.top
-/bin/grep 'LUA_URL_list :=' sys/unix/Makefile.top > /dev/null
+/bin/grep '^#fetch-lua-mirror: LUA_URL_list' sys/unix/Makefile.top > /dev/null
+/bin/grep '^#fetch-lua-nhd: LUA_URL_list' sys/unix/Makefile.top > /dev/null
 
 /bin/sh sys/unix/setup.sh "$hints"
 
