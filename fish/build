@@ -1324,10 +1324,11 @@ LIBS="-L`pwd` -lostepfish"
 # configure insists on finding nanosleep() in libc or librt; the shim's version is
 # renamed by the compat header, so tell it there is nothing to link.
 ac_cv_search_nanosleep='none required'
+ac_cv_search_connect='none required'
 # libiconv exports libiconv_open() (its iconv.h maps iconv_open onto it), so the
 # plain-name search fails every time it is repeated; -liconv is the answer.
 ac_cv_search_iconv_open=-liconv
-export ac_cv_search_nanosleep ac_cv_search_iconv_open
+export ac_cv_search_nanosleep ac_cv_search_connect ac_cv_search_iconv_open
 export CPPFLAGS LDFLAGS LIBS
 
 # fishd.c #defines FILE to a file-name prefix, which fights with stdio's FILE here.
