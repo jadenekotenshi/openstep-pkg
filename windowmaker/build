@@ -409,8 +409,36 @@ ostep_exit(int status)
 }
 XEOF
 $CC $CFLAGS -c openstep_exit.c -o openstep_exit.o
+# getcwd() is missing from this libc (it has getwd()).
+/bin/cat > openstep_getcwd.c <<'GEOF'
+#include <errno.h>
+#include <string.h>
+#include <sys/param.h>
+
+extern char *getwd();
+
+char *
+getcwd(char *buf, int size)
+{
+    char tmp[MAXPATHLEN + 1];
+
+    if (buf == 0 || size <= 0) {
+        errno = EINVAL;
+        return 0;
+    }
+    if (getwd(tmp) == 0)
+        return 0;
+    if ((int) strlen(tmp) >= size) {
+        errno = ERANGE;
+        return 0;
+    }
+    strcpy(buf, tmp);
+    return buf;
+}
+GEOF
+$CC $CFLAGS -c openstep_getcwd.c -o openstep_getcwd.o
 /bin/rm -f libopenstepsig.a
-"$AR" rc libopenstepsig.a openstep_sig.o openstep_exit.o
+"$AR" rc libopenstepsig.a openstep_sig.o openstep_exit.o openstep_getcwd.o
 "$RANLIB" libopenstepsig.a
 LIBS="-L`pwd` -lopenstepsig -lX11 $LIBS"
 export LIBS
