@@ -109,6 +109,31 @@ SIGEOF
 #ifndef SA_NOCLDSTOP
 # define SA_NOCLDSTOP	0x20000
 #endif
+#ifndef SA_SIGINFO
+# define SA_SIGINFO	0x40000
+#endif
+extern int sigemptyset(sigset_t *);
+extern int sigfillset(sigset_t *);
+extern int sigaddset(sigset_t *, int);
+extern int sigdelset(sigset_t *, int);
+extern int sigismember(const sigset_t *, int);
+extern int sigprocmask(int, const sigset_t *, sigset_t *);
+extern int sigsuspend(const sigset_t *);
+extern int sigaction(int, const struct sigaction *, struct sigaction *);
+SIGEOF
+# fish installs its handlers as SA_SIGINFO ones (sa_sigaction, taking a siginfo_t
+# pointer).  Here the handler is a BSD sigvec() one, which is called with a signal
+# number, a code and a context: the same three-argument shape, and fish ignores
+# the second and third.  So sa_sigaction is just another name for sa_handler.
+probe_sig 'siginfo_t probe_si;' || /bin/cat >> "$sig_h" <<'SIGEOF'
+typedef struct {
+    int si_signo;
+    int si_errno;
+    int si_code;
+} siginfo_t;
+SIGEOF
+/bin/cat >> "$sig_h" <<'SIGEOF'
+#define sa_sigaction sa_handler
 SIGEOF
 /bin/rm -f probe_sig.c probe_sig.o
 
@@ -576,6 +601,20 @@ extern wint_t towupper(wint_t);
 MEOF
 fi
 /bin/rm -f wide-probe.c wide-probe.o wide-probe
+/bin/cat > openstep/stdint.h <<'MEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long long intmax_t;
+typedef unsigned long long uintmax_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#endif
+MEOF
 /bin/cat > openstep/dirent.h <<'MEOF'
 #ifndef OPENSTEP_DIRENT_H
 #define OPENSTEP_DIRENT_H
