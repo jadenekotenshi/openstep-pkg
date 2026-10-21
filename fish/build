@@ -264,6 +264,12 @@ ostep_setpgid(int pid, int pgrp)
 }
 
 int
+ostep_getpgrp(void)
+{
+    return getpgrp(0);
+}
+
+int
 ostep_getpgid(int pid)
 {
     if (pid == 0 || pid == getpid())
@@ -925,6 +931,7 @@ struct timespec {
 extern int ostep_waitpid(int, int *, int);
 extern int ostep_setpgid(int, int);
 extern int ostep_getpgid(int);
+extern int ostep_getpgrp();
 extern int ostep_setsid(void);
 extern int ostep_tcgetpgrp(int);
 extern int ostep_tcsetpgrp(int, int);
@@ -937,6 +944,7 @@ extern char *ostep_realpath(const char *, char *);
 #define waitpid ostep_waitpid
 #define setpgid ostep_setpgid
 #define getpgid ostep_getpgid
+#define getpgrp ostep_getpgrp
 #define setsid ostep_setsid
 #define tcgetpgrp ostep_tcgetpgrp
 #define tcsetpgrp ostep_tcsetpgrp
