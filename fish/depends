@@ -6,4 +6,5 @@ grep
 gawk
 pdksh
 ncurses
+libiconv
 @i386:cctools
