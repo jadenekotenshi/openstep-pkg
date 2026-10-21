@@ -18,7 +18,11 @@ test -x "$LR/bin/fishd"
 
 # (fish complains on stderr when fishd cannot be reached; only stdout is checked.)
 check() {
-    got=`"$FISH" -c "$1" 2>/dev/null`
+    # (Output goes through a file, not `...`: fish starts fishd, the universal
+    # variable daemon, which can keep an inherited pipe open and so keep a command
+    # substitution waiting for end-of-file forever.)
+    "$FISH" -c "$1" > "$work/out" 2>/dev/null < /dev/null || :
+    got=`cat "$work/out"`
     if test "$got" != "$2"; then
         echo "fish: '$1' printed '$got', expected '$2'" >&2
         exit 1
