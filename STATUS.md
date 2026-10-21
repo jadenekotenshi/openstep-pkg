@@ -114,6 +114,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | — |
 | nedit | validated 5.7 (2026-10-27; builds, installs, test passes and the editor runs under CubXWindow; Motif comes from /usr/X11R5 or /usr/X11R6, whichever has it; needs a handful of header stand-ins and no glob()) | validated 5.7 (2026-10-27; builds, installs, tests and runs; needed -DYYMALLOC=malloc -DYYFREE=free for the bison-generated parser) | — |
 | nethack | validated (tty and X11) | validated 3.6.7 (`pkg test` passes, game starts; a stray "pkg: Stock: not found" after the install was a script replaced mid-run, fixed in pkg; rebootstrap, 2026-10-08) | — |
+| nethack5 | — (new 2026-10-27: NetHack 5.0.0, tty only, installed beside 3.6.7 as `nethack5` in /usr/local/lib/nethack5dir; builds its own Lua 5.4.8 with the lua package's OPENSTEP patch ported; the build flow is checked on Linux, nothing has been built on OPENSTEP yet) | — | — |
 | netsurf-buildsystem | validated | validated 1.10 (rebootstrap, 2026-10-08) | — |
 | netsurf-openstep | validated 3.12-dev.20261002 (2026-10-22; builds from turbolent/netsurf-openstep at 5fd3476, installs NetSurf.app into /usr/local/Apps, test passes; connects to slashdot.org over TLS) | n/a (i386 only) | n/a (i386 only) |
 | neXtaw | validated | validated (2026-10-10) | — |
