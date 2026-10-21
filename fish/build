@@ -302,6 +302,14 @@ ostep_getpgrp(void)
     return getpgrp(0);
 }
 
+/* rand_r(): a 31-bit linear congruential generator on the caller's seed. */
+int
+ostep_rand_r(unsigned int *seed)
+{
+    *seed = *seed * 1103515245U + 12345U;
+    return (int) ((*seed >> 1) & 0x7fffffff);
+}
+
 int
 ostep_getpgid(int pid)
 {
@@ -579,6 +587,7 @@ extern int wcscoll(const wchar_t *, const wchar_t *);
 extern size_t mbrtowc(wchar_t *, const char *, size_t, mbstate_t *);
 extern size_t wcrtomb(char *, wchar_t, mbstate_t *);
 extern size_t mbstowcs(wchar_t *, const char *, size_t);
+extern wint_t btowc(int);
 extern size_t wcstombs(char *, const wchar_t *, size_t);
 #endif
 MEOF
@@ -877,6 +886,12 @@ towupper(wint_t c)
     return (c >= 0 && c < 128) ? (wint_t) toupper((int) c) : c;
 }
 
+wint_t
+btowc(int c)
+{
+    return (c >= 0 && c < 256) ? (wint_t) c : WEOF;
+}
+
 size_t
 mbrtowc(wchar_t *pwc, const char *s, size_t n, mbstate_t *ps)
 {
@@ -993,6 +1008,9 @@ typedef long rlim_t;
 #ifndef EILSEQ
 # define EILSEQ 86
 #endif
+#ifndef ENOSYS
+# define ENOSYS 78
+#endif
 #ifndef O_NONBLOCK
 # ifdef FNDELAY
 #  define O_NONBLOCK FNDELAY
@@ -1077,6 +1095,7 @@ extern int ostep_waitpid(int, int *, int);
 extern int ostep_setpgid(int, int);
 extern int ostep_getpgid(int);
 extern int ostep_getpgrp();
+extern int ostep_rand_r(unsigned int *);
 extern int ostep_setsid(void);
 extern int ostep_tcgetpgrp(int);
 extern int ostep_tcsetpgrp(int, int);
@@ -1090,6 +1109,7 @@ extern char *ostep_realpath(const char *, char *);
 #define setpgid ostep_setpgid
 #define getpgid ostep_getpgid
 #define getpgrp ostep_getpgrp
+#define rand_r ostep_rand_r
 #define setsid ostep_setsid
 #define tcgetpgrp ostep_tcgetpgrp
 #define tcsetpgrp ostep_tcsetpgrp
@@ -1109,7 +1129,7 @@ $AR cr libostepfish.a openstep_sig.o openstep_posix.o openstep_wchar.o
 $RANLIB libostepfish.a
 
 # ncurses comes from the ncurses package.
-CPPFLAGS="-I$shimdir -I/usr/local/include/ncurses -I/usr/local/include $OSTEP_DEFS -include $sig_h -include $shimdir/fish-compat.h"
+CPPFLAGS="-I$shimdir -I/usr/local/include/ncurses -I/usr/local/include $OSTEP_DEFS -include $sig_h -include $shimdir/fish-compat.h -include `pwd`/snprintf-shim.h"
 LDFLAGS=-L/usr/local/lib
 LIBS="-L`pwd` -lostepfish"
 # configure insists on finding nanosleep() in libc or librt; the shim's version is
