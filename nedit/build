@@ -115,6 +115,11 @@ typedef unsigned short uid_t;
 #ifdef OSTEP_NEED_GID_T
 typedef unsigned short gid_t;
 #endif
+/* intptr_t: some files use it without including <inttypes.h> (which only an
+   include of that header would otherwise supply). */
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#define OSTEP_HAVE_INTPTR 1
 #include <locale.h>
 #ifndef LC_MESSAGES
 /* no message-catalog category here; NEdit only asks for it by name */
@@ -248,8 +253,10 @@ echo '/* empty: select() and fd_set come with <sys/types.h> here */' > ostep-inc
 #ifndef OPENSTEP_INTTYPES_H
 #define OPENSTEP_INTTYPES_H
 #include <sys/types.h>
+#ifndef OSTEP_HAVE_INTPTR
 typedef long intptr_t;
 typedef unsigned long uintptr_t;
+#endif
 #endif
 SEOF
 /bin/cat > ostep-inc/sys/utsname.h <<'SEOF'
