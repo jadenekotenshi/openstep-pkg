@@ -461,6 +461,14 @@ CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`
 export CFLAGS
 
 run_configure --build=$PKG_TARGET --prefix="$PREFIX" --without-libedit --disable-dependency-tracking
+# builtins.def is the preprocessed builtins.def.in; with the headers forced in through
+# CFLAGS their whole text ends up in it (and in the builtins table made from it).
+# Make it first with plain flags.
+(cd src && /usr/local/bin/gnumake builtins.def CFLAGS=-O2)
+if /usr/local/bin/grep -c 'compat' src/builtins.def > /dev/null; then
+    echo "dash: builtins.def still contains the compat headers" >&2
+    exit 1
+fi
 /usr/local/bin/gnumake "MKDIR=/usr/local/bin/mkdir -p"
 test -x src/dash || { echo "dash: src/dash was not built" >&2; exit 1; }
 /usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin" "$DESTDIR$PREFIX/man/man1"
