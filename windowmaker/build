@@ -350,13 +350,17 @@ $CC $CFLAGS -I. -c openstep_sig.c -o openstep_sig.o
 /bin/rm -f libopenstepsig.a
 "$AR" rc libopenstepsig.a openstep_sig.o
 "$RANLIB" libopenstepsig.a
-LIBS="-L`pwd` -lopenstepsig $LIBS"
+LIBS="-L`pwd` -lopenstepsig -lX11 $LIBS"
 export LIBS
 CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/afterstep-compat.h -include `pwd`/openstep-sig.h"
 export CFLAGS
 
 # Static libraries only; GIF and TIFF support (libraries this system does not have)
 # and the Hermes assembler blitters are left out.
+# configure's atexit() test fails here, and WINGs then calls on_exit(), which this
+# libc lacks.  atexit() exists.
+ac_cv_func_atexit=yes
+export ac_cv_func_atexit
 run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
     --disable-shared --enable-static \
     --x-includes="$x11_prefix/include" --x-libraries="$x11_prefix/lib" \
@@ -367,13 +371,24 @@ run_configure --build=$PKG_TARGET --prefix="$PREFIX" \
 # success.  Run each directory's make here, so a failure stops the build.
 MKDIRP="/usr/local/bin/mkdir -p"
 subdirs="wrlib WINGs src util WindowMaker WPrefs.app doc"
+# WINGs' own Examples, Extras and Tests are not wanted (and some of them link only
+# libWUtil, which needs X11's _Xsetlocale): build just the libraries and resources.
+wings_subdirs="SUBDIRS=WINGs . Resources"
 for dir in $subdirs; do
-    (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP") || exit 1
+    if [ "$dir" = WINGs ]; then
+        (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP" "$wings_subdirs") || exit 1
+    else
+        (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP") || exit 1
+    fi
 done
 test -f src/wmaker || { echo "windowmaker: src/wmaker was not built" >&2; exit 1; }
 
 for dir in $subdirs; do
-    (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP" install DESTDIR="$DESTDIR") || exit 1
+    if [ "$dir" = WINGs ]; then
+        (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP" "$wings_subdirs" install DESTDIR="$DESTDIR") || exit 1
+    else
+        (cd $dir && /usr/local/bin/gnumake "MKDIR=$MKDIRP" install DESTDIR="$DESTDIR") || exit 1
+    fi
 done
 test -x "$DESTDIR$PREFIX/bin/wmaker" || { echo "windowmaker: the window manager was not installed" >&2; exit 1; }
 
