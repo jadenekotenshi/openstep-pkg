@@ -37,6 +37,33 @@ for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
     fi
 done
 /bin/rm -f type-probe.c type-probe.o
+# <sys/utsname.h> is unusable here (dotlock.c cannot get a struct utsname from it);
+# uname() is made from gethostname().
+/usr/local/bin/mkdir -p openstep/sys
+/bin/cat > openstep/sys/utsname.h <<'SEOF'
+#ifndef OPENSTEP_UTSNAME_H
+#define OPENSTEP_UTSNAME_H
+#include <string.h>
+struct utsname {
+    char sysname[64];
+    char nodename[256];
+    char release[64];
+    char version[64];
+    char machine[64];
+};
+extern int gethostname();
+static int
+ostep_uname(struct utsname *u)
+{
+    memset(u, 0, sizeof(*u));
+    strcpy(u->sysname, "OPENSTEP");
+    if (gethostname(u->nodename, sizeof(u->nodename) - 1) < 0)
+        strcpy(u->nodename, "unknown");
+    return 0;
+}
+#define uname ostep_uname
+#endif
+SEOF
 /bin/cat > openstep/gnupg-compat.h <<'SEOF'
 #ifndef OPENSTEP_GNUPG_COMPAT_H
 #define OPENSTEP_GNUPG_COMPAT_H
