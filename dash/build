@@ -161,6 +161,14 @@ SIGEOF
 #ifndef SA_NOCLDSTOP
 # define SA_NOCLDSTOP	0x20000
 #endif
+extern int sigemptyset(sigset_t *);
+extern int sigfillset(sigset_t *);
+extern int sigaddset(sigset_t *, int);
+extern int sigdelset(sigset_t *, int);
+extern int sigismember(const sigset_t *, int);
+extern int sigprocmask(int, const sigset_t *, sigset_t *);
+extern int sigsuspend(const sigset_t *);
+extern int sigaction(int, const struct sigaction *, struct sigaction *);
 SIGEOF
 /bin/rm -f probe_sig.c probe_sig.o
 
@@ -440,6 +448,15 @@ $CC $CFLAGS -c openstep_misc.c -o openstep_misc.o
 "$RANLIB" libopenstepdash.a
 LIBS="-L`pwd` -lopenstepdash $LIBS"
 export LIBS
+# configure's function checks declare each function themselves, which clashes with
+# the prototypes in the headers forced in below and makes the check fail: say what
+# the libc has.  (strtoimax and strtoumax are the renamed ones from inttypes.h.)
+ac_cv_func_bsearch=yes
+ac_cv_func_strtod=yes
+ac_cv_func_sigsetmask=yes
+ac_cv_func_strtoimax=yes
+ac_cv_func_strtoumax=yes
+export ac_cv_func_bsearch ac_cv_func_strtod ac_cv_func_sigsetmask ac_cv_func_strtoimax ac_cv_func_strtoumax
 CFLAGS="$CFLAGS -fno-strict-aliasing $OSTEP_DEFS -I`pwd`/openstep -include `pwd`/openstep/dash-compat.h -include `pwd`/openstep-sig.h"
 export CFLAGS
 
