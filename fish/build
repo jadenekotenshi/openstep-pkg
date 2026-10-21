@@ -75,6 +75,8 @@ for ostep_type in mode_t ssize_t pid_t uid_t gid_t; do
 done
 printf '#include <sys/types.h>\n#include <time.h>\nstruct timespec probe_ts;\nint main(void) { return 0; }\n' > type-probe.c
 $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 || OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_TIMESPEC"
+printf '#include <sys/types.h>\n#include <sys/socket.h>\nsocklen_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
+$CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 || OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_SOCKLEN_T"
 printf '#include <sys/types.h>\n#include <sys/time.h>\n#include <sys/resource.h>\nrlim_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
 $CC -c type-probe.c -o type-probe.o > /dev/null 2>&1 || OSTEP_DEFS="$OSTEP_DEFS -DOSTEP_NEED_RLIM_T"
 printf '#include <stddef.h>\n#include <stdlib.h>\nwint_t probe_var;\nint main(void) { return 0; }\n' > type-probe.c
@@ -1168,6 +1170,10 @@ struct timespec {
 #ifdef OSTEP_NEED_RLIM_T
 typedef long rlim_t;
 #endif
+#include <sys/socket.h>
+#ifdef OSTEP_NEED_SOCKLEN_T
+typedef int socklen_t;
+#endif
 #ifndef RLIMIT_NOFILE
 # define RLIMIT_NOFILE 8
 #endif
@@ -1323,6 +1329,13 @@ ac_cv_search_nanosleep='none required'
 ac_cv_search_iconv_open=-liconv
 export ac_cv_search_nanosleep ac_cv_search_iconv_open
 export CPPFLAGS LDFLAGS LIBS
+
+# fishd.c #defines FILE to a file-name prefix, which fights with stdio's FILE here.
+/usr/local/bin/sed -e 's/^#define FILE "fishd\."/#define FISHD_FILE "fishd."/' \
+    -e 's/strlen(FILE)/strlen(FISHD_FILE)/' -e 's/strcat( name, FILE )/strcat( name, FISHD_FILE )/' \
+    fishd.c > fishd.c.new
+/bin/mv fishd.c.new fishd.c
+/usr/local/bin/grep 'FISHD_FILE' fishd.c > /dev/null
 
 run_configure \
   --build=$PKG_TARGET \
