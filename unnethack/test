@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+test -x "$LOCAL_ROOT/bin/unnethack"
+test -d "$LOCAL_ROOT/share/unnethack"
+# "-s" prints the score list and exits; with no record file it says there are no
+# entries, a game that cannot open its data files stops with a different message.
+out=`"$LOCAL_ROOT/bin/unnethack" -s all 2>&1 < /dev/null || :`
+case "$out" in
+*[Pp]anic*|*"annot open"*|*"annot find the"*|*"annot find file"*|*"not found"*)
+    echo "unnethack: $out" >&2
+    exit 1;;
+esac
+echo "unnethack ok"
