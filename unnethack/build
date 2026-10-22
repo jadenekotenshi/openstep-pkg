@@ -154,6 +154,9 @@ ostep_strtoull(const char *s, char **end, int base)
 #endif
 HEOF
 
+# SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
+# unsigned versions are forced into the game's code (empty on x86).
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
 # Configure: tty and curses interfaces (curses through the ncurses package), gzip for
 # compressed files, the Guidebook is not formatted (nroff is not used), and the
 # bison and flex packages for the level and dungeon compilers.  The compat header is
@@ -198,7 +201,7 @@ unnethack_configure() {
     /bin/mv include/autoconf.h.new include/autoconf.h
 
     for mk in src/Makefile util/Makefile; do
-        /bin/sed -e "s|^CFLAGS = |CFLAGS = -I$inc -I$ncinc -include $inc/unnethack-compat.h -DHACKDIR=\\\\\"$PREFIX/share/unnethack\\\\\" -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
+        /bin/sed -e "s|^CFLAGS = |CFLAGS = -I$inc -I$ncinc -include $inc/unnethack-compat.h $CMPFLAGS -DHACKDIR=\\\\\"$PREFIX/share/unnethack\\\\\" -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
             $mk > $mk.new
         /bin/mv $mk.new $mk
         /bin/grep 'unnethack-compat.h' $mk > /dev/null

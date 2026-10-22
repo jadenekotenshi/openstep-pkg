@@ -271,6 +271,9 @@ fi
 # hints include file.  The game goes in /usr/local/lib/splicehackdir with a launcher
 # in /usr/local/bin/splicehack.  There is no games user or group here, so ownership is
 # left alone and the score and save files are writable by everyone who can run it.
+# SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
+# unsigned versions are forced into the game's code (empty on x86).
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
 hints=sys/unix/hints/openstep.splice
 /bin/cat > "$hints" <<HEOF
 #-PRE
@@ -286,7 +289,7 @@ INSTDIR=\$(DESTDIR)\$(HACKDIR)
 VARDIR=\$(DESTDIR)\$(HACKDIR)
 SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
 
-CFLAGS=-O2 -I../include -I$inc -include $inc/splicehack-compat.h -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL
+CFLAGS=-O2 -I../include -I$inc -include $inc/splicehack-compat.h $CMPFLAGS -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL
 CFLAGS+=\$(WINCFLAGS)
 # ncurses' headers declare tputs() themselves; the game's own prototype for it must
 # stay out of the way.
