@@ -1,0 +1,170 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+# On i386 the archives and objects come from the cctools tools; a gcc42 built
+# before the cctools package needs the specs file to pick the right linker.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+export PATH CC
+# GitHub's archive unpacks as sporkhack-<commit>
+for d in sporkhack-*; do
+    if test -d "$d"; then cd "$d"; break; fi
+done
+. "$PKG_BUILD_HELPERS"
+
+# SporkHack 0.6.5 is NetHack 3.4.3 with additions, so it is set up the way the
+# slashem package does it: OPENSTEP is treated as a BSD system with termcap and no
+# POSIX job control or types.  tty and curses interfaces (the
+# curses one uses the ncurses package).
+/bin/sed \
+    -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
+    -e 's|^#define SYSV[ 	]|#undef SYSV |' \
+    -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
+    -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
+    -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
+    -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+/bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
+/bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+
+# gzip for compressed save files and bones, and plain string matching for menu
+# colors and no regex (there is no <regex.h> here).
+/bin/sed \
+    -e 's|"/bin/gzip"|"/usr/local/bin/gzip"|' \
+    -e 's|^# *define MENU_COLOR_REGEX_POSIX|/* #define MENU_COLOR_REGEX_POSIX */|' \
+    -e 's|^# *define MENU_COLOR_REGEX$|/* #define MENU_COLOR_REGEX */|' \
+    include/config.h > include/config.h.new
+/bin/mv include/config.h.new include/config.h
+/bin/grep '/usr/local/bin/gzip' include/config.h > /dev/null
+/bin/grep 'MENU_COLOR_REGEX \*/' include/config.h > /dev/null
+# global.h defines MENU_COLOR_REGEX_POSIX on its own; harmless without
+# MENU_COLOR_REGEX, but options.c declares a regex-only variable under it.
+/bin/sed -e 's|^# define MENU_COLOR_REGEX_POSIX|/* # define MENU_COLOR_REGEX_POSIX */|' \
+    include/global.h > include/global.h.new
+/bin/mv include/global.h.new include/global.h
+
+# The makefile is not to ask git for a version (there is no repository in a tarball).
+# makedefs puts the description in the version string.
+/bin/sed -e 's|^export VCS_DESCRIPTION.*|export VCS_DESCRIPTION = release 0.6.5|' \
+    sys/unix/Makefile.top > sys/unix/Makefile.top.new
+/bin/mv sys/unix/Makefile.top.new sys/unix/Makefile.top
+/bin/grep 'VCS_DESCRIPTION = release' sys/unix/Makefile.top > /dev/null
+
+# The level and dungeon compilers are generated with bison and flex: the lex and yacc
+# output the distribution carries in sys/share is for an older, different compiler.
+# bison's skeleton declares its own malloc and free unless told to use the real ones
+# (the compat header, read first, includes <stdlib.h>).
+# This libc lacks <stdint.h> (used by the random number code), snprintf() and
+# strdup().  A private include directory and a header read with -include supply
+# them as static code, so nothing needs linking.  The directory is not called
+# "openstep": make would take that for a target.
+inc=`pwd`/ostep-inc
+/usr/local/bin/mkdir -p ostep-inc
+/bin/cat > ostep-inc/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#endif
+SEOF
+/bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+/bin/cat > ostep-inc/sporkhack-compat.h <<'HEOF'
+#ifndef OPENSTEP_SPORKHACK_H
+#define OPENSTEP_SPORKHACK_H
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+#include "snprintf-shim.h"
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != 0)
+	memcpy(p, s, n);
+    return p;
+}
+#define strdup ostep_strdup
+#endif
+HEOF
+
+# The old Bourne /bin/sh treats an unquoted ^ as a pipe (see the nethack package).
+for mk in sys/unix/Makefile.dat sys/unix/Makefile.src sys/unix/Makefile.top sys/unix/Makefile.utl; do
+    /bin/sed -e "s/grep ^#define/grep '^#define'/" -e "s/grep -v ^#define/grep -v '^#define'/" $mk > $mk.new
+    /bin/mv $mk.new $mk
+done
+
+flags="-O2 $PKG_GCC42_ARCH_FLAGS -I../include -I$inc -include $inc/sporkhack-compat.h -I/usr/local/include/ncurses -DNeXT -DYYMALLOC=malloc -DYYFREE=free"
+/bin/sed \
+    -e "s|^CFLAGS = -g -O -I../include|CFLAGS = $flags -DHACKDIR=\\\\\"$PREFIX/lib/sporkhackdir\\\\\"|" \
+    -e "s|^WINTTYLIB = -lncurses|WINTTYLIB = -L/usr/local/lib -lncurses|" \
+    -e 's|^LFLAGS *=.*|LFLAGS =|' \
+    -e 's|^CC *=.*||' \
+    sys/unix/Makefile.src > sys/unix/Makefile.src.new
+/bin/mv sys/unix/Makefile.src.new sys/unix/Makefile.src
+/bin/sed \
+    -e "s|^CFLAGS = -g -O -I../include|CFLAGS = $flags -DHACKDIR=\\\\\"$PREFIX/lib/sporkhackdir\\\\\"|" \
+    -e 's|^LFLAGS *=.*|LFLAGS =|' \
+    -e 's|^YACC *=.*|YACC = /usr/local/bin/bison -y|' \
+    -e 's|^LEX *=.*|LEX = /usr/local/bin/flex|' \
+    sys/unix/Makefile.utl > sys/unix/Makefile.utl.new
+/bin/mv sys/unix/Makefile.utl.new sys/unix/Makefile.utl
+/bin/grep 'sporkhack-compat.h' sys/unix/Makefile.src sys/unix/Makefile.utl > /dev/null
+/bin/grep '^WINTTYLIB = -L/usr/local/lib -lncurses' sys/unix/Makefile.src > /dev/null
+
+# No games user or group here, so ownership is left alone and the score and save
+# files are writable by everyone who can run it.
+/bin/sed \
+    -e 's|^CHOWN *=.*|CHOWN = true|' \
+    -e 's|^CHGRP *=.*|CHGRP = true|' \
+    -e 's|^GAMEPERM *=.*|GAMEPERM = 0755|' \
+    sys/unix/Makefile.top > sys/unix/Makefile.top.new
+/bin/mv sys/unix/Makefile.top.new sys/unix/Makefile.top
+
+/bin/sh sys/unix/setup.sh
+
+# GNU make (the bare "make" is BSD make).  The game keeps its files in the playground
+# directory, so the variable files go there too.
+/bin/gnumake
+gamedir="$DESTDIR$PREFIX/lib/sporkhackdir"
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin"
+/bin/gnumake install \
+    GAMEDIR="$gamedir" \
+    VARDIR="$gamedir" \
+    SHELLDIR="$DESTDIR$PREFIX/bin"
+
+# Replace the stock launcher (it uses shell features the system sh lacks).
+/bin/cat > "$DESTDIR$PREFIX/bin/sporkhack" <<'LEOF'
+#!/bin/sh
+HACKDIR=/usr/local/lib/sporkhackdir
+export HACKDIR
+cd $HACKDIR
+exec $HACKDIR/sporkhack ${1+"$@"}
+LEOF
+/bin/chmod 755 "$DESTDIR$PREFIX/bin/sporkhack"
+
+test -x "$gamedir/sporkhack"
+test -f "$gamedir/nhdat" -o -f "$gamedir/dungeon"
+test -f "$gamedir/license"
