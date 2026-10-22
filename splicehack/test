@@ -9,5 +9,5 @@ test -f "$HACKDIR/nhdat"
 test -f "$HACKDIR/sysconf"
 test -x "$LOCAL_ROOT/bin/splicehack"
 cd "$HACKDIR"
-./splicehack --version | /usr/local/bin/grep 'SpliceHack Version 1.2' > /dev/null
+./splicehack --version | /usr/local/bin/grep 'NetHack Version 1.2' > /dev/null
 echo "splicehack ok"
