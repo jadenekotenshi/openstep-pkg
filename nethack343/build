@@ -11,7 +11,8 @@ if test -d "nethack-$VERSION"; then cd "nethack-$VERSION"; fi
 
 # NetHack 3.4.3, set up the way the slashem package does it (they are the same code
 # base): OPENSTEP is treated as a BSD system with termcap and no POSIX job control or
-# types.  The game is installed as "nethack343" in /usr/local/lib/nethack343dir, so it
+# types.  (The curses patch turns LINUX on, which brings the POSIX types back; it
+# goes.)  The game is installed as "nethack343" in /usr/local/lib/nethack343dir, so it
 # can sit beside the newer NetHack packages.  There is no games user or group here, so
 # ownership is left alone and the score and save files are writable by everyone who
 # can run it.
@@ -72,6 +73,7 @@ fi
     -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
     -e 's|^#define SYSV[ 	]|#undef SYSV |' \
     -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
+    -e 's|^#define LINUX[ 	]|#undef LINUX |' \
     -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
     -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
     -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
@@ -80,6 +82,10 @@ fi
 /bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
 /bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
+if /bin/grep '^#define LINUX' include/unixconf.h > /dev/null; then
+    echo "nethack343: unixconf.h still defines LINUX" >&2
+    exit 1
+fi
 
 # OPENSTEP has no PATH_MAX; compile-time settings go in a header read with -include.
 /bin/cat > openstep-nethack343.h <<'HEOF'
