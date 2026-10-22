@@ -80,7 +80,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | gnupg | validated 1.4.23 (2026-10-26; builds, installs, tests; no mmap/munmap here, so gpg uses malloc for secure memory and warns about insecure memory unless `no-secmem-warning` is set; compat for putenv, strdup, snprintf, sighold/sigrelse, uname, ENOSYS and the int wait macros) | validated 1.4.23 (2026-10-26; builds, installs, tests; compiled with -mcpu=v8 and a C __udiv_qrnnd, since the assembly modules are not used) | — |
 | gperf | validated | validated 3.3 (2026-10-09) | — |
 | grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | — |
+| gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | validated 1.3.12 (2026-11-04; builds, installs and `pkg test gzip` passes) |
 | help2man | validated | validated 1.27 | — |
 | jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | — |
 | less | validated | validated 710 (rebootstrap, 2026-10-08) | — |
@@ -139,7 +139,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | roboclient | validated (1.1 with `rc.dhcp` installs and tests clean on x86) | validated 1.1 (2026-10-09) | — |
 | rsync | validated | validated (2026-10-10) | — |
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | — |
-| sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | — |
+| sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | validated 4.0.9 (2026-11-04; builds, installs and `pkg test sed` passes; unsigned compares via pkg_cmp_shim) |
 | slashem | validated 0.0.7E7F3 (2026-10-26; builds, installs, test passes, and the game plays; tty interface only, set up as a BSD/termcap build like nethack; menu colours match plain strings, not regexes, since there is no regex.h) | validated 0.0.7E7F3 (2026-10-27; builds, installs and tests) | — |
 | sudo | validated | validated 1.7.10p9 (2026-10-09) | — |
 | tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
