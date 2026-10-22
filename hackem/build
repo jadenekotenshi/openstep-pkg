@@ -150,6 +150,10 @@ CFLAGS=-O2 -I../include -I$inc -include $inc/hackem-compat.h $CMPFLAGS -I/usr/lo
 # ncurses' <term.h> (which termcap.c includes) declares tputs() itself; the game's own
 # prototype for it must stay out of the way.
 CFLAGS+=-DHAVE_TPUTS
+# pline.c defines replace() and piratesay() only when DUMPLOG is on, but other files use
+# them unconditionally (a bug upstream; the public server's build always has DUMPLOG).
+# Without a DUMPLOGFILE in the sysconf no dump files are written.
+CFLAGS+=-DDUMPLOG
 CFLAGS+=-DDLB -DTIMED_DELAY
 CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
 CFLAGS+=-DSYSCF -DSYSCF_FILE=\\"\$(HACKDIR)/sysconf\\"
