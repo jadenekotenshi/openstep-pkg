@@ -55,6 +55,18 @@ if test $curses = 1; then
         echo "nethack343: curswins.c still uses wide characters" >&2
         exit 1
     fi
+    # curses_convert_glyph() in cursmisc.c returns the wide-character line-drawing
+    # characters (WACS_xxx) and Unicode shade characters; with the plain ncurses it
+    # returns the ordinary ones (ACS_xxx) and leaves the shade characters as they are.
+    /bin/sed -e 's|^#define _wide(val) W##val->chars\[0\]|#define _wide(val) val|' \
+        -e 's|return 0x2591;.*|return ch;|' -e 's|return 0x2592;.*|return ch;|' \
+        -e 's|return 0x2248;.*|return ch;|' -e 's|return 0x224b;.*|return ch;|' \
+        win/curses/cursmisc.c > win/curses/cursmisc.c.new
+    /bin/mv win/curses/cursmisc.c.new win/curses/cursmisc.c
+    if /bin/grep 'WACS_\|chars\[0\]\|return 0x2' win/curses/cursmisc.c > /dev/null; then
+        echo "nethack343: cursmisc.c still uses wide characters" >&2
+        exit 1
+    fi
     # no UTF-8 glyphs or locale query, and the tty interface stays (the patch builds
     # a curses-only game)
     /bin/sed -e 's|^#define UTF8_GLYPHS|/* #define UTF8_GLYPHS|' \
