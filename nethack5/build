@@ -256,7 +256,10 @@ if test "${NETHACK5_NO_CURSES-}" = 1; then
     cur_lib=
     tty_lib=-ltermcap
 else
-    cur_cflags="-I/usr/local/include/ncurses -DCURSES_GRAPHICS"
+    # (This ncurses is not a wide-character one, but its header still defines
+    # NCURSES_WIDECHAR, as 0, which the game's "#ifdef" takes as "wide characters are
+    # available"; CURSES_GENL_PUTMIXED is the game's switch for the plain version.)
+    cur_cflags="-I/usr/local/include/ncurses -DCURSES_GRAPHICS -DCURSES_GENL_PUTMIXED"
     cur_src=' $(WINCURSESSRC)'
     cur_obj=' $(WINCURSESOBJ)'
     cur_lib=' $(WINCURSESLIB)'
