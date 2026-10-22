@@ -1,0 +1,6 @@
+NetHack 3.4.3 starts in the curses interface (the patched build) and has no -w command
+line option.  To use the plain tty interface put
+
+    OPTIONS=windowtype:tty
+
+in ~/.nethackrc, or set NETHACKOPTIONS=windowtype:tty in the environment.

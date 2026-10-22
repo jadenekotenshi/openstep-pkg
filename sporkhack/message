@@ -1,0 +1,6 @@
+SporkHack starts in the tty interface, and (like other NetHack 3.4.3 games) has no -w
+command line option.  To use the curses interface put
+
+    OPTIONS=windowtype:curses
+
+in ~/.nethackrc, or set NETHACKOPTIONS=windowtype:curses in the environment.
