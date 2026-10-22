@@ -22,6 +22,23 @@ if test -d "NetHack-$VERSION"; then cd "NetHack-$VERSION"; fi
 # (it rejects the GNU-style arguments).  A directory with "make" linked to gnumake
 # goes first in the PATH, so that any such call gets GNU make.
 /usr/local/bin/mkdir -p ostep-bin
+# NetHack's makefiles run "ar rcs", and the SPARC ar has no "s" option.  This ar
+# wrapper drops the "s" and runs ranlib on the archive instead.
+/bin/cat > ostep-bin/ar-wrap <<AEOF
+#!/bin/sh
+op=\$1
+shift
+case \$op in
+*s*) op=\`echo \$op | /bin/sed 's/s//g'\`; idx=1;;
+*) idx=;;
+esac
+$AR_CMD \$op "\$@" || exit 1
+if [ -n "\$idx" ]; then
+    $RANLIB_CMD "\$1" || exit 1
+fi
+AEOF
+/bin/chmod 755 ostep-bin/ar-wrap
+AR_CMD=`pwd`/ostep-bin/ar-wrap
 /bin/rm -f ostep-bin/make
 /bin/ln -s /bin/gnumake ostep-bin/make
 PATH=`pwd`/ostep-bin:$PATH
