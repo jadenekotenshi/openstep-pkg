@@ -1,0 +1,139 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS -std=gnu99"
+# On i386 the archives and objects come from the cctools tools; a gcc42 built
+# before the cctools package needs the specs file to pick the right linker.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+export PATH CC
+# GitHub's archive unpacks as UnNetHack-<commit>
+for d in UnNetHack-*; do
+    if test -d "$d"; then cd "$d"; break; fi
+done
+. "$PKG_BUILD_HELPERS"
+
+# UnNetHack is NetHack 3.4.3 with a great deal added, built with autoconf.  OPENSTEP
+# is configured as a System V system by default; like the nethack and slashem
+# packages it is treated as a BSD system with termcap and no POSIX job control or
+# types (the rewritten lines are checked below).
+/bin/sed \
+    -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
+    -e 's|^#define SYSV[ 	]|#undef SYSV |' \
+    -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
+    -e 's|^#define LINUX[ 	]|#undef LINUX |' \
+    -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
+    -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
+    -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+/bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
+/bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+/bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
+
+# This libc lacks <stdint.h>, snprintf() and strdup(), and may lack some types.  A
+# private include directory and a header read with -include supply them as static
+# code, so nothing needs linking.  The directory is not called "openstep": make
+# would take that for a target.
+inc=`pwd`/ostep-inc
+/usr/local/bin/mkdir -p ostep-inc
+/bin/cat > ostep-inc/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#define INT32_MAX 2147483647
+#define UINT32_MAX 4294967295U
+#endif
+SEOF
+/bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+# Types the <sys/types.h> may lack (probed, since a duplicate typedef is an error too).
+: > ostep-inc/types-extra.h
+for t in pid_t uid_t gid_t; do
+    {
+        echo '#include <sys/types.h>'
+        echo "$t probe_var;"
+    } > probe.c
+    if $CC -c probe.c -o probe.o 2> /dev/null; then :; else
+        echo "typedef int $t;" >> ostep-inc/types-extra.h
+    fi
+done
+/bin/cat > ostep-inc/unnethack-compat.h <<'HEOF'
+#ifndef OPENSTEP_UNNETHACK_H
+#define OPENSTEP_UNNETHACK_H
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+#include "types-extra.h"
+#include "snprintf-shim.h"
+static char *
+ostep_strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != 0)
+	memcpy(p, s, n);
+    return p;
+}
+#define strdup ostep_strdup
+#endif
+HEOF
+
+# Configure: tty and curses interfaces (curses through the ncurses package), gzip for
+# compressed files, the Guidebook is not formatted (nroff is not used), and the
+# bison and flex packages for the level and dungeon compilers.  The compat header is
+# not read by configure's own tests (a forced header breaks them); it is added to the
+# makefiles afterwards.
+ncinc=/usr/local/include/ncurses
+CFLAGS="-O2 -I$inc -I$ncinc" CPPFLAGS="-I$inc -I$ncinc -I/usr/local/include" \
+LDFLAGS="-L/usr/local/lib" \
+LUA=/usr/local/bin/lua LUA_INCLUDE="-I/usr/local/include" LUA_LIB="-L/usr/local/lib -llua -lm" \
+YACC="/usr/local/bin/bison -y" LEX=/usr/local/bin/flex \
+HAVE_NROFF=no HAVE_COL=yes \
+run_configure --prefix=$PREFIX --build=$PKG_TARGET --host=$PKG_TARGET \
+    --with-compression=/usr/local/bin/gzip --disable-file-areas \
+    --enable-tty-graphics --enable-curses-graphics --disable-utf8-glyphs \
+    --with-owner=root --with-group=wheel
+
+# configure treats this as System V; the game is built as BSD (see above).
+/bin/sed -e 's|^#define SYSV.*|/* #undef SYSV */|' \
+    -e 's|^#undef BSD$|#define BSD 1|' \
+    -e 's|^#define LINUX.*|/* #undef LINUX */|' \
+    include/autoconf.h > include/autoconf.h.new
+/bin/mv include/autoconf.h.new include/autoconf.h
+/bin/grep '^#define BSD 1' include/autoconf.h > /dev/null
+
+for mk in src/Makefile util/Makefile; do
+    /bin/sed -e "s|^CFLAGS = |CFLAGS = -include $inc/unnethack-compat.h -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
+        $mk > $mk.new
+    /bin/mv $mk.new $mk
+    /bin/grep 'unnethack-compat.h' $mk > /dev/null
+done
+
+/bin/gnumake
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin"
+# There is no games user or group here; ownership is left alone and the score and
+# save files are writable by everyone who can run it.
+/bin/gnumake install DESTDIR="$DESTDIR" CHOWN=true CHGRP=true
+
+test -x "$DESTDIR$PREFIX/bin/unnethack" -o -x "$DESTDIR$PREFIX/share/unnethack/unnethack"

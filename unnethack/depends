@@ -1,0 +1,11 @@
+gcc42
+make
+coreutils
+sed
+grep
+gawk
+gzip
+ncurses
+bison
+flex
+lua
