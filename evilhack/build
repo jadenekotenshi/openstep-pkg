@@ -39,9 +39,40 @@ if test -d "EvilHack-$VERSION"; then cd "EvilHack-$VERSION"; fi
 inc=`pwd`/ostep-inc
 /usr/local/bin/mkdir -p ostep-inc
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+/bin/cat > ostep-inc/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#define INT32_MAX 2147483647
+#define UINT32_MAX 4294967295U
+#define UINT64_MAX 18446744073709551615ULL
+#endif
+SEOF
+/bin/cat > ostep-inc/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <stdint.h>
+#define PRId32 "d"
+#define PRIu32 "u"
+#define PRIx32 "x"
+#define PRId64 "lld"
+#define PRIu64 "llu"
+#define PRIx64 "llx"
+#endif
+SEOF
 # Types the <sys/types.h> may lack (probed, since a duplicate typedef is an error too).
 : > ostep-inc/types-extra.h
-for t in pid_t uid_t gid_t; do
+for t in pid_t uid_t gid_t mode_t ssize_t; do
     {
         echo '#include <sys/types.h>'
         echo "$t probe_var;"
@@ -64,6 +95,18 @@ done
 #define PATH_MAX 1024
 #endif
 #include "types-extra.h"
+#include <sys/stat.h>
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+#endif
 #include "snprintf-shim.h"
 static char *
 ostep_strdup(const char *s)
@@ -76,6 +119,14 @@ ostep_strdup(const char *s)
     return p;
 }
 #define strdup ostep_strdup
+/* msleep() is only defined by the game for System V; this is the BSD way */
+extern int usleep();
+static void
+ostep_msleep(unsigned ms)
+{
+    usleep(ms * 1000);
+}
+#define msleep ostep_msleep
 extern char *getwd();
 #define getcwd(buf, size) getwd(buf)
 #endif
