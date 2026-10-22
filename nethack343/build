@@ -1,0 +1,137 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+CC=/usr/local/bin/gcc-4.2
+export PATH CC
+if test -d "nethack-$VERSION"; then cd "nethack-$VERSION"; fi
+. "$PKG_BUILD_HELPERS"
+
+# NetHack 3.4.3, set up the way the slashem package does it (they are the same code
+# base): OPENSTEP is treated as a BSD system with termcap and no POSIX job control or
+# types.  The game is installed as "nethack343" in /usr/local/lib/nethack343dir, so it
+# can sit beside the newer NetHack packages.  There is no games user or group here, so
+# ownership is left alone and the score and save files are writable by everyone who
+# can run it.
+/bin/sed \
+    -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
+    -e 's|^#define SYSV[ 	]|#undef SYSV |' \
+    -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
+    -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
+    -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
+    -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+/bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
+/bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+/bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
+
+# OPENSTEP has no PATH_MAX; compile-time settings go in a header read with -include.
+/bin/cat > openstep-nethack343.h <<'HEOF'
+#ifndef OPENSTEP_NETHACK343_H
+#define OPENSTEP_NETHACK343_H
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+#endif
+HEOF
+compat=`pwd`/openstep-nethack343.h
+# gzip is used for compressed save files and bones.
+/bin/sed \
+    -e 's|"/usr/bin/compress"|"/usr/local/bin/gzip"|' \
+    -e 's|"\.Z"|".gz"|' \
+    include/config.h > include/config.h.new
+/bin/mv include/config.h.new include/config.h
+/bin/grep '"/usr/local/bin/gzip"' include/config.h > /dev/null
+# The old Bourne /bin/sh treats an unquoted ^ as a pipe (see the nethack package).
+for mk in sys/unix/Makefile.dat sys/unix/Makefile.src sys/unix/Makefile.top sys/unix/Makefile.utl; do
+    /bin/sed -e "s/grep ^#define/grep '^#define'/" -e "s/grep -v ^#define/grep -v '^#define'/" $mk > $mk.new
+    /bin/mv $mk.new $mk
+done
+
+# strdup() is missing from this libc and the level and dungeon compilers may use it;
+# supply it as an object linked into those tools and the game.
+/bin/cat > openstep_strdup.c <<'SDEOF'
+#include <stdlib.h>
+#include <string.h>
+
+char *
+strdup(const char *s)
+{
+    size_t n = strlen(s) + 1;
+    char *p = (char *) malloc(n);
+
+    if (p != 0)
+	memcpy(p, s, n);
+    return p;
+}
+SDEOF
+$CC $PKG_GCC42_ARCH_FLAGS -O2 -c openstep_strdup.c -o openstep_strdup.o
+strdup_obj=`pwd`/openstep_strdup.o
+
+# SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
+# unsigned versions are forced into the game's code (empty on x86).
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
+
+hackdir=$PREFIX/lib/nethack343dir
+/bin/sed \
+    -e "s|^CFLAGS = -O -I../include|CFLAGS = -O2 $PKG_GCC42_ARCH_FLAGS -I../include -DHACKDIR=\\\\\"$hackdir\\\\\" -include $compat $CMPFLAGS|" \
+    -e "s|^WINTTYLIB = -ltermlib|WINTTYLIB = -ltermcap $strdup_obj|" \
+    -e 's|^GAME *=.*|GAME     = nethack343|' \
+    -e 's|^CC *=.*||' \
+    sys/unix/Makefile.src > sys/unix/Makefile.src.new
+/bin/mv sys/unix/Makefile.src.new sys/unix/Makefile.src
+/bin/sed \
+    -e "s|^CFLAGS = -O -I../include|CFLAGS = -O2 $PKG_GCC42_ARCH_FLAGS -I../include -DHACKDIR=\\\\\"$hackdir\\\\\" -include $compat $CMPFLAGS|" \
+    -e "s|^LFLAGS *=.*|LFLAGS = $strdup_obj|" \
+    sys/unix/Makefile.utl > sys/unix/Makefile.utl.new
+/bin/mv sys/unix/Makefile.utl.new sys/unix/Makefile.utl
+/bin/grep 'HACKDIR' sys/unix/Makefile.src sys/unix/Makefile.utl > /dev/null
+
+/bin/sed \
+    -e 's|^PREFIX *=.*|PREFIX = /usr|' \
+    -e 's|^GAME *=.*|GAME     = nethack343|' \
+    -e 's|^CHOWN *=.*|CHOWN = true|' \
+    -e 's|^CHGRP *=.*|CHGRP = true|' \
+    -e 's|^VARDIRPERM *=.*|VARDIRPERM = 0777|' \
+    -e 's|^VARFILEPERM *=.*|VARFILEPERM = 0666|' \
+    -e 's|^GAMEPERM *=.*|GAMEPERM = 0755|' \
+    sys/unix/Makefile.top > sys/unix/Makefile.top.new
+/bin/mv sys/unix/Makefile.top.new sys/unix/Makefile.top
+/bin/grep '^GAME     = nethack343' sys/unix/Makefile.top sys/unix/Makefile.src > /dev/null
+
+/bin/sh sys/unix/setup.sh
+
+# The distribution carries pre-generated lex and yacc output for the level and
+# dungeon compilers; use it instead of depending on the system's yacc and lex (copied
+# after the makefiles are set up, so they are newer than the .y and .l sources and
+# make leaves them alone).
+/bin/cp sys/share/lev_comp.h sys/share/dgn_comp.h include/
+/bin/cp sys/share/lev_lex.c sys/share/lev_yacc.c sys/share/dgn_lex.c sys/share/dgn_yacc.c util/
+
+# Build everything, then install into DESTDIR by overriding the install locations on
+# the command line.  The Guidebook is not formatted (it needs nroff); install builds
+# what is needed.
+/bin/gnumake
+gamedir="$DESTDIR$hackdir"
+/usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin"
+/bin/gnumake install \
+    GAMEDIR="$gamedir" \
+    VARDIR="$gamedir" \
+    SHELLDIR="$DESTDIR$PREFIX/bin"
+
+# Replace the stock launcher (it uses shell features the system sh lacks).
+/bin/cat > "$DESTDIR$PREFIX/bin/nethack343" <<'LEOF'
+#!/bin/sh
+HACKDIR=/usr/local/lib/nethack343dir
+export HACKDIR
+cd $HACKDIR
+exec $HACKDIR/nethack343 ${1+"$@"}
+LEOF
+/bin/chmod 755 "$DESTDIR$PREFIX/bin/nethack343"
+
+test -x "$gamedir/nethack343"
+test -f "$gamedir/nhdat" -o -f "$gamedir/dungeon"
+test -f "$gamedir/license"
