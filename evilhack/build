@@ -119,14 +119,6 @@ ostep_strdup(const char *s)
     return p;
 }
 #define strdup ostep_strdup
-/* msleep() is only defined by the game for System V; this is the BSD way */
-extern int usleep();
-static void
-ostep_msleep(unsigned ms)
-{
-    usleep(ms * 1000);
-}
-#define msleep ostep_msleep
 extern char *getwd();
 #define getcwd(buf, size) getwd(buf)
 #endif
@@ -189,6 +181,24 @@ HEOF
 /bin/mv src/Makefile.new src/Makefile
 /bin/grep '^REGEXOBJ = pmatchregex.o' src/Makefile > /dev/null
 /bin/grep '^WINCURSESLIB =$' src/Makefile > /dev/null
+
+# EvilHack's curses interface is written for a wide-character ncurses (<wchar.h>,
+# setcchar() and mvwadd_wch() for UTF-8 symbol sets).  This system has no wide
+# characters, and its ncurses is the plain one, so curswins.c is patched to draw every
+# character with mvwaddch(), as for the other symbol sets.
+/usr/local/bin/gawk '
+    /^#if defined __has_include/ { print "#include \"curses.h\""; skipinc = 1; next }
+    skipinc { if ($0 ~ /^#endif/) skipinc = 0; next }
+    /^#include <wchar.h>/ { next }
+    /if \(SYMHANDLING\(H_UTF8\) && nch.ch > 0x7F\) \{/ { print "    {"; skipblk = 1; next }
+    skipblk { if ($0 ~ /^    \} else \{/) skipblk = 0; next }
+    { print }
+' win/curses/curswins.c > win/curses/curswins.c.new
+/bin/mv win/curses/curswins.c.new win/curses/curswins.c
+if /usr/local/bin/grep 'wchar\|setcchar\|has_include' win/curses/curswins.c | /usr/local/bin/grep -v '^ *[/*]' > /dev/null; then
+    echo "evilhack: curswins.c still uses wide characters" >&2
+    exit 1
+fi
 
 # bison and flex generate the level and dungeon compilers; the old Bourne /bin/sh
 # treats an unquoted ^ as a pipe, so dat/Makefile's grep patterns are quoted.
