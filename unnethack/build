@@ -62,7 +62,7 @@ SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
 # Types the <sys/types.h> may lack (probed, since a duplicate typedef is an error too).
 : > ostep-inc/types-extra.h
-for t in pid_t uid_t gid_t; do
+for t in pid_t uid_t gid_t mode_t; do
     {
         echo '#include <sys/types.h>'
         echo "$t probe_var;"
@@ -84,6 +84,18 @@ done
 #define PATH_MAX 1024
 #endif
 #include "types-extra.h"
+#include <sys/stat.h>
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+#endif
 #include "snprintf-shim.h"
 static char *
 ostep_strdup(const char *s)
@@ -159,6 +171,10 @@ run_configure --prefix=$PREFIX --build=$PKG_TARGET --host=$PKG_TARGET \
     include/autoconf.h > include/autoconf.h.new
 /bin/mv include/autoconf.h.new include/autoconf.h
 /bin/grep '^#define BSD 1' include/autoconf.h > /dev/null
+# <utime.h> exists here but has no struct utimbuf (utime() takes a time_t array); the
+# game then skips setting the time stamps of its dump files.
+/bin/sed -e 's|^#define HAVE_UTIME_H.*|/* #undef HAVE_UTIME_H */|' include/autoconf.h > include/autoconf.h.new
+/bin/mv include/autoconf.h.new include/autoconf.h
 
 for mk in src/Makefile util/Makefile; do
     /bin/sed -e "s|^CFLAGS = |CFLAGS = -I$inc -I$ncinc -include $inc/unnethack-compat.h -DHACKDIR=\\\\\"$PREFIX/share/unnethack\\\\\" -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
