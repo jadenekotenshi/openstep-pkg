@@ -19,14 +19,15 @@ done
 
 # UnNetHack is NetHack 3.4.3 with a great deal added, built with autoconf.  OPENSTEP
 # is configured as a System V system by default; like the nethack and slashem
-# packages it is treated as a BSD system with termcap and no POSIX job control or
-# types (the rewritten lines are checked below).
+# packages it is treated as a BSD system without POSIX job control or types.  The
+# terminal handling stays terminfo (through ncurses): the termcap-only paths in the
+# tty code are not kept up to date upstream and do not compile.  The rewritten lines
+# are checked below.
 /bin/sed \
     -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
     -e 's|^#define SYSV[ 	]|#undef SYSV |' \
     -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
     -e 's|^#define LINUX[ 	]|#undef LINUX |' \
-    -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
     -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
     -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
     include/unixconf.h > include/unixconf.h.new
@@ -34,24 +35,6 @@ done
 /bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
 /bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
-
-# win/tty/termcap.c is missing a closing brace when TERMINFO is not defined (the
-# "if (!(BC = Tgetstr("le")))" block is only closed in the terminfo branch); close it
-# after the termcap fallback.
-before=`/bin/grep -c '' win/tty/termcap.c`
-/usr/local/bin/gawk '
-    st == 2 && /^# endif/ { print "    }" }
-    st == 2 { st = 0 }
-    st == 1 { st = 2 }
-    /\*BC = / { st = 1 }
-    { print }
-' win/tty/termcap.c > win/tty/termcap.c.new
-/bin/mv win/tty/termcap.c.new win/tty/termcap.c
-after=`/bin/grep -c '' win/tty/termcap.c`
-if test "$after" -le "$before"; then
-    echo "unnethack: termcap.c patch did not apply" >&2
-    exit 1
-fi
 
 # This libc lacks <stdint.h>, snprintf() and strdup(), and may lack some types.  A
 # private include directory and a header read with -include supply them as static
