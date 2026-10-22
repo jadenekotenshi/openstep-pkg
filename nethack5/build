@@ -246,6 +246,22 @@ fi
 # nethack5) to rule out a compiler problem.
 CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
 OPT=${NETHACK5_OPT--O2}
+# The curses window interface is built as well (tty stays the default); it and the tty
+# interface use the ncurses package.  NETHACK5_NO_CURSES=1 in the environment leaves it
+# out and uses termcap for the tty interface alone.
+if test "${NETHACK5_NO_CURSES-}" = 1; then
+    cur_cflags=
+    cur_src=
+    cur_obj=
+    cur_lib=
+    tty_lib=-ltermcap
+else
+    cur_cflags="-I/usr/local/include/ncurses -DCURSES_GRAPHICS"
+    cur_src=' $(WINCURSESSRC)'
+    cur_obj=' $(WINCURSESOBJ)'
+    cur_lib=' $(WINCURSESLIB)'
+    tty_lib="-L/usr/local/lib -lncurses"
+fi
 hints=sys/unix/hints/openstep.500
 /bin/cat > "$hints" <<HEOF
 #-PRE
@@ -263,15 +279,16 @@ CFLAGS+=-DDISABLE_WARNING_PRAGMAS
 # There is no <term.h> or curses here, only the termcap functions (-ltermcap):
 # wintty.h declares them itself with this.
 CFLAGS+=-DNO_TERMCAP_HEADERS
+CFLAGS+=$cur_cflags
 CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
 CFLAGS+=-DHACKDIR=\\"\$(HACKDIR)\\"
 SYSCFLAGS=-DNeXT
 LINK=\$(CC)
 
-WINSRC = \$(WINTTYSRC)
-WINOBJ = \$(WINTTYOBJ)
-WINLIB = \$(WINTTYLIB)
-WINTTYLIB = -ltermcap
+WINSRC = \$(WINTTYSRC)$cur_src
+WINOBJ = \$(WINTTYOBJ)$cur_obj
+WINLIB = \$(WINTTYLIB)$cur_lib
+WINTTYLIB = $tty_lib
 
 # No <regex.h> here: NetHack's own pattern matcher.
 REGEXOBJ = \$(TARGETPFX)pmatchregex.o
@@ -298,6 +315,15 @@ HEOF
 /bin/grep '^#fetch-lua-nhd: LUA_URL_list' sys/unix/Makefile.top > /dev/null
 
 /bin/sh sys/unix/setup.sh "$hints"
+# The ncurses link is in WINTTYLIB; the makefile's own curses library name is dropped.
+/bin/sed -e 's/^WINCURSESLIB *=.*/WINCURSESLIB =/' src/Makefile > src/Makefile.new
+/bin/mv src/Makefile.new src/Makefile
+if test "${NETHACK5_NO_CURSES-}" != 1; then
+    /bin/grep '^WINCURSESSRC' src/Makefile > /dev/null || {
+        echo "nethack5: this makefile has no curses interface; set NETHACK5_NO_CURSES=1" >&2
+        exit 1
+    }
+fi
 
 # Build and install; "make all" would also format the Guidebook with nroff.
 # GAME names the binary and the data directory.  The archives Lua is put in are made
