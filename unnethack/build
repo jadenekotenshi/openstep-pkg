@@ -105,11 +105,19 @@ HEOF
 # not read by configure's own tests (a forced header breaks them); it is added to the
 # makefiles afterwards.
 ncinc=/usr/local/include/ncurses
-CFLAGS="-O2 -I$inc -I$ncinc" CPPFLAGS="-I$inc -I$ncinc -I/usr/local/include" \
-LDFLAGS="-L/usr/local/lib" \
-LUA=/usr/local/bin/lua LUA_INCLUDE="-I/usr/local/include" LUA_LIB="-L/usr/local/lib -llua -lm" \
-YACC="/usr/local/bin/bison -y" LEX=/usr/local/bin/flex \
-HAVE_NROFF=no HAVE_COL=yes \
+# (Exported rather than set in front of the command: the shell here does not pass
+# assignments made in front of a function call on to the programs it runs.)
+CFLAGS="-O2 -I$inc -I$ncinc"
+CPPFLAGS="-I$inc -I$ncinc -I/usr/local/include"
+LDFLAGS="-L/usr/local/lib"
+LUA=/usr/local/bin/lua
+LUA_INCLUDE="-I/usr/local/include"
+LUA_LIB="-L/usr/local/lib -llua -lm"
+YACC="/usr/local/bin/bison -y"
+LEX=/usr/local/bin/flex
+HAVE_NROFF=no
+HAVE_COL=yes
+export CFLAGS CPPFLAGS LDFLAGS LUA LUA_INCLUDE LUA_LIB YACC LEX HAVE_NROFF HAVE_COL
 run_configure --prefix=$PREFIX --build=$PKG_TARGET --host=$PKG_TARGET \
     --with-compression=/usr/local/bin/gzip --disable-file-areas \
     --enable-tty-graphics --enable-curses-graphics --disable-utf8-glyphs \
@@ -124,7 +132,7 @@ run_configure --prefix=$PREFIX --build=$PKG_TARGET --host=$PKG_TARGET \
 /bin/grep '^#define BSD 1' include/autoconf.h > /dev/null
 
 for mk in src/Makefile util/Makefile; do
-    /bin/sed -e "s|^CFLAGS = |CFLAGS = -include $inc/unnethack-compat.h -DHACKDIR=\\\\\"$PREFIX/share/unnethack\\\\\" -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
+    /bin/sed -e "s|^CFLAGS = |CFLAGS = -I$inc -I$ncinc -include $inc/unnethack-compat.h -DHACKDIR=\\\\\"$PREFIX/share/unnethack\\\\\" -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
         $mk > $mk.new
     /bin/mv $mk.new $mk
     /bin/grep 'unnethack-compat.h' $mk > /dev/null
