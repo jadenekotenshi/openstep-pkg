@@ -32,6 +32,7 @@ done
 /bin/mv include/unixconf.h.new include/unixconf.h
 /bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+/bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
 
 # gzip for compressed save files and bones, and plain string matching for menu
 # colors and no regex (there is no <regex.h> here).
@@ -83,6 +84,18 @@ typedef unsigned long uintptr_t;
 #endif
 SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+# Types this libc's <sys/types.h> may lack (probed, since a duplicate typedef is an
+# error too).
+: > ostep-inc/types-extra.h
+for t in pid_t uid_t gid_t; do
+    {
+        echo '#include <sys/types.h>'
+        echo "$t probe_var;"
+    } > probe.c
+    if $CC $PKG_GCC42_ARCH_FLAGS -c probe.c -o probe.o 2> /dev/null; then :; else
+        echo "typedef int $t;" >> ostep-inc/types-extra.h
+    fi
+done
 /bin/cat > ostep-inc/sporkhack-compat.h <<'HEOF'
 #ifndef OPENSTEP_SPORKHACK_H
 #define OPENSTEP_SPORKHACK_H
@@ -95,6 +108,7 @@ SEOF
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
+#include "types-extra.h"
 #include "snprintf-shim.h"
 static char *
 ostep_strdup(const char *s)
