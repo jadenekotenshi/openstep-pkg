@@ -284,6 +284,9 @@ SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
 
 CFLAGS=-O2 -I../include -I$inc -include $inc/splicehack-compat.h -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL
 CFLAGS+=\$(WINCFLAGS)
+# ncurses' headers declare tputs() themselves; the game's own prototype for it must
+# stay out of the way.
+CFLAGS+=-DHAVE_TPUTS
 # gcc 4.2 does not allow #pragma GCC diagnostic inside a function, which the
 # warning-suppression macros use; this makes them no-ops.
 CFLAGS+=-DDISABLE_WARNING_PRAGMAS
