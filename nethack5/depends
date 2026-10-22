@@ -6,4 +6,5 @@ grep
 gawk
 gzip
 termcap
+ncurses
 patch
