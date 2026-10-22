@@ -50,7 +50,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 |---|---|---|---|
 | afterstep | validated 1.8.11 (2026-10-23; builds with the NeXT-style default title bar, installs, test passes, runs under CubXWindow; needs libXpm) | validated 1.8.11 (2026-10-24; builds, installs and tests on SPARC) | — |
 | aterm | validated 0.4.2 (2026-10-23; builds with the termios/waitpid/setsid/putenv shims, installs, test passes, runs under CubXWindow) | validated 0.4.2 (2026-10-23; builds, installs, tests and runs) | — |
-| base64 | validated 1.5 (2026-10-24; builds, installs and tests clean on the first attempt; Fourmilab base64 with LF line ends) | validated 1.5 (2026-10-24; builds, installs and tests) | — |
+| base64 | validated 1.5 (2026-10-24; builds, installs and tests clean on the first attempt; Fourmilab base64 with LF line ends) | validated 1.5 (2026-10-24; builds, installs and tests) | validated (2026-11-06; builds, installs and `pkg test base64` passes) |
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | validated (2026-10-21; built with gcc42, tests pass) |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
@@ -110,7 +110,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | — |
 | mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
-| nano | validated | validated 2.9.8 | — |
+| nano | validated | validated 2.9.8 | validated (2026-11-06; builds, installs and `pkg test nano` passes; links the ncurses package) |
 | ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | validated 6.5 (2026-11-04; builds, installs and `pkg test ncurses` passes) |
 | nedit | validated 5.7 (2026-10-27; builds, installs, test passes and the editor runs under CubXWindow; Motif comes from /usr/X11R5 or /usr/X11R6, whichever has it; needs a handful of header stand-ins and no glob()) | validated 5.7 (2026-10-27; builds, installs, tests and runs; needed -DYYMALLOC=malloc -DYYFREE=free for the bison-generated parser) | — |
 | nethack | validated (tty and X11; 2026-11-05: rebuilt with the curses interface through ncurses, `pkg test` passes and the game runs correctly with `-w curses`) | validated 3.6.7 (`pkg test` passes, game starts; a stray "pkg: Stock: not found" after the install was a script replaced mid-run, fixed in pkg; rebootstrap, 2026-10-08) | — |
