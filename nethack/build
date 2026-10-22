@@ -44,7 +44,7 @@ if test "${NETHACK_NO_CURSES-}" = 1; then
     cur_lib=
     tty_lib=-ltermcap
 else
-    cur_cflags="-I/usr/local/include/ncurses -DCURSES_GRAPHICS"
+    cur_cflags="-I/usr/local/include/ncurses -DCURSES_GRAPHICS -DHAVE_TPUTS"
     cur_src=' $(WINCURSESSRC)'
     cur_obj=' $(WINCURSESOBJ)'
     cur_lib=' $(WINCURSESLIB)'
