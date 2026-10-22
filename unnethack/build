@@ -60,6 +60,18 @@ typedef unsigned long uintptr_t;
 #define UINT32_MAX 4294967295U
 #endif
 SEOF
+/bin/cat > ostep-inc/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <stdint.h>
+#define PRId32 "d"
+#define PRIu32 "u"
+#define PRIx32 "x"
+#define PRId64 "lld"
+#define PRIu64 "llu"
+#define PRIx64 "llx"
+#endif
+SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
 # Types the <sys/types.h> may lack (probed, since a duplicate typedef is an error too).
 : > ostep-inc/types-extra.h
@@ -81,6 +93,7 @@ done
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
+#include <unistd.h>
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
