@@ -83,7 +83,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | validated 1.3.12 (2026-11-04; builds, installs and `pkg test gzip` passes) |
 | help2man | validated | validated 1.27 | — |
 | jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | — |
-| less | validated | validated 710 (rebootstrap, 2026-10-08) | — |
+| less | validated | validated 710 (rebootstrap, 2026-10-08) | validated (2026-11-05; builds, installs and `pkg test less` passes) |
 | liba52 | validated | validated 0.7.4 (rebootstrap, 2026-10-08) | — |
 | libcss | validated | validated 0.9.2 (2026-10-09) | — |
 | libdom | validated | validated 0.4.2 (2026-10-09) | — |
