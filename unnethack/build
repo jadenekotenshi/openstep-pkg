@@ -190,7 +190,11 @@ unnethack_configure() {
     /bin/grep '^#define BSD 1' include/autoconf.h > /dev/null
     # <utime.h> exists here but has no struct utimbuf (utime() takes a time_t array); the
     # game then skips setting the time stamps of its dump files.
-    /bin/sed -e 's|^#define HAVE_UTIME_H.*|/* #undef HAVE_UTIME_H */|' include/autoconf.h > include/autoconf.h.new
+    # fcntl() file locking does not work here (F_SETLK on the "perm" file fails, so the
+    # game waits ten times and gives up); without HAVE_FCNTL it locks files with link(),
+    # as the other NetHack packages do.
+    /bin/sed -e 's|^#define HAVE_UTIME_H.*|/* #undef HAVE_UTIME_H */|' \
+        -e 's|^#define HAVE_FCNTL .*|/* #undef HAVE_FCNTL */|' include/autoconf.h > include/autoconf.h.new
     /bin/mv include/autoconf.h.new include/autoconf.h
 
     for mk in src/Makefile util/Makefile; do
