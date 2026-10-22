@@ -214,6 +214,13 @@ ostep_localtime_r(const time_t *t, struct tm *out)
 SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
 
+# The heap log (MONITOR_HEAP, see NETHACK5_CFLAGS) is buffered, so a crash loses its
+# last lines; make it unbuffered.  (Harmless when the log is not compiled in.)
+/bin/sed -e 's|heaplog = fopen(logname, "w");|heaplog = fopen(logname, "w"); if (heaplog) setvbuf(heaplog, (char *) 0, _IONBF, 0);|' \
+    src/alloc.c > src/alloc.c.new
+/bin/mv src/alloc.c.new src/alloc.c
+/bin/grep 'setvbuf(heaplog' src/alloc.c > /dev/null
+
 # unixconf.h: this is a BSD system with termcap and without POSIX job control or
 # types (the same settings the nethack package uses for 3.6.7).
 /bin/sed \
