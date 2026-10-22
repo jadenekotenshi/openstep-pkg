@@ -228,6 +228,23 @@ FEOF
     win/curses/cursmisc.h > win/curses/cursmisc.h.new
 /bin/mv win/curses/cursmisc.h.new win/curses/cursmisc.h
 /bin/grep 'define NH_NCURSES_EXT_COLORS 0' win/curses/cursmisc.h > /dev/null
+# EvilHack's help files include the Guidebook, which its makefile formats with tbl and
+# nroff; tbl is not available here.  The distribution carries the formatted text
+# (doc/Guidebook.txt), so the doc makefile is told to use that.  It is copied to
+# another name first, as the makefile also writes Guidebook.txt.
+/bin/cp doc/Guidebook.txt doc/Guidebook.preformatted
+/usr/local/bin/gawk '
+    /^(GUIDECMD|ONEPAGECMD) *=/ {
+        n = $0; sub(/ *=.*/, "", n)
+        print n " = cat Guidebook.preformatted"
+        skip = ($0 ~ /\\$/); next
+    }
+    skip { skip = ($0 ~ /\\$/); next }
+    { print }
+' doc/Makefile > doc/Makefile.new
+/bin/mv doc/Makefile.new doc/Makefile
+/usr/local/bin/grep '^GUIDECMD = cat Guidebook.preformatted' doc/Makefile > /dev/null
+/usr/local/bin/grep '^ONEPAGECMD = cat Guidebook.preformatted' doc/Makefile > /dev/null
 }
 pkg_step prepare evilhack_prepare
 
