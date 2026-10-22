@@ -15,6 +15,59 @@ if test -d "nethack-$VERSION"; then cd "nethack-$VERSION"; fi
 # can sit beside the newer NetHack packages.  There is no games user or group here, so
 # ownership is left alone and the score and save files are writable by everyone who
 # can run it.
+# The curses window interface (Karl Garrison's patch, in John McDole's version for a
+# clean 3.4.3) is added, with the tty interface kept as the default.  NETHACK343_NO_CURSES=1
+# in the environment leaves it out.  That patch also adds UTF-8 graphics through the
+# wide-character ncurses ("ncursesw"); this system has neither wide characters nor that
+# library, so the wide-character code is turned off: the curses files read <curses.h>,
+# and the one function that draws a map character with mvwadd_wch() uses mvwaddch().
+curses=1
+if test "${NETHACK343_NO_CURSES-}" = 1; then
+    curses=0
+fi
+if test $curses = 1; then
+    pkg_apply_patch "nethack-3.4.3-curses.patch"
+    for f in win/curses/*.c; do
+        /bin/sed -e '/^#define _XOPEN_SOURCE_EXTENDED/d' \
+            -e 's|<ncursesw/curses.h>|<curses.h>|' $f > $f.new
+        /bin/mv $f.new $f
+    done
+    if /bin/grep 'ncursesw' win/curses/*.c > /dev/null; then
+        echo "nethack343: the curses files still name ncursesw" >&2
+        exit 1
+    fi
+    /usr/local/bin/gawk '
+        /^static void write_wchar\(WINDOW \*win, int x, int y, nethack_char nch\)$/ {
+            print
+            print "{"
+            print "    curses_toggle_color_attr(win, nch.color, nch.attr, ON);"
+            print "    mvwaddch(win, y, x, nch.ch);"
+            print "    curses_toggle_color_attr(win, nch.color, nch.attr, OFF);"
+            print "}"
+            skip = 1; next
+        }
+        skip { if ($0 ~ /^}/) skip = 0; next }
+        { print }
+    ' win/curses/curswins.c > win/curses/curswins.c.new
+    /bin/mv win/curses/curswins.c.new win/curses/curswins.c
+    if /bin/grep 'mvwadd_wch\|cchar_t' win/curses/curswins.c > /dev/null; then
+        echo "nethack343: curswins.c still uses wide characters" >&2
+        exit 1
+    fi
+    # no UTF-8 glyphs or locale query, and the tty interface stays (the patch builds
+    # a curses-only game)
+    /bin/sed -e 's|^#define UTF8_GLYPHS|/* #define UTF8_GLYPHS|' \
+        -e 's|^#define HAVE_SETLOCALE|/* #define HAVE_SETLOCALE|' \
+        -e 's|^/\* #define TTY_GRAPHICS \*/|#define TTY_GRAPHICS|' \
+        include/config.h > include/config.h.new
+    /bin/mv include/config.h.new include/config.h
+    /bin/grep '^#define TTY_GRAPHICS' include/config.h > /dev/null
+    if /bin/grep '^#define UTF8_GLYPHS' include/config.h > /dev/null; then
+        echo "nethack343: UTF8_GLYPHS is still on" >&2
+        exit 1
+    fi
+fi
+
 /bin/sed \
     -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
     -e 's|^#define SYSV[ 	]|#undef SYSV |' \
@@ -32,6 +85,9 @@ if test -d "nethack-$VERSION"; then cd "nethack-$VERSION"; fi
 /bin/cat > openstep-nethack343.h <<'HEOF'
 #ifndef OPENSTEP_NETHACK343_H
 #define OPENSTEP_NETHACK343_H
+#include <sys/types.h>
+#include <time.h>
+#include <sys/time.h>
 #ifndef PATH_MAX
 #define PATH_MAX 1024
 #endif
@@ -76,9 +132,20 @@ strdup_obj=`pwd`/openstep_strdup.o
 CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
 
 hackdir=$PREFIX/lib/nethack343dir
+if test $curses = 1; then
+    # tty and curses, both through the ncurses package (which has the termcap functions)
+    cur_inc=-I/usr/local/include/ncurses
+    src_lib_sed="s|^WINLIB = .*|WINLIB = -L/usr/local/lib -lncurses $strdup_obj|"
+else
+    cur_inc=
+    src_lib_sed="s|^WINTTYLIB = -ltermlib|WINTTYLIB = -ltermcap $strdup_obj|"
+fi
 /bin/sed \
-    -e "s|^CFLAGS = -O -I../include|CFLAGS = -O2 $PKG_GCC42_ARCH_FLAGS -I../include -DHACKDIR=\\\\\"$hackdir\\\\\" -include $compat $CMPFLAGS|" \
-    -e "s|^WINTTYLIB = -ltermlib|WINTTYLIB = -ltermcap $strdup_obj|" \
+    -e "s|^CFLAGS = -O -I../include|CFLAGS = -O2 $PKG_GCC42_ARCH_FLAGS -I../include $cur_inc -DHACKDIR=\\\\\"$hackdir\\\\\" -include $compat $CMPFLAGS|" \
+    -e "$src_lib_sed" \
+    -e 's|^WINSRC = \$(WINCURSESSRC)|WINSRC = $(WINTTYSRC) $(WINCURSESSRC)|' \
+    -e 's|^WINOBJ = \$(WINCURSESOBJ)|WINOBJ = $(WINTTYOBJ) $(WINCURSESOBJ)|' \
+    -e 's|^WINCURSESLIB = .*|WINCURSESLIB =|' \
     -e 's|^GAME *=.*|GAME     = nethack343|' \
     -e 's|^CC *=.*||' \
     sys/unix/Makefile.src > sys/unix/Makefile.src.new
@@ -89,6 +156,10 @@ hackdir=$PREFIX/lib/nethack343dir
     sys/unix/Makefile.utl > sys/unix/Makefile.utl.new
 /bin/mv sys/unix/Makefile.utl.new sys/unix/Makefile.utl
 /bin/grep 'HACKDIR' sys/unix/Makefile.src sys/unix/Makefile.utl > /dev/null
+if test $curses = 1; then
+    /bin/grep '^WINSRC = $(WINTTYSRC) $(WINCURSESSRC)' sys/unix/Makefile.src > /dev/null
+    /bin/grep '^WINLIB = -L/usr/local/lib -lncurses' sys/unix/Makefile.src > /dev/null
+fi
 
 /bin/sed \
     -e 's|^PREFIX *=.*|PREFIX = /usr|' \
