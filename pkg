@@ -406,6 +406,7 @@ usage:
   pkg installpkg <file>...
   pkg list
   pkg remove <name>
+  pkg message <name>
   pkg test <name>...
   pkg verify [--quick] [<name>...]
   pkg cleanup [--dry-run] [<name>...]
@@ -572,6 +573,7 @@ package layout:
   checksums     SHA-256 and filename for each remote source
   post-install  optional shell hook
   pre-remove    optional shell hook
+  message       optional text shown after the install (and by "pkg message")
   test          optional installed-package test hook
 EOF
 }
@@ -1523,6 +1525,13 @@ write_manifest() {
             rm -f "$INST_DIR/$hook"
         fi
     done
+
+    # The message shown after the install (and by "pkg message").
+    if [ -f "$HOOK_DIR/message" ]; then
+        cp "$HOOK_DIR/message" "$INST_DIR/message"
+    else
+        rm -f "$INST_DIR/message"
+    fi
 
     # Paths pkg strip leaves alone.
     if [ -f "$HOOK_DIR/nostrip" ]; then
@@ -2847,6 +2856,33 @@ record_next_packages() {
     done > "$INST_DIR/nextpackages"
 }
 
+# Print a package's message (the "message" file in its directory: text for the
+# user, such as a notice that the package is superseded), set off from the log.
+# Arguments: the package name and the file.  Nothing is printed without the file.
+show_message_file() {
+    sm_name=$1
+    sm_file=$2
+    [ -f "$sm_file" ] || return 0
+    echo
+    echo "==> message for $sm_name:"
+    sed -e 's/^/    /' "$sm_file"
+    echo
+}
+
+# pkg message <name>: show the message an installed package came with.
+message_name() {
+    mn_name=$1
+    mn_root=`default_value "$PKG_ROOT" "/"`
+    mn_root=`trim_slash "$mn_root"`
+    mn_db=`default_value "$PKG_DB" "$mn_root/usr/local/var/pkg/db"`
+    [ -d "$mn_db/installed/$mn_name" ] || die "$mn_name is not installed"
+    if [ -f "$mn_db/installed/$mn_name/message" ]; then
+        show_message_file "$mn_name" "$mn_db/installed/$mn_name/message"
+    else
+        echo "$mn_name has no message"
+    fi
+}
+
 # Install the staged image of PKG_NAME into ROOT_DIR, replacing any installed
 # version, record it in the package database and run its post-install hook.
 # HOOK_DIR holds the package's hooks; FEATURES_FILE, when set, is the recorded
@@ -2882,6 +2918,7 @@ commit_install() {
 
     clean_image_cache
     log "installed $PKG_NAME $PKG_VERSION"
+    show_message_file "$PKG_NAME" "$INST_DIR/message"
 }
 
 install_pkgs() {
@@ -2977,7 +3014,7 @@ binpkg_pkg() {
     if [ -f "$PKG_DIR/requires" ]; then
         cp "$PKG_DIR/requires" "$bp_meta/requires"
     fi
-    for hook in pre-remove post-install test verify-ignore nostrip; do
+    for hook in pre-remove post-install test verify-ignore nostrip message; do
         if [ -f "$PKG_DIR/$hook" ]; then
             cp "$PKG_DIR/$hook" "$bp_meta/$hook"
         fi
@@ -3498,6 +3535,11 @@ case $ACTION in
     remove)
         [ "$ARGC" -eq 2 ] || die "remove requires <name>"
         remove_name "$ARG2"
+    ;;
+
+    message)
+        [ "$ARGC" -eq 2 ] || die "message requires <name>"
+        message_name "$ARG2"
     ;;
 
     test)
