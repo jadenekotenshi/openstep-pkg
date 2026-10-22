@@ -124,11 +124,15 @@ run_configure --prefix=$PREFIX --build=$PKG_TARGET --host=$PKG_TARGET \
 /bin/grep '^#define BSD 1' include/autoconf.h > /dev/null
 
 for mk in src/Makefile util/Makefile; do
-    /bin/sed -e "s|^CFLAGS = |CFLAGS = -include $inc/unnethack-compat.h -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
+    /bin/sed -e "s|^CFLAGS = |CFLAGS = -include $inc/unnethack-compat.h -DHACKDIR=\\\\\"$PREFIX/share/unnethack\\\\\" -DNeXT -DYYMALLOC=malloc -DYYFREE=free |" \
         $mk > $mk.new
     /bin/mv $mk.new $mk
     /bin/grep 'unnethack-compat.h' $mk > /dev/null
 done
+
+# With the file areas off the game keeps everything in one playground, which it enters
+# by name: the HACKDIR above, where the install puts the game and its data.
+/bin/grep 'DHACKDIR' src/Makefile > /dev/null
 
 /bin/gnumake
 /usr/local/bin/mkdir -p "$DESTDIR$PREFIX/bin"
@@ -136,4 +140,19 @@ done
 # save files are writable by everyone who can run it.
 /bin/gnumake install DESTDIR="$DESTDIR" CHOWN=true CHGRP=true
 
-test -x "$DESTDIR$PREFIX/bin/unnethack" -o -x "$DESTDIR$PREFIX/share/unnethack/unnethack"
+# Replace the stock launcher (it uses "test -e", which the system sh lacks).
+/bin/cat > "$DESTDIR$PREFIX/bin/unnethack" <<'LEOF'
+#!/bin/sh
+HACKDIR=/usr/local/share/unnethack
+export HACKDIR
+# a first-time player gets the default configuration file
+if test ! -f "$HOME/.unnethackrc" && test ! -f "$HOME/.nethackrc"; then
+    cp "$HACKDIR/unnethackrc.default" "$HOME/.unnethackrc"
+fi
+cd $HACKDIR
+exec $HACKDIR/unnethack ${1+"$@"}
+LEOF
+/bin/chmod 755 "$DESTDIR$PREFIX/bin/unnethack"
+
+test -x "$DESTDIR$PREFIX/share/unnethack/unnethack"
+test -f "$DESTDIR$PREFIX/share/unnethack/unnethackrc.default"
