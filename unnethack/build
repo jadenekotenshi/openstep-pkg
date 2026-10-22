@@ -38,7 +38,7 @@ done
 # win/tty/termcap.c is missing a closing brace when TERMINFO is not defined (the
 # "if (!(BC = Tgetstr("le")))" block is only closed in the terminfo branch); close it
 # after the termcap fallback.
-before=`/usr/bin/wc -l < win/tty/termcap.c`
+before=`/bin/grep -c '' win/tty/termcap.c`
 /usr/local/bin/gawk '
     st == 2 && /^# endif/ { print "    }" }
     st == 2 { st = 0 }
@@ -47,7 +47,7 @@ before=`/usr/bin/wc -l < win/tty/termcap.c`
     { print }
 ' win/tty/termcap.c > win/tty/termcap.c.new
 /bin/mv win/tty/termcap.c.new win/tty/termcap.c
-after=`/usr/bin/wc -l < win/tty/termcap.c`
+after=`/bin/grep -c '' win/tty/termcap.c`
 if test "$after" -le "$before"; then
     echo "unnethack: termcap.c patch did not apply" >&2
     exit 1
