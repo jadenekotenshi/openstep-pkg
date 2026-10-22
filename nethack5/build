@@ -214,6 +214,20 @@ ostep_localtime_r(const time_t *t, struct tm *out)
 SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
 
+# alloc.c declares and defines FITSint_() with Lua's integer type (LUA_INTEGER), while
+# every other file declares it with "long long".  With the C89 settings this Lua needs,
+# LUA_INTEGER is "long", so on a 32-bit big-endian machine the caller passes a 64-bit
+# value in two registers and the function reads only the first (the high word, 0): the
+# result was always 0, and buffers were allocated with size 0 and overflowed.  (On x86
+# the low word comes first, so it happened to work.)  Use "long long" in alloc.c too.
+/bin/sed -e 's/FITSint_(LUA_INTEGER/FITSint_(long long/' src/alloc.c > src/alloc.c.new
+/bin/mv src/alloc.c.new src/alloc.c
+if /bin/grep 'FITSint_(LUA_INTEGER' src/alloc.c > /dev/null; then
+    echo "nethack5: alloc.c still declares FITSint_ with LUA_INTEGER" >&2
+    exit 1
+fi
+/bin/grep 'FITSint_(long long' src/alloc.c > /dev/null
+
 # The heap log (MONITOR_HEAP, see NETHACK5_CFLAGS) is buffered, so a crash loses its
 # last lines; make it unbuffered.  (Harmless when the log is not compiled in.)
 /bin/sed -e 's|heaplog = fopen(logname, "w");|heaplog = fopen(logname, "w"); if (heaplog) setvbuf(heaplog, (char *) 0, _IONBF, 0);|' \
