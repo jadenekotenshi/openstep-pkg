@@ -96,6 +96,35 @@ ostep_strdup(const char *s)
     return p;
 }
 #define strdup ostep_strdup
+/* strtoull() is missing here (makedefs reads SOURCE_DATE_EPOCH with it) */
+static unsigned long long
+ostep_strtoull(const char *s, char **end, int base)
+{
+    unsigned long long v = 0;
+    int d;
+
+    while (*s == ' ' || *s == '\t')
+	s++;
+    if (base == 0)
+	base = 10;
+    for (;; s++) {
+	if (*s >= '0' && *s <= '9')
+	    d = *s - '0';
+	else if (*s >= 'a' && *s <= 'z')
+	    d = *s - 'a' + 10;
+	else if (*s >= 'A' && *s <= 'Z')
+	    d = *s - 'A' + 10;
+	else
+	    break;
+	if (d >= base)
+	    break;
+	v = v * base + d;
+    }
+    if (end)
+	*end = (char *) s;
+    return v;
+}
+#define strtoull ostep_strtoull
 #endif
 HEOF
 
