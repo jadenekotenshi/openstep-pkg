@@ -280,6 +280,8 @@ CFLAGS+=-DDISABLE_WARNING_PRAGMAS
 # wintty.h declares them itself with this.
 CFLAGS+=-DNO_TERMCAP_HEADERS
 CFLAGS+=$cur_cflags
+# (extra compiler flags for debugging, e.g. NETHACK5_CFLAGS=-DMONITOR_HEAP)
+CFLAGS+=${NETHACK5_CFLAGS-}
 CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
 CFLAGS+=-DHACKDIR=\\"\$(HACKDIR)\\"
 SYSCFLAGS=-DNeXT
