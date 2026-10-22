@@ -75,7 +75,7 @@ SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
 # Types the <sys/types.h> may lack (probed, since a duplicate typedef is an error too).
 : > ostep-inc/types-extra.h
-for t in pid_t uid_t gid_t mode_t; do
+for t in pid_t uid_t gid_t mode_t ssize_t; do
     {
         echo '#include <sys/types.h>'
         echo "$t probe_var;"
