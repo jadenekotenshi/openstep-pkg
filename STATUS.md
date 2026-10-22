@@ -108,7 +108,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | lz4 | validated | validated (2026-10-10) | — |
 | m4 | validated | validated 1.4.6 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | — |
+| mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | validated (2026-11-06; builds, installs and `pkg test mktemp` passes) |
 | mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
 | nano | validated | validated 2.9.8 | validated (2026-11-06; builds, installs and `pkg test nano` passes; links the ncurses package) |
 | ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | validated 6.5 (2026-11-04; builds, installs and `pkg test ncurses` passes) |
