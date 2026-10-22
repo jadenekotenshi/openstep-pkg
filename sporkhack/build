@@ -19,12 +19,14 @@ done
 
 # SporkHack 0.6.5 is NetHack 3.4.3 with additions, so it is set up the way the
 # slashem package does it: OPENSTEP is treated as a BSD system with termcap and no
-# POSIX job control or types.  tty and curses interfaces (the
+# POSIX job control or types.  SporkHack's unixconf.h also defines LINUX by default,
+# which has to go.  tty and curses interfaces (the
 # curses one uses the ncurses package).
 /bin/sed \
     -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
     -e 's|^#define SYSV[ 	]|#undef SYSV |' \
     -e 's|^#define SVR4[ 	]|#undef SVR4 |' \
+    -e 's|^#define LINUX[ 	]|#undef LINUX |' \
     -e 's|^#define TERMINFO[ 	]|#undef TERMINFO |' \
     -e 's|^#define POSIX_JOB_CONTROL[ 	]|#undef POSIX_JOB_CONTROL |' \
     -e 's|^#define POSIX_TYPES[ 	]|#undef POSIX_TYPES |' \
@@ -33,6 +35,7 @@ done
 /bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
 /bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
+/bin/grep '^#undef LINUX' include/unixconf.h > /dev/null
 
 # gzip for compressed save files and bones, and plain string matching for menu
 # colors and no regex (there is no <regex.h> here).
