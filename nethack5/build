@@ -240,6 +240,12 @@ fi
 # a launcher in /usr/local/bin/nethack5, so it can sit beside the 3.6.7 package.
 # There is no games user or group here, so ownership is left alone and the score and
 # save files are writable by everyone who can run it.
+# SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
+# unsigned versions are forced into the game's own code (empty on x86).  The
+# optimization level can be changed from the environment (NETHACK5_OPT=-O0 pkg build
+# nethack5) to rule out a compiler problem.
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
+OPT=${NETHACK5_OPT--O2}
 hints=sys/unix/hints/openstep.500
 /bin/cat > "$hints" <<HEOF
 #-PRE
@@ -250,7 +256,7 @@ INSTDIR=\$(DESTDIR)\$(HACKDIR)
 VARDIR=\$(DESTDIR)\$(HACKDIR)
 SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
 
-CFLAGS=-O2 -I../include -I$inc -DNeXT -include $inc/nethack5-compat.h
+CFLAGS=$OPT -I../include -I$inc -DNeXT -include $inc/nethack5-compat.h $CMPFLAGS
 # gcc 4.2 does not allow #pragma GCC diagnostic inside a function, which the
 # warning-suppression macros use; this makes them no-ops.
 CFLAGS+=-DDISABLE_WARNING_PRAGMAS
