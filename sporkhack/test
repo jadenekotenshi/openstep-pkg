@@ -1,0 +1,19 @@
+#!/bin/sh
+set -e
+HACKDIR=$LOCAL_ROOT/lib/sporkhackdir
+export HACKDIR
+
+test -x "$HACKDIR/sporkhack"
+test -f "$HACKDIR/nhdat" -o -f "$HACKDIR/dungeon"
+test -x "$LOCAL_ROOT/bin/sporkhack"
+cd "$HACKDIR"
+# "-s" prints the score list and exits; with an empty record file it says
+# "Cannot find any current entries".  A game that cannot open its data files
+# stops with a different message.
+out=`./sporkhack -s all 2>&1 < /dev/null || :`
+case "$out" in
+*[Pp]anic*|*"annot open"*|*"annot find the"*|*"annot find file"*|*"not found"*)
+    echo "sporkhack: $out" >&2
+    exit 1;;
+esac
+echo "sporkhack ok"
