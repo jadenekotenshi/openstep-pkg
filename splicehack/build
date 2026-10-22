@@ -124,6 +124,17 @@ echo '/* empty: select() and fd_set come with <sys/types.h> here */' > ostep-inc
 #define WTERMSIG(s) (((int) (s)) & 0x7f)
 #endif
 SEOF
+# Types the <sys/types.h> may lack (probed, since a duplicate typedef is an error too).
+: > ostep-inc/types-extra.h
+for t in pid_t uid_t gid_t mode_t ssize_t; do
+    {
+        echo '#include <sys/types.h>'
+        echo "$t probe_var;"
+    } > probe.c
+    if $CC -c probe.c -o probe.o 2> /dev/null; then :; else
+        echo "typedef int $t;" >> ostep-inc/types-extra.h
+    fi
+done
 /bin/cat > ostep-inc/splicehack-compat.h <<'SEOF'
 #ifndef OPENSTEP_SPLICEHACK_COMPAT_H
 #define OPENSTEP_SPLICEHACK_COMPAT_H
@@ -136,6 +147,7 @@ SEOF
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "types-extra.h"
 #ifndef PATH_MAX
 # define PATH_MAX 1024
 #endif
@@ -214,6 +226,14 @@ ostep_localtime_r(const time_t *t, struct tm *out)
 #define gmtime_r ostep_gmtime_r
 #define localtime_r ostep_localtime_r
 #include "snprintf-shim.h"
+/* msleep() is only defined by the game for System V; this is the BSD way */
+extern int usleep();
+static void
+ostep_msleep(unsigned ms)
+{
+    usleep(ms * 1000);
+}
+#define msleep ostep_msleep
 #endif
 SEOF
 /bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
