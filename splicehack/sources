@@ -1,0 +1,4 @@
+https://github.com/NullCGT/SpliceHack/archive/8d70ade6f015c7894c171af691393327983173fe.tar.gz
+https://www.lua.org/ftp/lua-5.4.8.tar.gz SpliceHack-8d70ade6f015c7894c171af691393327983173fe/lib
+lua-5.4.8-openstep.patch SpliceHack-8d70ade6f015c7894c171af691393327983173fe
+snprintf-shim.h SpliceHack-8d70ade6f015c7894c171af691393327983173fe
