@@ -133,7 +133,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) | — |
 | pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) | — |
-| python311 | validated | validated 3.11.17 (2026-10-31; builds, installs and `pkg test python311` passes; the 68k FPU flushes subnormal operands to zero, so `frexp()` is replaced by an integer-shift version in the OPENSTEP patch) | — |
+| python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) | validated 3.11.17 (2026-10-31; builds, installs and `pkg test python311` passes; the 68k FPU flushes subnormal operands to zero, so `frexp()` is replaced by an integer-shift version in the OPENSTEP patch) |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | validated (2026-10-10; content-free dedicated-server startup test) | — |
 | quickjs | validated | validated 2025-09-13-2 (2026-10-13; SPARC needs memcpy accessors and an 8-byte aligned constant pool) | — |
 | roboclient | validated (1.1 with `rc.dhcp` installs and tests clean on x86) | validated 1.1 (2026-10-09) | — |
