@@ -111,7 +111,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | — |
 | mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
 | nano | validated | validated 2.9.8 | — |
-| ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | — |
+| ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | validated 6.5 (2026-11-04; builds, installs and `pkg test ncurses` passes) |
 | nedit | validated 5.7 (2026-10-27; builds, installs, test passes and the editor runs under CubXWindow; Motif comes from /usr/X11R5 or /usr/X11R6, whichever has it; needs a handful of header stand-ins and no glob()) | validated 5.7 (2026-10-27; builds, installs, tests and runs; needed -DYYMALLOC=malloc -DYYFREE=free for the bison-generated parser) | — |
 | nethack | validated (tty and X11) | validated 3.6.7 (`pkg test` passes, game starts; a stray "pkg: Stock: not found" after the install was a script replaced mid-run, fixed in pkg; rebootstrap, 2026-10-08) | — |
 | nethack5 | validated 5.0.0 (2026-10-27; tty only, installed beside 3.6.7 as `nethack5` in /usr/local/lib/nethack5dir; builds its own Lua 5.4.8 with the lua package's OPENSTEP patch ported; `pkg test` passes and the game starts and runs) | — | — |
