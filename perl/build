@@ -14,6 +14,23 @@ done
 echo "perl: stack limit `ulimit -s 2>&1`, data limit `ulimit -d 2>&1`"
 if test -d "perl-$VERSION"; then cd "perl-$VERSION"; fi
 patch -p1 < "perl-$VERSION-openstep.patch"
+# The 68k libc has the stdio.h macro fileno() but no function of that name, and some of
+# perl's code calls the function (miniperl failed to link with _fileno undefined).  Define
+# it in util.c, which every perl binary links.
+if [ "$PKG_ARCH" = m68k ]; then
+    /bin/cat >> util.c <<'FEOF'
+
+/* OPENSTEP on the 68k: only the stdio.h macro exists, not the function */
+#ifdef fileno
+#undef fileno
+#endif
+int
+fileno(FILE *fp)
+{
+    return fp->_file;
+}
+FEOF
+fi
 # GCC 4.2 cannot emit usable PIC for this target; link the bundled XS modules.
 /usr/local/bin/ksh ./Configure -des -O -Dprefix=/usr/local \
     -Dcc=/usr/local/bin/gcc-4.2 -Dld=/usr/local/bin/gcc-4.2 \
