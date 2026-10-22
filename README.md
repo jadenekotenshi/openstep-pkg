@@ -311,10 +311,27 @@ Optional:
 - `checksums` (required for remote sources)
 - `post-install`
 - `pre-remove`
+- `message` (text shown after the package is installed, and again by `pkg message <name>`;
+  for notices such as "this package is superseded"; see "Package messages")
 - `test`
 - `verify-ignore` (paths `pkg verify` skips for this package; see "Verifying installed files")
 - `nostrip` (paths `pkg strip` leaves alone; see "Stripping")
 - `nextpkg` (makes a NeXT package; see "Native applications")
+
+## Package messages
+
+A package may carry a `message` file: plain text for the person installing it, such as a
+notice that the package is superseded or a thing to do after the install.  `pkg` prints it
+once the install has finished, indented under a "message for <name>" heading, and keeps a
+copy in the package database, so
+
+```sh
+pkg message slashem
+```
+
+shows it again later (it says so if the package has none, and fails if the package is not
+installed).  It is carried in binary packages (`binpkg` and `installpkg`) too.  It is only
+text: nothing is run, so a `post-install` hook is still the place to do anything.
 
 ## Upgrading
 
