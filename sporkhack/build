@@ -36,6 +36,19 @@ done
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
 /bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
 /bin/grep '^#undef LINUX' include/unixconf.h > /dev/null
+# The variable files (scores, saves, bones, locks) default to a /opt/games/... playground
+# through VAR_PLAYGROUND, and the playground itself defaults to HACKDIR in config.h.
+# Both go to this package's directory; without VAR_PLAYGROUND the variable parts are
+# kept in the playground, which is where the install puts them.
+/bin/sed -e 's|^#define VAR_PLAYGROUND|/* #define VAR_PLAYGROUND|' \
+    -e 's|^\(/\* #define VAR_PLAYGROUND.*\)$|\1 */|' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+/bin/grep '^/\* #define VAR_PLAYGROUND' include/unixconf.h > /dev/null
+/bin/sed -e 's|"/opt/games/lib/sporkhackdir/"|"'$PREFIX'/lib/sporkhackdir/"|' \
+    include/config.h > include/config.h.new
+/bin/mv include/config.h.new include/config.h
+/bin/grep "$PREFIX/lib/sporkhackdir" include/config.h > /dev/null
 
 # gzip for compressed save files and bones, and plain string matching for menu
 # colors and no regex (there is no <regex.h> here).
