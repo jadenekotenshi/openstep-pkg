@@ -1,0 +1,7 @@
+UnNetHack starts in the tty interface and has no -w command line option.  To use the
+curses interface put
+
+    OPTIONS=windowtype:curses
+
+in ~/.unnethackrc (or ~/.nethackrc), or set NETHACKOPTIONS=windowtype:curses in the
+environment.
