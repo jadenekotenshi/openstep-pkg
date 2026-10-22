@@ -17,6 +17,10 @@ if test -d "EvilHack-$VERSION"; then cd "EvilHack-$VERSION"; fi
 # EvilHack is NetHack 3.6 with additions, so it is set up the way the nethack package
 # does it: OPENSTEP is treated as a BSD system with termcap and no POSIX job control
 # or types.  The rewritten lines are checked below.
+# Everything up to the build itself is one step: a resumed build (PKG_RESUME=1) skips it
+# once it has succeeded, so the files it edited are not touched again and only what
+# changed is recompiled; PKG_REDO=prepare runs it again.
+evilhack_prepare() {
 /bin/sed \
     -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
     -e 's|^#define SYSV[ 	]|#undef SYSV |' \
@@ -215,6 +219,17 @@ FEOF
 /bin/sed -f nh-fix.sed dat/Makefile > dat/Makefile.new
 /bin/mv dat/Makefile.new dat/Makefile
 /bin/rm -f nh-fix.sed
+
+# The curses code uses ncurses 6.1's extended-colour functions (init_extended_pair()
+# and init_extended_color()) when the header declares them, but they are only in the
+# library when it is built with extended colours, which this one is not.  They are
+# left out so the plain init_pair() path is used.
+/bin/sed -e 's/^# define NH_NCURSES_EXT_COLORS 1/# define NH_NCURSES_EXT_COLORS 0/' \
+    win/curses/cursmisc.h > win/curses/cursmisc.h.new
+/bin/mv win/curses/cursmisc.h.new win/curses/cursmisc.h
+/bin/grep 'define NH_NCURSES_EXT_COLORS 0' win/curses/cursmisc.h > /dev/null
+}
+pkg_step prepare evilhack_prepare
 
 # "make all" would also format the Guidebook with nroff; install builds what the
 # game needs.
