@@ -343,7 +343,16 @@ luaflags="CC='$CC' SYSCFLAGS='-DNeXT' AR='$AR_CMD rcu' RANLIB='$RANLIB_CMD'"
 # This build uses a system configuration file and the game refuses to start without
 # one: install the stock sysconf.
 gamedir="$DESTDIR$PREFIX/lib/nethack5dir"
-/bin/cp sys/unix/sysconf "$gamedir/sysconf"
+# The stock sysconf is a public server's: it points at gdb, a log directory and
+# live-logging settings this system does not have, and the game refuses a sysconf with
+# an error in it.  Those settings are commented out (and anybody may use explore mode).
+/bin/sed \
+    -e 's/^GDBPATH=/#GDBPATH=/' -e 's/^GREPPATH=/#GREPPATH=/' \
+    -e 's/^PANICTRACE_GDB=/#PANICTRACE_GDB=/' -e 's/^PANICTRACE_LIBC=/#PANICTRACE_LIBC=/' \
+    -e 's/^LIVELOG=/#LIVELOG=/' -e 's/^LLC_TURNS=/#LLC_TURNS=/' \
+    -e 's/^DUMPLOGFILE=/#DUMPLOGFILE=/' -e 's/^DUMPHTMLFILE=/#DUMPHTMLFILE=/' \
+    -e 's/^EXPLORERS=nobody/EXPLORERS=*/' \
+    sys/unix/sysconf > "$gamedir/sysconf"
 /bin/chmod 644 "$gamedir/sysconf"
 
 # Replace the stock launcher (it uses shell features the system sh lacks).
