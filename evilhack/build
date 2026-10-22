@@ -133,6 +133,9 @@ HEOF
 seed=`/usr/local/bin/gawk 'BEGIN { srand(); print int(rand() * 2000000000) + 1 }'`
 echo "$seed" > dat/serverseed
 
+# SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
+# unsigned versions are forced into the game's code (empty on x86).
+CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
 hints=sys/unix/hints/openstep
 /bin/cat > "$hints" <<HEOF
 #-PRE
@@ -145,7 +148,7 @@ SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
 
 POSTINSTALL=cp sys/unix/sysconf \$(INSTDIR)/sysconf; chmod 644 \$(INSTDIR)/sysconf; cp dat/serverseed \$(INSTDIR)/serverseed; chmod 666 \$(INSTDIR)/serverseed
 
-CFLAGS=-O2 -I../include -I$inc -include $inc/evilhack-compat.h -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL -DYYMALLOC=malloc -DYYFREE=free
+CFLAGS=-O2 -I../include -I$inc -include $inc/evilhack-compat.h $CMPFLAGS -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL -DYYMALLOC=malloc -DYYFREE=free
 # ncurses' <term.h> (which termcap.c includes) declares tputs() itself; the game's own
 # prototype for it must stay out of the way.
 CFLAGS+=-DHAVE_TPUTS
