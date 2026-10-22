@@ -252,6 +252,18 @@ pkg_step prepare evilhack_prepare
 # game needs.
 /bin/gnumake install DESTDIR="$DESTDIR"
 
+# The stock sysconf is a public server's: it points at gdb, a log directory and
+# live-logging settings this system does not have, and the game refuses a sysconf with
+# an error in it.  Those settings are commented out (and anybody may use explore mode).
+/bin/sed \
+    -e 's/^GDBPATH=/#GDBPATH=/' -e 's/^GREPPATH=/#GREPPATH=/' \
+    -e 's/^PANICTRACE_GDB=/#PANICTRACE_GDB=/' -e 's/^PANICTRACE_LIBC=/#PANICTRACE_LIBC=/' \
+    -e 's/^LIVELOG=/#LIVELOG=/' -e 's/^LLC_TURNS=/#LLC_TURNS=/' \
+    -e 's/^DUMPLOGFILE=/#DUMPLOGFILE=/' -e 's/^DUMPHTMLFILE=/#DUMPHTMLFILE=/' \
+    -e 's/^EXPLORERS=nobody/EXPLORERS=*/' \
+    sys/unix/sysconf > "$DESTDIR$PREFIX/lib/evilhackdir/sysconf"
+/bin/chmod 644 "$DESTDIR$PREFIX/lib/evilhackdir/sysconf"
+
 # Replace the stock launcher (it uses shell features the system sh lacks).
 /bin/cat > "$DESTDIR$PREFIX/bin/evilhack" <<'LEOF'
 #!/bin/sh
