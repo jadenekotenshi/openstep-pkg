@@ -35,6 +35,24 @@ done
 /bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
 /bin/grep '^#undef POSIX_TYPES' include/unixconf.h > /dev/null
 
+# win/tty/termcap.c is missing a closing brace when TERMINFO is not defined (the
+# "if (!(BC = Tgetstr("le")))" block is only closed in the terminfo branch); close it
+# after the termcap fallback.
+before=`/usr/bin/wc -l < win/tty/termcap.c`
+/usr/local/bin/gawk '
+    st == 2 && /^# endif/ { print "    }" }
+    st == 2 { st = 0 }
+    st == 1 { st = 2 }
+    /\*BC = / { st = 1 }
+    { print }
+' win/tty/termcap.c > win/tty/termcap.c.new
+/bin/mv win/tty/termcap.c.new win/tty/termcap.c
+after=`/usr/bin/wc -l < win/tty/termcap.c`
+if test "$after" -le "$before"; then
+    echo "unnethack: termcap.c patch did not apply" >&2
+    exit 1
+fi
+
 # This libc lacks <stdint.h>, snprintf() and strdup(), and may lack some types.  A
 # private include directory and a header read with -include supply them as static
 # code, so nothing needs linking.  The directory is not called "openstep": make
