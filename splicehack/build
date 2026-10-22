@@ -1,0 +1,329 @@
+#!/bin/sh
+set -e
+DESTDIR=$1
+VERSION=$2
+PREFIX=/usr/local
+PATH=/usr/local/bin:/usr/ucb:/bin:/usr/bin
+# SpliceHack is NetHack 3.7 based (C99, and it builds Lua 5.4); gcc 4.2 does it with
+# -std=gnu99.
+CC="/usr/local/bin/gcc-4.2 $PKG_GCC42_ARCH_FLAGS -std=gnu99"
+AR_CMD="$PKG_AR"
+RANLIB_CMD="$PKG_RANLIB"
+# On i386 the archives are made by the cctools ar, which keeps long member names;
+# the stock linker cannot read them.  A gcc42 built after the cctools package links
+# with the cctools ld by itself; an older one needs the specs file selecting it.
+if [ "$PKG_ARCH" = i386 ] && [ -f /usr/local/lib/cctools/gcc42.specs ]; then
+    CC="$CC -specs=/usr/local/lib/cctools/gcc42.specs"
+fi
+export PATH CC
+# GitHub's archive unpacks as SpliceHack-<commit>
+for d in SpliceHack-*; do
+    if test -d "$d"; then cd "$d"; break; fi
+done
+. "$PKG_BUILD_HELPERS"
+
+# NetHack's makefiles run Lua's build with a bare "make", which here is the BSD make
+# (it rejects the GNU-style arguments).  A directory with "make" linked to gnumake
+# goes first in the PATH, so that any such call gets GNU make.
+/usr/local/bin/mkdir -p ostep-bin
+# The SPARC ar has no "s" option, and some makefiles run "ar rcs".  This ar wrapper
+# drops the "s" and runs ranlib on the archive instead.
+/bin/cat > ostep-bin/ar-wrap <<AEOF
+#!/bin/sh
+op=\$1
+shift
+case \$op in
+*s*) op=\`echo \$op | /bin/sed 's/s//g'\`; idx=1;;
+*) idx=;;
+esac
+$AR_CMD \$op "\$@" || exit 1
+if [ -n "\$idx" ]; then
+    $RANLIB_CMD "\$1" || exit 1
+fi
+AEOF
+/bin/chmod 755 ostep-bin/ar-wrap
+AR_CMD=`pwd`/ostep-bin/ar-wrap
+/bin/rm -f ostep-bin/make
+/bin/ln -s /bin/gnumake ostep-bin/make
+PATH=`pwd`/ostep-bin:$PATH
+export PATH
+
+# Lua 5.4.8 comes in lib/lua-5.4.8 (the sources file puts it there); it needs the
+# same OPENSTEP fixes as the lua package (wait macros, popen, frexp, strtod).
+(cd lib/lua-5.4.8 && patch -p1 < ../../lua-5.4.8-openstep.patch)
+
+# This libc and these headers lack a good deal NetHack 5.0 assumes: <stdint.h>,
+# <inttypes.h>, the POSIX <dirent.h>, snprintf() and vsnprintf(), and the wait-status
+# macros for an int.  A private include directory supplies them (static code
+# renamed by macros, so nothing needs linking and nothing can clash).  The
+# directory is not called "openstep": make would take that for a target.
+inc=`pwd`/ostep-inc
+/usr/local/bin/mkdir -p ostep-inc/sys
+/bin/cat > ostep-inc/stdint.h <<'SEOF'
+#ifndef OPENSTEP_STDINT_H
+#define OPENSTEP_STDINT_H
+#include <sys/types.h>
+typedef signed char int8_t;
+typedef short int16_t;
+typedef int int32_t;
+typedef long long int64_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+typedef unsigned int uint32_t;
+typedef unsigned long long uint64_t;
+typedef long long intmax_t;
+typedef unsigned long long uintmax_t;
+typedef long intptr_t;
+typedef unsigned long uintptr_t;
+#define INT8_MAX 127
+#define INT16_MAX 32767
+#define INT32_MAX 2147483647
+#define INT64_MAX 9223372036854775807LL
+#define UINT8_MAX 255
+#define UINT16_MAX 65535
+#define UINT32_MAX 4294967295U
+#define UINT64_MAX 18446744073709551615ULL
+#define INTMAX_MAX 9223372036854775807LL
+#define UINTMAX_MAX 18446744073709551615ULL
+#endif
+SEOF
+/bin/cat > ostep-inc/inttypes.h <<'SEOF'
+#ifndef OPENSTEP_INTTYPES_H
+#define OPENSTEP_INTTYPES_H
+#include <stdint.h>
+#define PRId32 "d"
+#define PRIu32 "u"
+#define PRIx32 "x"
+#define PRId64 "lld"
+#define PRIu64 "llu"
+#define PRIx64 "llx"
+#define PRIdMAX "lld"
+#define PRIuMAX "llu"
+#endif
+SEOF
+/bin/cat > ostep-inc/dirent.h <<'SEOF'
+#ifndef OPENSTEP_DIRENT_H
+#define OPENSTEP_DIRENT_H
+#include <sys/types.h>
+#include <sys/dir.h>
+#define dirent direct
+#endif
+SEOF
+echo '/* empty: select() and fd_set come with <sys/types.h> here */' > ostep-inc/sys/select.h
+/bin/cat > ostep-inc/sys/wait.h <<'SEOF'
+#ifndef OPENSTEP_SYS_WAIT_H
+#define OPENSTEP_SYS_WAIT_H
+#include_next <sys/wait.h>
+#undef WIFEXITED
+#undef WEXITSTATUS
+#undef WIFSIGNALED
+#undef WTERMSIG
+#define WIFEXITED(s) ((((int) (s)) & 0xff) == 0)
+#define WEXITSTATUS(s) ((((int) (s)) >> 8) & 0xff)
+#define WIFSIGNALED(s) ((((int) (s)) & 0xff) != 0 && (((int) (s)) & 0xff) != 0x7f)
+#define WTERMSIG(s) (((int) (s)) & 0x7f)
+#endif
+SEOF
+/bin/cat > ostep-inc/splicehack-compat.h <<'SEOF'
+#ifndef OPENSTEP_SPLICEHACK_COMPAT_H
+#define OPENSTEP_SPLICEHACK_COMPAT_H
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/param.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#ifndef PATH_MAX
+# define PATH_MAX 1024
+#endif
+#ifndef O_NONBLOCK
+# ifdef FNDELAY
+#  define O_NONBLOCK FNDELAY
+# else
+#  define O_NONBLOCK 0x0004
+# endif
+#endif
+#ifndef S_IRUSR
+# define S_IRUSR 0000400
+# define S_IWUSR 0000200
+# define S_IXUSR 0000100
+# define S_IRGRP 0000040
+# define S_IWGRP 0000020
+# define S_IXGRP 0000010
+# define S_IROTH 0000004
+# define S_IWOTH 0000002
+# define S_IXOTH 0000001
+#endif
+#ifndef S_ISDIR
+# define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
+#endif
+#ifndef S_ISREG
+# define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#endif
+#ifndef ENOSYS
+# define ENOSYS 78
+#endif
+#include <time.h>
+extern int wait3();
+extern int wait4();
+extern char *getwd();
+/* getcwd(), waitpid() and the _r time functions are missing from this libc; they are
+   static here and renamed by macros, so nothing needs linking.  wait4() with a pid
+   of -1 reports ECHILD here, so "any child" goes through wait3(). */
+static char *
+ostep_getcwd(char *buf, size_t size)
+{
+    if (buf == 0 || size < MAXPATHLEN) {
+        errno = ERANGE;
+        return 0;
+    }
+    return getwd(buf);
+}
+static int
+ostep_waitpid(int pid, int *status, int options)
+{
+    if (pid == -1)
+        return wait3((void *) status, options, (void *) 0);
+    return wait4(pid, (void *) status, options, (void *) 0);
+}
+static struct tm *
+ostep_gmtime_r(const time_t *t, struct tm *out)
+{
+    struct tm *p = gmtime(t);
+
+    if (p == 0)
+        return 0;
+    *out = *p;
+    return out;
+}
+static struct tm *
+ostep_localtime_r(const time_t *t, struct tm *out)
+{
+    struct tm *p = localtime(t);
+
+    if (p == 0)
+        return 0;
+    *out = *p;
+    return out;
+}
+#define getcwd ostep_getcwd
+#define waitpid ostep_waitpid
+#define gmtime_r ostep_gmtime_r
+#define localtime_r ostep_localtime_r
+#include "snprintf-shim.h"
+#endif
+SEOF
+/bin/cp snprintf-shim.h ostep-inc/snprintf-shim.h
+
+# unixconf.h: this is a BSD system with termcap and without POSIX job control or
+# types (the same settings the nethack package uses for 3.6.7).
+/bin/sed \
+    -e 's|^/\* #define BSD 1 \*/|#define BSD 1|' \
+    -e 's|^#define SYSV |#undef SYSV |' \
+    -e 's|^#define SVR4 |#undef SVR4 |' \
+    -e 's|^#define LINUX |#undef LINUX |' \
+    -e 's|^#define TERMINFO |#undef TERMINFO |' \
+    -e 's|^#define POSIX_JOB_CONTROL |#undef POSIX_JOB_CONTROL |' \
+    -e 's|^#define POSIX_TYPES |#undef POSIX_TYPES |' \
+    -e 's|^#define memcpy(d, s, n) bcopy(s, d, n)|/* memcpy is a real function here */|' \
+    -e 's|^#define memcmp(s1, s2, n) bcmp(s2, s1, n)|/* memcmp is a real function here */|' \
+    include/unixconf.h > include/unixconf.h.new
+/bin/mv include/unixconf.h.new include/unixconf.h
+/bin/grep '^#define BSD 1' include/unixconf.h > /dev/null
+/bin/grep '^#undef SYSV' include/unixconf.h > /dev/null
+/bin/grep '^#undef LINUX' include/unixconf.h > /dev/null
+# (The BSD settings rename memcpy and memcmp to bcopy and bcmp, which return void or
+# take their arguments the other way round; the code uses the return values.)
+if /bin/grep '^#define memcpy' include/unixconf.h > /dev/null; then
+    echo "splicehack: unixconf.h still defines memcpy as a macro" >&2
+    exit 1
+fi
+
+# The hints file for this system: tty and curses interfaces (both through the ncurses
+# package, which also provides the termcap functions), the interface picked by the
+# hints include file.  The game goes in /usr/local/lib/splicehackdir with a launcher
+# in /usr/local/bin/splicehack.  There is no games user or group here, so ownership is
+# left alone and the score and save files are writable by everyone who can run it.
+hints=sys/unix/hints/openstep.splice
+/bin/cat > "$hints" <<HEOF
+#-PRE
+# OPENSTEP hints (generated by the pkg build script)
+WANT_WIN_TTY=1
+WANT_WIN_CURSES=1
+WANT_DEFAULT=tty
+#-INCLUDE multiw-2.2020
+
+PREFIX=$PREFIX
+HACKDIR=\$(PREFIX)/lib/\$(GAME)dir
+INSTDIR=\$(DESTDIR)\$(HACKDIR)
+VARDIR=\$(DESTDIR)\$(HACKDIR)
+SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
+
+CFLAGS=-O2 -I../include -I$inc -include $inc/splicehack-compat.h -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL
+CFLAGS+=\$(WINCFLAGS)
+# gcc 4.2 does not allow #pragma GCC diagnostic inside a function, which the
+# warning-suppression macros use; this makes them no-ops.
+CFLAGS+=-DDISABLE_WARNING_PRAGMAS
+CFLAGS+=-DDLB -DTIMED_DELAY
+CFLAGS+=-DCOMPRESS=\\"/usr/local/bin/gzip\\" -DCOMPRESS_EXTENSION=\\".gz\\"
+CFLAGS+=-DHACKDIR=\\"\$(HACKDIR)\\"
+CFLAGS+=-DDEFAULT_WINDOW_SYS=\\"\$(WANT_DEFAULT)\\"
+CFLAGS+=-DSYSCF -DSYSCF_FILE=\\"\$(HACKDIR)/sysconf\\"
+SYSCFLAGS=-DNeXT
+LINK=\$(CC)
+
+WINOBJ = \$(sort \$(WINOBJ0))
+WINLIB = -L/usr/local/lib -lncurses
+VARDATND =
+
+CHOWN=true
+CHGRP=true
+ROOTCHECK=true
+DIRPERM = 0755
+FILEPERM = 0644
+EXEPERM = 0755
+GAMEPERM = 0755
+VARDIRPERM = 0777
+VARFILEPERM = 0666
+HEOF
+
+/bin/sh sys/unix/setup.sh "$hints"
+
+# No <regex.h> here: NetHack's own pattern matcher.  This has to be set in the
+# generated makefile because it is assigned after the hints.
+/bin/sed 's/^REGEXOBJ = $(TARGETPFX)posixregex.o/REGEXOBJ = $(TARGETPFX)pmatchregex.o/' \
+    src/Makefile > src/Makefile.new
+/bin/mv src/Makefile.new src/Makefile
+/bin/grep '^REGEXOBJ = $(TARGETPFX)pmatchregex.o' src/Makefile > /dev/null
+
+# Build and install; "make all" would also format the Guidebook with nroff.  The
+# makefile builds Lua 5.4.3 by default; the staged one is 5.4.8 (with the OPENSTEP
+# patch).  Lua's makefile runs the "ar" and "ranlib" it finds in the PATH, so the
+# wrappers in ostep-bin make those the right ones.  Lua is built without
+# LUA_USE_POSIX (it would use gmtime_r, localtime_r and mkstemp, which this libc lacks).
+/bin/ln -s "$AR_CMD" ostep-bin/ar
+/bin/ln -s "$RANLIB_CMD" ostep-bin/ranlib
+/bin/gnumake CC="$CC" GAME=splicehack LUA_VERSION=5.4.8 install DESTDIR="$DESTDIR"
+
+# This build uses a system configuration file and the game refuses to start without
+# one: install the stock sysconf.
+gamedir="$DESTDIR$PREFIX/lib/splicehackdir"
+/bin/cp sys/unix/sysconf "$gamedir/sysconf"
+/bin/chmod 644 "$gamedir/sysconf"
+
+# Replace the stock launcher (it uses shell features the system sh lacks).
+/bin/cat > "$DESTDIR$PREFIX/bin/splicehack" <<'LEOF'
+#!/bin/sh
+HACKDIR=/usr/local/lib/splicehackdir
+export HACKDIR
+cd $HACKDIR
+exec $HACKDIR/splicehack ${1+"$@"}
+LEOF
+/bin/chmod 755 "$DESTDIR$PREFIX/bin/splicehack"
+
+test -x "$gamedir/splicehack"
+test -f "$gamedir/nhdat"
+test -f "$gamedir/sysconf"
