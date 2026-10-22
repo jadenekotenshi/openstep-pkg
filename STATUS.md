@@ -142,7 +142,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | rsync | validated | validated (2026-10-10) | — |
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | — |
 | sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | validated 4.0.9 (2026-11-04; builds, installs and `pkg test sed` passes; unsigned compares via pkg_cmp_shim) |
-| slashem | validated 0.0.7E7F3 (2026-10-26; builds, installs, test passes, and the game plays; tty interface only, set up as a BSD/termcap build like nethack; menu colours match plain strings, not regexes, since there is no regex.h) | validated 0.0.7E7F3 (2026-10-27; builds, installs and tests) | — |
+| slashem | validated 0.0.7E7F3 (2026-10-26; builds, installs, test passes, and the game plays; tty interface only, set up as a BSD/termcap build like nethack; menu colours match plain strings, not regexes, since there is no regex.h); kept in the tree, tty only, though Hack'EM (`hackem`) is the recommended successor and has a curses interface (the Slash'EM curses patch is not used: it is 2010-era and its source is unreachable) | validated 0.0.7E7F3 (2026-10-27; builds, installs and tests) | — |
 | sudo | validated | validated 1.7.10p9 (2026-10-09) | — |
 | tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | tcsh | validated | validated 6.24.13 (rebootstrap, 2026-10-08; vfork.h fix) | — |
