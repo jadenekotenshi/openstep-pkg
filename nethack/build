@@ -34,6 +34,23 @@ $CC $PKG_GCC42_ARCH_FLAGS -O2 -c openstep_strdup.c -o openstep_strdup.o
 strdup_shim=`pwd`/openstep_strdup.o
 strdup_obj=
 
+# The curses window interface is built as well (tty stays the default); it and the tty
+# interface use the ncurses package.  NETHACK_NO_CURSES=1 in the environment leaves it
+# out and uses termcap for the tty interface alone.
+if test "${NETHACK_NO_CURSES-}" = 1; then
+    cur_cflags=
+    cur_src=
+    cur_obj=
+    cur_lib=
+    tty_lib=-ltermcap
+else
+    cur_cflags="-I/usr/local/include/ncurses -DCURSES_GRAPHICS"
+    cur_src=' $(WINCURSESSRC)'
+    cur_obj=' $(WINCURSESOBJ)'
+    cur_lib=' $(WINCURSESLIB)'
+    tty_lib="-L/usr/local/lib -lncurses"
+fi
+
 hints=sys/unix/hints/openstep
 /bin/cat > "$hints" <<'HEOF'
 #-PRE
@@ -44,16 +61,16 @@ INSTDIR=$(DESTDIR)$(HACKDIR)
 VARDIR=$(DESTDIR)$(HACKDIR)
 SHELLDIR=$(DESTDIR)$(PREFIX)/bin
 
-CFLAGS=@CFLAGS@ -I../include -DNeXT -DNOTPARMDECL
+CFLAGS=@CFLAGS@ -I../include -DNeXT -DNOTPARMDECL @CURSES_CFLAGS@
 CFLAGS+=-DDLB -DTIMED_DELAY
 CFLAGS+=-DCOMPRESS=\"/usr/local/bin/gzip\" -DCOMPRESS_EXTENSION=\".gz\"
 CFLAGS+=-DHACKDIR=\"$(HACKDIR)\"
 LINK=$(CC)
 
-WINSRC = $(WINTTYSRC)
-WINOBJ = $(WINTTYOBJ)
-WINLIB = $(WINTTYLIB)
-WINTTYLIB = @STRDUP@ -ltermcap
+WINSRC = $(WINTTYSRC)@CURSES_SRC@
+WINOBJ = $(WINTTYOBJ)@CURSES_OBJ@
+WINLIB = $(WINTTYLIB)@CURSES_LIB@
+WINTTYLIB = @STRDUP@ @TTY_LIB@
 
 CHOWN=true
 CHGRP=true
@@ -104,9 +121,9 @@ if test "$HAVE_X11" = 1; then
     /bin/cat >> "$hints" <<HEOF
 CFLAGS+=-DX11_GRAPHICS $xpm_def -I$x11/include $xaw_inc -idirafter /usr/local/include
 LFLAGS=-L/usr/local/lib -L$x11/lib
-WINSRC = \$(WINTTYSRC) \$(WINX11SRC)
-WINOBJ = \$(WINTTYOBJ) \$(WINX11OBJ)
-WINLIB = \$(WINTTYLIB) \$(WINX11LIB)
+WINSRC = \$(WINTTYSRC) \$(WINX11SRC)$cur_src
+WINOBJ = \$(WINTTYOBJ) \$(WINX11OBJ)$cur_obj
+WINLIB = \$(WINTTYLIB) \$(WINX11LIB)$cur_lib
 WINX11LIB = -lneXtaw $xpm_lib -lXmu -lXt $sm_libs -lXext -lX11
 VARDATND = x11tiles NetHack.ad pet_mark.xbm pilemark.xbm
 HEOF
@@ -115,7 +132,10 @@ HEOF
     fi
 fi
 
-/bin/sed -e "s|@CFLAGS@|-O2 $PKG_GCC42_ARCH_FLAGS|" -e "s|@STRDUP@|$strdup_obj|" "$hints" > "$hints.new"
+/bin/sed -e "s|@CFLAGS@|-O2 $PKG_GCC42_ARCH_FLAGS|" -e "s|@STRDUP@|$strdup_obj|" \
+    -e "s|@CURSES_CFLAGS@|$cur_cflags|" -e "s|@CURSES_SRC@|$cur_src|" \
+    -e "s|@CURSES_OBJ@|$cur_obj|" -e "s|@CURSES_LIB@|$cur_lib|" \
+    -e "s|@TTY_LIB@|$tty_lib|" "$hints" > "$hints.new"
 /bin/mv "$hints.new" "$hints"
 
 # The distribution carries pre-generated lex and yacc output; use it instead of
@@ -138,7 +158,9 @@ FEOF
 echo "LFLAGS += $strdup_shim" >> util/Makefile
 # Use NetHack's own pattern matcher instead of the system regcomp(); this has to
 # be set in the generated makefile because the object list is read early.
-/bin/sed 's/^REGEXOBJ = posixregex.o/REGEXOBJ = pmatchregex.o/' src/Makefile > src/Makefile.new
+# (The ncurses link is in WINTTYLIB; the makefile's own curses library name is dropped.)
+/bin/sed -e 's/^REGEXOBJ = posixregex.o/REGEXOBJ = pmatchregex.o/' \
+    -e 's/^WINCURSESLIB *=.*/WINCURSESLIB =/' src/Makefile > src/Makefile.new
 /bin/mv src/Makefile.new src/Makefile
 # "make all" would also format the Guidebook with nroff; install builds what the
 # game needs.

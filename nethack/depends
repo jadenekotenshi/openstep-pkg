@@ -6,5 +6,6 @@ grep
 gawk
 gzip
 termcap
+ncurses
 patch
 ?HAVE_X11:neXtaw
