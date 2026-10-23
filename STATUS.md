@@ -156,7 +156,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | wget | 1.25.0 validated on x86 (HTTPS via OpenSSL) | 1.25.0 validated (2026-10-10) | — |
 | wget-bootstrap | 1.19.5 validated | validated 1.19.5 (needs the localtime and unsigned-compare fixes; rebootstrap, 2026-10-08) | validated (2026-10-19; m68k-only workarounds) |
 | windowmaker | validated 0.80.0 (2026-10-24; builds, installs, test passes, runs under CubXWindow; Dock and Clip off by default) | validated 0.80.0 (2026-10-24; builds, installs, tests and runs under CubXWindow) | — |
-| xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | — |
+| xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | validated 0.8.4 (2026-11-15; builds, installs and `pkg test xxhash` passes; built with `XXH_FORCE_MEMORY_ACCESS=0`, as on SPARC) |
 | xz | validated | validated 5.8.4 | — |
 | zip | validated | validated 3.0 (2026-10-09) | — |
 | zlib | validated | validated 1.2.13 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
