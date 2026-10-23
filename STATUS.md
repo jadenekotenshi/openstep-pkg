@@ -105,7 +105,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-13) | — |
 | lua | validated | validated (2026-10-10) | — |
 | lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) | — |
-| lz4 | validated | validated (2026-10-10) | — |
+| lz4 | validated | validated (2026-10-10) | validated (2026-11-15; builds, installs and `pkg test lz4` passes) |
 | m4 | validated | validated 1.4.6 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | validated (2026-11-06; builds, installs and `pkg test mktemp` passes) |
