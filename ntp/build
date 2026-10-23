@@ -748,6 +748,17 @@ run_configure --prefix=/usr/local --sysconfdir=/usr/local/etc \
     --without-crypto --without-sntp --without-ntpsnmpd --disable-debugging \
     --disable-thread-support --disable-dependency-tracking \
     --disable-all-clocks --enable-LOCAL-CLOCK
+# configure turns on "check-layout" when perl is installed: ntpdc (and ntpd) then compare
+# the layout of the mode 7 request structures with a reference file, and stop if they
+# differ.  They do differ on the 68k, which aligns 32-bit values to 2 bytes where the
+# reference has 4; that only matters for ntpdc talking to a ntpd on another kind of
+# machine (ntpq, the usual tool, is unaffected), and the check was not being run on
+# machines without perl.  Leave it out everywhere.
+for mk in `/usr/bin/find . -name Makefile -print`
+do
+    /bin/sed 's|^MAKE_CHECK_LAYOUT = check-layout|MAKE_CHECK_LAYOUT =|' "$mk" > "$mk.new"
+    /bin/mv "$mk.new" "$mk"
+done
 # <memory.h> here declares memcpy/memcmp/memset the old way ("char *memcpy()"),
 # which conflicts with the ANSI prototypes in <string.h> that ntp includes
 # right after it.  <string.h> provides everything, so stop ntp using it.
