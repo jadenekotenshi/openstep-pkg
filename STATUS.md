@@ -133,7 +133,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | pantomime | validated 1.4.0 (2026-10-16; build, install and the 46 offline checks pass; `pmail` has connected to a local server; the full IMAP/POP3/SMTP flows are tested against Dovecot on Linux) | validated 1.4.0 (2026-10-16; build, install and the offline checks pass; `pmail` connected to a local server) | — |
 | patch | validated | validated 2.6.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) | — |
+| perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) | validated (2026-11-14; builds, installs and `pkg test perl` passes) |
 | pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) | — |
 | python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) | validated 3.11.17 (2026-10-31; builds, installs and `pkg test python311` passes; the 68k FPU flushes subnormal operands to zero, so `frexp()` is replaced by an integer-shift version in the OPENSTEP patch) |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | validated (2026-10-10; content-free dedicated-server startup test) | — |
@@ -143,12 +143,12 @@ SPARC `test world` of 2026-10-14 covers every row.
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | — |
 | sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | validated 4.0.9 (2026-11-04; builds, installs and `pkg test sed` passes; unsigned compares via pkg_cmp_shim) |
 | slashem | validated 0.0.7E7F3 (2026-10-26; builds, installs, test passes, and the game plays; tty interface only, set up as a BSD/termcap build like nethack; menu colours match plain strings, not regexes, since there is no regex.h); kept in the tree, tty only, though Hack'EM (`hackem`) is the recommended successor and has a curses interface (the Slash'EM curses patch is not used: it is 2010-era and its source is unreachable) | validated 0.0.7E7F3 (2026-10-27; builds, installs and tests) | — |
-| sudo | validated | validated 1.7.10p9 (2026-10-09) | — |
+| sudo | validated | validated 1.7.10p9 (2026-10-09) | validated (2026-11-14; builds, installs and `pkg test sudo` passes) |
 | tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| tcsh | validated | validated 6.24.13 (rebootstrap, 2026-10-08; vfork.h fix) | — |
+| tcsh | validated | validated 6.24.13 (rebootstrap, 2026-10-08; vfork.h fix) | validated (2026-11-14; builds, installs and `pkg test tcsh` passes) |
 | termcap | validated | validated 1.3.1 (rebootstrap, 2026-10-08) | — |
 | texinfo | validated | validated 4.8 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| top | validated | validated 3.6.1 (2026-10-09; needed work: the SPARC kernel refuses the `utask` read through /dev/kmem that holds the command name, so reads are non-fatal and names come from one `ps -axc` snapshot per refresh; the process list matches the x86 one; the earlier SPARC result was only an install) | — |
+| top | validated | validated 3.6.1 (2026-10-09; needed work: the SPARC kernel refuses the `utask` read through /dev/kmem that holds the command name, so reads are non-fatal and names come from one `ps -axc` snapshot per refresh; the process list matches the x86 one; the earlier SPARC result was only an install) | validated (2026-11-14; builds, installs and `pkg test top` passes) |
 | unzip | validated | validated 6.0 (rebootstrap, 2026-10-08) | — |
 | utf8proc | validated | validated (2026-10-10) | — |
 | vim | validated | validated 9.2.1091 (rebuilt 2026-10-09) | — |
@@ -160,7 +160,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | xz | validated | validated 5.8.4 | — |
 | zip | validated | validated 3.0 (2026-10-09) | — |
 | zlib | validated | validated 1.2.13 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
-| zsh | validated | validated 5.9 | — |
+| zsh | validated | validated 5.9 | validated (2026-11-14; builds, installs and `pkg test zsh` passes) |
 | zstd | validated | rebuilt 2026-10-09 with memcpy memory access (MEM_FORCE_MEMORY_ACCESS=0); tests clean | — |
 
 ## Notes
