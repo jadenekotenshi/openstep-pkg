@@ -73,12 +73,12 @@ SPARC `test world` of 2026-10-14 covers every row.
 | freetype | validated | validated 2.14.3 (2026-10-09) | — |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | validated (2026-11-16; builds, installs and `pkg test freeze` passes) |
 | fribidi | 0.19.7 validated | validated 0.19.7 (2026-10-09) | — |
-| fortune | validated 1.99.1 (2026-10-21; build, install and test pass; built without `-m` pattern search: this libc has no `re_comp`) | validated 1.99.1 (2026-10-22; build, install and test pass; no `-m` pattern search without `re_comp`) | — |
+| fortune | validated 1.99.1 (2026-10-21; build, install and test pass; built without `-m` pattern search: this libc has no `re_comp`) | validated 1.99.1 (2026-10-22; build, install and test pass; no `-m` pattern search without `re_comp`) | validated (2026-11-17; builds, installs and `pkg test fortune` passes) |
 | gawk | validated | validated 3.1.8 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gcc42 | validated | validated 4.2.1-apple-5666.3 (port; bootstraps, compare passes, `pkg test` passes; clean rebuild on a rebootstrapped host, 2026-10-08) | validated 4.2.1-apple-5666.3 (2026-10-19; `pkg test gcc42` passes with no failures; full native bootstrap on scimitar, a Previous emulator of a NeXTcube Turbo with Dimension, CPU at full speed: `pkg reinstall gcc42` took 88381 s real, 69547 s user, 13409 s system, about 24.5 hours; needs the cse and simplify-rtx fixes in `gcc42/M68K.md`) |
 | git | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated 2.55.0 (needs the unsigned memcmp/strcmp fix and -O0) | validated (2026-10-23; built with gcc42 at -O0, tests pass; python311 was pulled in as a dependency) |
 | gnupg | validated 1.4.23 (2026-10-26; builds, installs, tests; no mmap/munmap here, so gpg uses malloc for secure memory and warns about insecure memory unless `no-secmem-warning` is set; compat for putenv, strdup, snprintf, sighold/sigrelse, uname, ENOSYS and the int wait macros) | validated 1.4.23 (2026-10-26; builds, installs, tests; compiled with -mcpu=v8 and a C __udiv_qrnnd, since the assembly modules are not used) | validated (2026-11-16; builds, installs and `pkg test gnupg` passes) |
-| gperf | validated | validated 3.3 (2026-10-09) | — |
+| gperf | validated | validated 3.3 (2026-10-09) | validated (2026-11-17; builds, installs and `pkg test gperf` passes) |
 | grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | validated 1.3.12 (2026-11-04; builds, installs and `pkg test gzip` passes) |
 | help2man | validated | validated 1.27 | validated (2026-11-16; built, installed and `pkg test help2man` passed as a dependency of another package) |
@@ -134,7 +134,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | patch | validated | validated 2.6.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | perl | validated 5.8.9 (rebuilt on messer 2026-10-10, tests pass; the first make has bus-errored in ext/Encode on every clean build there, `perl/build` now retries it once, cause unknown) | validated 5.8.9 (rebuilt with the unsigned memcmp, 2026-10-09) | validated (2026-11-14; builds, installs and `pkg test perl` passes) |
-| pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) | — |
+| pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) | validated (2026-11-17; builds, installs and `pkg test pkgconf` passes) |
 | python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) | validated 3.11.17 (2026-10-31; builds, installs and `pkg test python311` passes; the 68k FPU flushes subnormal operands to zero, so `frexp()` is replaced by an integer-shift version in the OPENSTEP patch) |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | validated (2026-10-10; content-free dedicated-server startup test) | — |
 | quickjs | validated | validated 2025-09-13-2 (2026-10-13; SPARC needs memcpy accessors and an 8-byte aligned constant pool) | — |
@@ -149,8 +149,8 @@ SPARC `test world` of 2026-10-14 covers every row.
 | termcap | validated | validated 1.3.1 (rebootstrap, 2026-10-08) | validated (2026-11-17; installed and `pkg test termcap` passes) |
 | texinfo | validated | validated 4.8 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | top | validated | validated 3.6.1 (2026-10-09; needed work: the SPARC kernel refuses the `utask` read through /dev/kmem that holds the command name, so reads are non-fatal and names come from one `ps -axc` snapshot per refresh; the process list matches the x86 one; the earlier SPARC result was only an install) | validated (2026-11-14; builds, installs and `pkg test top` passes) |
-| unzip | validated | validated 6.0 (rebootstrap, 2026-10-08) | — |
-| utf8proc | validated | validated (2026-10-10) | — |
+| unzip | validated | validated 6.0 (rebootstrap, 2026-10-08) | validated (2026-11-17; builds, installs and `pkg test unzip` passes) |
+| utf8proc | validated | validated (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test utf8proc` passes) |
 | vim | validated | validated 9.2.1091 (rebuilt 2026-10-09) | — |
 | vlc | 0.9.10 validated (runs as root) | validated (2026-10-10; the i386-only flags and Mach-O subtype fix are skipped, the audio test expects host byte order) | — |
 | wget | 1.25.0 validated on x86 (HTTPS via OpenSSL) | 1.25.0 validated (2026-10-10) | — |
