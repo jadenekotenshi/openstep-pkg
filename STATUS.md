@@ -59,16 +59,16 @@ SPARC `test world` of 2026-10-14 covers every row.
 | cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) | n/a (i386 only) |
 | class-dump | validated | validated (2026-10-10; builds with `-arch $PKG_ARCH`) | — |
 | coreutils | validated (rebuilt on a host with libiconv installed, iconv off, 2026-10-09) | validated 5.0 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| cowsay | validated 3.03+dfsg2 (2026-10-21; build, install and test pass; `fortune \| cowsay` works) | validated 3.03+dfsg2 (2026-10-22; build, install and test pass) | — |
+| cowsay | validated 3.03+dfsg2 (2026-10-21; build, install and test pass; `fortune \| cowsay` works) | validated (2026-11-17; builds, installs and `pkg test cowsay` passes) | — |
 | curl | validated | validated 8.17.0 (rebuilt 2026-10-09 against the rebuilt libcrypto: links with the ostep_* routines from libcrypto.a, installs and tests) | validated (2026-10-21; built with gcc42, tests pass) |
-| darkhttpd | validated 1.13 (2026-10-25; builds, installs and tests; the test serves a directory and fetches from it) | validated 1.13 (2026-10-25; builds, installs, tests; the system printf misread %llu/%zu, so output goes through the snprintf shim) | — |
-| dash | validated 0.5.12 on x86 (2026-10-25; builds, installs, tests, and an interactive session with job control works; private stdint/inttypes, <dirent.h> and <sys/wait.h>, a sigaction-on-sigvec shim and waitpid/setpgid/getpgrp/tcgetpgrp/getcwd/strtoll/strsignal/vsnprintf shims) | validated 0.5.12 (2026-10-25; builds, installs and tests) | — |
-| diffutils | validated | validated 2.8.1 (2026-10-09) | — |
+| darkhttpd | validated 1.13 (2026-10-25; builds, installs and tests; the test serves a directory and fetches from it) | validated 1.13 (2026-10-25; builds, installs, tests; the system printf misread %llu/%zu, so output goes through the snprintf shim) | validated (2026-11-17; builds, installs and `pkg test darkhttpd` passes) |
+| dash | validated 0.5.12 on x86 (2026-10-25; builds, installs, tests, and an interactive session with job control works; private stdint/inttypes, <dirent.h> and <sys/wait.h>, a sigaction-on-sigvec shim and waitpid/setpgid/getpgrp/tcgetpgrp/getcwd/strtoll/strsignal/vsnprintf shims) | validated 0.5.12 (2026-10-25; builds, installs and tests) | validated (2026-11-17; builds, installs and `pkg test dash` passes) |
+| diffutils | validated | validated 2.8.1 (2026-10-09) | validated (2026-11-17; builds, installs and `pkg test diffutils` passes; unsigned memcmp/strcmp via pkg_cmp_shim) |
 | duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
 | emacs | validated | validated (2026-10-10; needed the pdumper alignment fixes for the 64-bit wide-int Lisp_Object, and a SPARC `netinet/in.h` big-endian branch) | — |
 | expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
-| findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | — |
+| findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | validated (2026-11-17; builds, installs and `pkg test findutils` passes; unsigned memcmp/strcmp via pkg_cmp_shim) |
 | flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | freetype | validated | validated 2.14.3 (2026-10-09) | — |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | validated (2026-11-16; builds, installs and `pkg test freeze` passes) |
@@ -103,8 +103,8 @@ SPARC `test world` of 2026-10-14 covers every row.
 | libsvgtiny | validated | validated 0.1.8 (2026-10-09) | — |
 | libwapcaplet | validated | validated 0.4.3 (rebootstrap, 2026-10-08) | — |
 | libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-13) | — |
-| lua | validated | validated (2026-10-10) | — |
-| lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) | — |
+| lua | validated | validated (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test lua` passes) |
+| lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test lua51` passes) |
 | lz4 | validated | validated (2026-10-10) | validated (2026-11-15; builds, installs and `pkg test lz4` passes) |
 | m4 | validated | validated 1.4.6 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
