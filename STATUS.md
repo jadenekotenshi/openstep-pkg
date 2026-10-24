@@ -53,7 +53,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | base64 | validated 1.5 (2026-10-24; builds, installs and tests clean on the first attempt; Fourmilab base64 with LF line ends) | validated 1.5 (2026-10-24; builds, installs and tests) | validated (2026-11-06; builds, installs and `pkg test base64` passes) |
 | bash | validated | validated 5.3 (rebuilt on the rebootstrapped host) | validated (2026-10-21; built with gcc42, tests pass) |
 | bison | validated | validated 2.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | — |
+| bzip2 | validated | validated 1.0.8 (rebootstrap, 2026-10-08) | validated (2026-11-17; installed and `pkg test bzip2` passes) |
 | ca-certificates | validated; bundle updated 2026-11-07 to Mozilla's of 2026-10-20 (2026.10.20, from curl.se/ca/cacert.pem, whose sha256 matches the digest curl.se publishes): 118 roots, with the three emSign roots (emSign Root CA - C1, emSign ECC Root CA - C3, emSign ECC Root CA - G3) removed and none added; reinstalled and `pkg test` passes (2026-11-08) | validated 2026.09.25 (rebootstrap, 2026-10-08); reinstall of the 2026.10.20 bundle pending | validated (2026-10-19; as a dependency of wget-bootstrap); reinstall of the 2026.10.20 bundle pending |
 | cctools | validated (from upstream, 2026-10-19: `ar`, `ranlib` and the cctools-806 linker; gcc42 bootstraps with them) | n/a (i386 only) | n/a (i386 only) |
 | cctools-as | 806 validated (reinstalled on messer 2026-10-10) | n/a (i386 only) | n/a (i386 only) |
@@ -146,7 +146,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | sudo | validated | validated 1.7.10p9 (2026-10-09) | validated (2026-11-14; builds, installs and `pkg test sudo` passes) |
 | tar | 1.15.1 validated | validated 1.15.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | tcsh | validated | validated 6.24.13 (rebootstrap, 2026-10-08; vfork.h fix) | validated (2026-11-14; builds, installs and `pkg test tcsh` passes) |
-| termcap | validated | validated 1.3.1 (rebootstrap, 2026-10-08) | — |
+| termcap | validated | validated 1.3.1 (rebootstrap, 2026-10-08) | validated (2026-11-17; installed and `pkg test termcap` passes) |
 | texinfo | validated | validated 4.8 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | top | validated | validated 3.6.1 (2026-10-09; needed work: the SPARC kernel refuses the `utask` read through /dev/kmem that holds the command name, so reads are non-fatal and names come from one `ps -axc` snapshot per refresh; the process list matches the x86 one; the earlier SPARC result was only an install) | validated (2026-11-14; builds, installs and `pkg test top` passes) |
 | unzip | validated | validated 6.0 (rebootstrap, 2026-10-08) | — |
@@ -158,7 +158,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | windowmaker | validated 0.80.0 (2026-10-24; builds, installs, test passes, runs under CubXWindow; Dock and Clip off by default) | validated 0.80.0 (2026-10-24; builds, installs, tests and runs under CubXWindow) | — |
 | xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | validated 0.8.4 (2026-11-15; builds, installs and `pkg test xxhash` passes; built with `XXH_FORCE_MEMORY_ACCESS=0`, as on SPARC) |
 | xz | validated | validated 5.8.4 | validated (2026-11-16; built, installed and `pkg test xz` passed as a dependency of another package) |
-| zip | validated | validated 3.0 (2026-10-09) | — |
+| zip | validated | validated 3.0 (2026-10-09) | validated (2026-11-17; installed and `pkg test zip` passes) |
 | zlib | validated | validated 1.2.13 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | zsh | validated | validated 5.9 | validated (2026-11-14; builds, installs and `pkg test zsh` passes) |
 | zstd | validated | rebuilt 2026-10-09 with memcpy memory access (MEM_FORCE_MEMORY_ACCESS=0); tests clean | validated (2026-11-16; builds, installs and `pkg test zstd` passes) |
