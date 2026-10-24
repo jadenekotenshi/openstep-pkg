@@ -81,7 +81,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | gperf | validated | validated 3.3 (2026-10-09) | — |
 | grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | validated 1.3.12 (2026-11-04; builds, installs and `pkg test gzip` passes) |
-| help2man | validated | validated 1.27 | — |
+| help2man | validated | validated 1.27 | validated (2026-11-16; built, installed and `pkg test help2man` passed as a dependency of another package) |
 | jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | — |
 | less | validated | validated 710 (rebootstrap, 2026-10-08) | validated (2026-11-05; builds, installs and `pkg test less` passes) |
 | liba52 | validated | validated 0.7.4 (rebootstrap, 2026-10-08) | — |
@@ -157,7 +157,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | wget-bootstrap | 1.19.5 validated | validated 1.19.5 (needs the localtime and unsigned-compare fixes; rebootstrap, 2026-10-08) | validated (2026-10-19; m68k-only workarounds) |
 | windowmaker | validated 0.80.0 (2026-10-24; builds, installs, test passes, runs under CubXWindow; Dock and Clip off by default) | validated 0.80.0 (2026-10-24; builds, installs, tests and runs under CubXWindow) | — |
 | xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | validated 0.8.4 (2026-11-15; builds, installs and `pkg test xxhash` passes; built with `XXH_FORCE_MEMORY_ACCESS=0`, as on SPARC) |
-| xz | validated | validated 5.8.4 | — |
+| xz | validated | validated 5.8.4 | validated (2026-11-16; built, installed and `pkg test xz` passed as a dependency of another package) |
 | zip | validated | validated 3.0 (2026-10-09) | — |
 | zlib | validated | validated 1.2.13 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | zsh | validated | validated 5.9 | validated (2026-11-14; builds, installs and `pkg test zsh` passes) |
