@@ -46,6 +46,21 @@ ensure_dir() {
 
 /usr/local/bin/patch -p1 < sdl12-1.2.15-openstep.patch
 
+# src/audio/SDL_mixer_m68k.c has hand-written 68k assembly in the Linux (GNU, "%d0"
+# register prefix) syntax, which this system's assembler rejects ("Statement ... ignored"),
+# and compiles whenever the compiler says m68k.  The routines are only called when
+# SDL_ASSEMBLY_ROUTINES is defined, which this build does not; the file is compiled
+# empty.  (The audio mixer uses the C code.)
+if test -f src/audio/SDL_mixer_m68k.c; then
+    /bin/sed -e 's|^#if (defined(__m68k__) \&\& !defined(__mcoldfire__)) \&\& defined(__GNUC__)$|#if 0|' \
+        src/audio/SDL_mixer_m68k.c > src/audio/SDL_mixer_m68k.c.new
+    /bin/mv src/audio/SDL_mixer_m68k.c.new src/audio/SDL_mixer_m68k.c
+    /bin/grep '^#if 0$' src/audio/SDL_mixer_m68k.c > /dev/null
+    if /bin/grep 'define SDL_ASSEMBLY_ROUTINES' include/SDL_config.h include/SDL_config_*.h > /dev/null 2>&1; then
+        echo "sdl12: SDL_ASSEMBLY_ROUTINES is defined; the m68k mixer routines are needed" >&2
+    fi
+fi
+
 # The bundled build script hardcodes -m486; use the per-arch cc flags instead
 # (and say so explicitly that SPARC and m68k are big-endian).
 ARCH_CFLAGS=$PKG_SYSCC_ARCH_FLAGS
