@@ -70,9 +70,9 @@ SPARC `test world` of 2026-10-14 covers every row.
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
 | findutils | validated | validated 4.2.33 (2026-10-10; unsigned memcmp/strcmp linked in with `pkg_cmp_obj`) | validated (2026-11-17; builds, installs and `pkg test findutils` passes; unsigned memcmp/strcmp via pkg_cmp_shim) |
 | flex | validated | validated 2.5.39 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
-| freetype | validated | validated 2.14.3 (2026-10-09) | — |
+| freetype | validated | validated 2.14.3 (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test freetype` passes) |
 | freeze | validated | validated 2.5 (rebootstrap, 2026-10-08) | validated (2026-11-16; builds, installs and `pkg test freeze` passes) |
-| fribidi | 0.19.7 validated | validated 0.19.7 (2026-10-09) | — |
+| fribidi | 0.19.7 validated | validated 0.19.7 (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test fribidi` passes) |
 | fortune | validated 1.99.1 (2026-10-21; build, install and test pass; built without `-m` pattern search: this libc has no `re_comp`) | validated 1.99.1 (2026-10-22; build, install and test pass; no `-m` pattern search without `re_comp`) | validated (2026-11-17; builds, installs and `pkg test fortune` passes) |
 | gawk | validated | validated 3.1.8 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gcc42 | validated | validated 4.2.1-apple-5666.3 (port; bootstraps, compare passes, `pkg test` passes; clean rebuild on a rebootstrapped host, 2026-10-08) | validated 4.2.1-apple-5666.3 (2026-10-19; `pkg test gcc42` passes with no failures; full native bootstrap on scimitar, a Previous emulator of a NeXTcube Turbo with Dimension, CPU at full speed: `pkg reinstall gcc42` took 88381 s real, 69547 s user, 13409 s system, about 24.5 hours; needs the cse and simplify-rtx fixes in `gcc42/M68K.md`) |
@@ -82,34 +82,34 @@ SPARC `test world` of 2026-10-14 covers every row.
 | grep | validated | validated 2.5.4 (rebuilt with the unsigned memcmp via pkg_cmp_obj, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | gzip | validated | validated 1.3.12 (rebootstrap, 2026-10-08) | validated 1.3.12 (2026-11-04; builds, installs and `pkg test gzip` passes) |
 | help2man | validated | validated 1.27 | validated (2026-11-16; built, installed and `pkg test help2man` passed as a dependency of another package) |
-| jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | — |
+| jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | validated (2026-11-18; builds, installs and `pkg test jpeg` passes) |
 | less | validated | validated 710 (rebootstrap, 2026-10-08) | validated (2026-11-05; builds, installs and `pkg test less` passes) |
-| liba52 | validated | validated 0.7.4 (rebootstrap, 2026-10-08) | — |
+| liba52 | validated | validated 0.7.4 (rebootstrap, 2026-10-08) | validated (2026-11-18; builds, installs and `pkg test liba52` passes) |
 | libcss | validated | validated 0.9.2 (2026-10-09) | — |
 | libdom | validated | validated 0.4.2 (2026-10-09) | — |
-| libgcrypt | 1.5.6 validated (reinstalled on messer 2026-10-10) | validated 1.5.6 (2026-10-10; needs `-D__sparc_v8__` for the V8 udiv/umul in mpi) | — |
-| libgpg-error | 1.12 validated | validated 1.12 (2026-10-09) | — |
+| libgcrypt | 1.5.6 validated (reinstalled on messer 2026-10-10) | validated 1.5.6 (2026-10-10; needs `-D__sparc_v8__` for the V8 udiv/umul in mpi) | validated (2026-11-18; builds, installs and `pkg test libgcrypt` passes) |
+| libgpg-error | 1.12 validated | validated 1.12 (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test libgpg-error` passes) |
 | libhubbub | validated | validated 0.3.8 (2026-10-09) | — |
 | libiconv | validated | validated 1.15 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
-| libmad | validated (reinstalled on messer 2026-10-10; `VERSION` is exported to the build) | validated 0.15.1b (2026-10-09) | — |
-| libmpeg2 | validated | validated (2026-10-10) | — |
+| libmad | validated (reinstalled on messer 2026-10-10; `VERSION` is exported to the build) | validated 0.15.1b (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test libmad` passes) |
+| libmpeg2 | validated | validated (2026-10-10) | validated (2026-11-18; builds, installs and `pkg test libmpeg2` passes) |
 | libnsbmp | validated | validated 0.1.7 (2026-10-09) | — |
 | libnsfb | validated | validated 0.2.2 (2026-10-09) | — |
 | libnsgif | validated | validated (2026-10-10) | — |
 | libnslog | validated | validated (2026-10-10) | — |
 | libnsutils | validated | validated 0.1.1 (2026-10-09) | — |
 | libparserutils | validated | validated 0.2.5 (rebootstrap, 2026-10-08) | — |
-| libpng | validated | validated 1.6.59 (2026-10-09) | — |
+| libpng | validated | validated 1.6.59 (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test libpng` passes) |
 | libsvgtiny | validated | validated 0.1.8 (2026-10-09) | — |
 | libwapcaplet | validated | validated 0.4.3 (rebootstrap, 2026-10-08) | — |
-| libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-13) | — |
+| libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-13) | validated (2026-11-18; builds, installs and `pkg test libxml2` passes) |
 | lua | validated | validated (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test lua` passes) |
 | lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test lua51` passes) |
 | lz4 | validated | validated (2026-10-10) | validated (2026-11-15; builds, installs and `pkg test lz4` passes) |
 | m4 | validated | validated 1.4.6 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | make | validated (built with the system cc) | validated 3.81 (built with the system cc; rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | mktemp | validated | validated 1.7 (rebootstrap, 2026-10-08) | validated (2026-11-06; builds, installs and `pkg test mktemp` passes) |
-| mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | — |
+| mpg123 | validated (1.33.7, with private stdint.h/inttypes.h shims; rebuilt on a fresh host) | validated (2026-10-10) | validated (2026-11-18; builds, installs and `pkg test mpg123` passes) |
 | nano | validated | validated 2.9.8 | validated (2026-11-06; builds, installs and `pkg test nano` passes; links the ncurses package) |
 | ncurses | validated | validated 6.5 (rebootstrap, 2026-10-08) | validated 6.5 (2026-11-04; builds, installs and `pkg test ncurses` passes) |
 | nedit | validated 5.7 (2026-10-27; builds, installs, test passes and the editor runs under CubXWindow; Motif comes from /usr/X11R5 or /usr/X11R6, whichever has it; needs a handful of header stand-ins and no glob()) | validated 5.7 (2026-10-27; builds, installs, tests and runs; needed -DYYMALLOC=malloc -DYYFREE=free for the bison-generated parser) | — |
