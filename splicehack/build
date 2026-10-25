@@ -275,13 +275,15 @@ fi
 # unsigned versions are forced into the game's code (empty on x86).
 CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
 # Optimization level.  SPLICEHACK_OPT in the environment overrides it.  On the 68k the
-# assembler cannot encode a branch of more than 32K ("Fixup ... too large for field width
-# of 2") and gcc at -O2 inlines so much into mhitm.c (and other big files)'s functions that some branches
-# are longer; -O1 without the inlining of once-called functions keeps them short.
+# assembler cannot encode a displacement of more than 32K ("Fixup ... too large for field
+# width of 2"): gcc's switch jump tables there hold 16-bit offsets, and a big function
+# (mhitm.c has some) spreads a table further than that.  -fno-jump-tables (Apple's gcc 4.2
+# has it) compiles those switches as branches, which the assembler can lengthen; -O1
+# without the inlining of once-called functions keeps the functions smaller.
 OPT=${SPLICEHACK_OPT-}
 if [ -z "$OPT" ]; then
     case "$PKG_ARCH" in
-        m68k) OPT="-O1 -fno-inline-functions-called-once" ;;
+        m68k) OPT="-O1 -fno-inline-functions-called-once -fno-jump-tables" ;;
         *) OPT=-O2 ;;
     esac
 fi

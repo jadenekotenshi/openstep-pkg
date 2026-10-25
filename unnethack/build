@@ -157,6 +157,20 @@ HEOF
 # SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
 # unsigned versions are forced into the game's code (empty on x86).
 CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
+# Optimization level.  UNNETHACK_OPT in the environment overrides it.  On the 68k the
+# assembler cannot encode a displacement of more than 32K ("Fixup ... too large for field
+# width of 2"): gcc's switch jump tables there hold 16-bit offsets, and a big function
+# spreads a table further than that.  -fno-jump-tables (Apple's gcc 4.2 has it) compiles
+# those switches as branches, which the assembler can lengthen; -O1 without the inlining
+# of once-called functions keeps the functions smaller.
+OPT=${UNNETHACK_OPT-}
+if [ -z "$OPT" ]; then
+    case "$PKG_ARCH" in
+        m68k) OPT="-O1 -fno-inline-functions-called-once -fno-jump-tables" ;;
+        *) OPT=-O2 ;;
+    esac
+fi
+
 # Configure: tty and curses interfaces (curses through the ncurses package), gzip for
 # compressed files, the Guidebook is not formatted (nroff is not used), and the
 # bison and flex packages for the level and dungeon compilers.  The compat header is
@@ -168,7 +182,7 @@ unnethack_configure() {
     ncinc=/usr/local/include/ncurses
     # (Exported rather than set in front of the command: the shell here does not pass
     # assignments made in front of a function call on to the programs it runs.)
-    CFLAGS="-O2 -I$inc -I$ncinc"
+    CFLAGS="$OPT -I$inc -I$ncinc"
     CPPFLAGS="-I$inc -I$ncinc -I/usr/local/include"
     LDFLAGS="-L/usr/local/lib"
     LUA=/usr/local/bin/lua

@@ -149,7 +149,20 @@ done
 # SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
 # unsigned versions are forced into the game's code (empty on x86).
 CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
-flags="-O2 $PKG_GCC42_ARCH_FLAGS -I../include -I$inc -include $inc/sporkhack-compat.h $CMPFLAGS -I/usr/local/include/ncurses -DNeXT -DYYMALLOC=malloc -DYYFREE=free"
+# Optimization level.  SPORKHACK_OPT in the environment overrides it.  On the 68k the
+# assembler cannot encode a displacement of more than 32K ("Fixup ... too large for field
+# width of 2"): gcc's switch jump tables there hold 16-bit offsets, and a big function
+# spreads a table further than that.  -fno-jump-tables (Apple's gcc 4.2 has it) compiles
+# those switches as branches, which the assembler can lengthen; -O1 without the inlining
+# of once-called functions keeps the functions smaller.
+OPT=${SPORKHACK_OPT-}
+if [ -z "$OPT" ]; then
+    case "$PKG_ARCH" in
+        m68k) OPT="-O1 -fno-inline-functions-called-once -fno-jump-tables" ;;
+        *) OPT=-O2 ;;
+    esac
+fi
+flags="$OPT $PKG_GCC42_ARCH_FLAGS -I../include -I$inc -include $inc/sporkhack-compat.h $CMPFLAGS -I/usr/local/include/ncurses -DNeXT -DYYMALLOC=malloc -DYYFREE=free"
 /bin/sed \
     -e "s|^CFLAGS = -g -O -I../include|CFLAGS = $flags -DHACKDIR=\\\\\"$PREFIX/lib/sporkhackdir\\\\\"|" \
     -e "s|^WINTTYLIB = -lncurses|WINTTYLIB = -L/usr/local/lib -lncurses|" \
