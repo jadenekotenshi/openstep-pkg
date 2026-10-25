@@ -140,7 +140,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | quickjs | validated | validated 2025-09-13-2 (2026-10-13; SPARC needs memcpy accessors and an 8-byte aligned constant pool) | — |
 | roboclient | validated (1.1 with `rc.dhcp` installs and tests clean on x86) | validated 1.1 (2026-10-09) | — |
 | rsync | validated | validated (2026-10-10) | validated (2026-11-16; builds, installs and `pkg test rsync` passes) |
-| sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | — |
+| sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | validated (2026-11-18; builds, installs and `pkg test sdl12` passes; the Linux-syntax 68k mixer assembly in SDL_mixer_m68k.c is compiled out, since this assembler rejects it, so mixing uses the C code) |
 | sed | validated | validated 4.0.9 (with pkg_cmp_shim; rebootstrap, 2026-10-08) | validated 4.0.9 (2026-11-04; builds, installs and `pkg test sed` passes; unsigned compares via pkg_cmp_shim) |
 | slashem | validated 0.0.7E7F3 (2026-10-26; builds, installs, test passes, and the game plays; tty interface only, set up as a BSD/termcap build like nethack; menu colours match plain strings, not regexes, since there is no regex.h); kept in the tree, tty only, though Hack'EM (`hackem`) is the recommended successor and has a curses interface (the Slash'EM curses patch is not used: it is 2010-era and its source is unreachable) | validated 0.0.7E7F3 (2026-10-27; builds, installs and tests) | — |
 | sudo | validated | validated 1.7.10p9 (2026-10-09) | validated (2026-11-14; builds, installs and `pkg test sudo` passes) |
