@@ -136,6 +136,17 @@ echo "$seed" > dat/serverseed
 # SPARC and m68k libc compare bytes as signed in memcmp(), strcmp() and strncmp(); the
 # unsigned versions are forced into the game's code (empty on x86).
 CMPFLAGS=`pkg_cmp_shim "\`pwd\`/ostep-cmp"`
+# Optimization level.  EVILHACK_OPT in the environment overrides it.  On the 68k the
+# assembler cannot encode a branch of more than 32K ("Fixup ... too large for field width
+# of 2") and gcc at -O2 inlines so much into mhitm.c (and other big files)'s functions that some branches
+# are longer; -O1 without the inlining of once-called functions keeps them short.
+OPT=${EVILHACK_OPT-}
+if [ -z "$OPT" ]; then
+    case "$PKG_ARCH" in
+        m68k) OPT="-O1 -fno-inline-functions-called-once" ;;
+        *) OPT=-O2 ;;
+    esac
+fi
 hints=sys/unix/hints/openstep
 /bin/cat > "$hints" <<HEOF
 #-PRE
@@ -148,7 +159,7 @@ SHELLDIR=\$(DESTDIR)\$(PREFIX)/bin
 
 POSTINSTALL=cp sys/unix/sysconf \$(INSTDIR)/sysconf; chmod 644 \$(INSTDIR)/sysconf; cp dat/serverseed \$(INSTDIR)/serverseed; chmod 666 \$(INSTDIR)/serverseed
 
-CFLAGS=-O2 -I../include -I$inc -include $inc/evilhack-compat.h $CMPFLAGS -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL -DYYMALLOC=malloc -DYYFREE=free
+CFLAGS=$OPT -I../include -I$inc -include $inc/evilhack-compat.h $CMPFLAGS -I/usr/local/include/ncurses -DNeXT -DNOTPARMDECL -DYYMALLOC=malloc -DYYFREE=free
 # ncurses' <term.h> (which termcap.c includes) declares tputs() itself; the game's own
 # prototype for it must stay out of the way.
 CFLAGS+=-DHAVE_TPUTS
