@@ -85,23 +85,23 @@ SPARC `test world` of 2026-10-14 covers every row.
 | jpeg | validated | validated 8d (rebootstrap, 2026-10-08) | validated (2026-11-18; builds, installs and `pkg test jpeg` passes) |
 | less | validated | validated 710 (rebootstrap, 2026-10-08) | validated (2026-11-05; builds, installs and `pkg test less` passes) |
 | liba52 | validated | validated 0.7.4 (rebootstrap, 2026-10-08) | validated (2026-11-18; builds, installs and `pkg test liba52` passes) |
-| libcss | validated | validated 0.9.2 (2026-10-09) | — |
-| libdom | validated | validated 0.4.2 (2026-10-09) | — |
+| libcss | validated | validated 0.9.2 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libdom | validated | validated 0.4.2 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | libgcrypt | 1.5.6 validated (reinstalled on messer 2026-10-10) | validated 1.5.6 (2026-10-10; needs `-D__sparc_v8__` for the V8 udiv/umul in mpi) | validated (2026-11-18; builds, installs and `pkg test libgcrypt` passes) |
 | libgpg-error | 1.12 validated | validated 1.12 (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test libgpg-error` passes) |
-| libhubbub | validated | validated 0.3.8 (2026-10-09) | — |
+| libhubbub | validated | validated 0.3.8 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | libiconv | validated | validated 1.15 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | libmad | validated (reinstalled on messer 2026-10-10; `VERSION` is exported to the build) | validated 0.15.1b (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test libmad` passes) |
 | libmpeg2 | validated | validated (2026-10-10) | validated (2026-11-18; builds, installs and `pkg test libmpeg2` passes) |
-| libnsbmp | validated | validated 0.1.7 (2026-10-09) | — |
-| libnsfb | validated | validated 0.2.2 (2026-10-09) | — |
-| libnsgif | validated | validated (2026-10-10) | — |
-| libnslog | validated | validated (2026-10-10) | — |
-| libnsutils | validated | validated 0.1.1 (2026-10-09) | — |
-| libparserutils | validated | validated 0.2.5 (rebootstrap, 2026-10-08) | — |
+| libnsbmp | validated | validated 0.1.7 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libnsfb | validated | validated 0.2.2 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libnsgif | validated | validated (2026-10-10) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libnslog | validated | validated (2026-10-10) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libnsutils | validated | validated 0.1.1 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libparserutils | validated | validated 0.2.5 (rebootstrap, 2026-10-08) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | libpng | validated | validated 1.6.59 (2026-10-09) | validated (2026-11-18; builds, installs and `pkg test libpng` passes) |
-| libsvgtiny | validated | validated 0.1.8 (2026-10-09) | — |
-| libwapcaplet | validated | validated 0.4.3 (rebootstrap, 2026-10-08) | — |
+| libsvgtiny | validated | validated 0.1.8 (2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
+| libwapcaplet | validated | validated 0.4.3 (rebootstrap, 2026-10-08) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | libxml2 | validated on x86 (2.15.4: build, install, test; reinstalled on messer 2026-10-10, LZMA test case dropped with 2.15) | validated 2.15.4 (2026-10-13) | validated (2026-11-18; builds, installs and `pkg test libxml2` passes) |
 | lua | validated | validated (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test lua` passes) |
 | lua51 | 5.1.5 validated | validated 5.1.5 (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test lua51` passes) |
@@ -121,10 +121,10 @@ SPARC `test world` of 2026-10-14 covers every row.
 | hackem | validated 1.3.2 (2026-11-06; x86: builds, installs and `pkg test` passes and the game runs in both the tty and curses interfaces; Hack'EM, an EvilHack-based (NetHack 3.6) successor to Slash'EM, last upstream commit 2024-09-01 from nethack-cleaner/HackEM commit ef72a41; built with DUMPLOG because the sources need it; installed as `hackem` in /usr/local/lib/hackemdir with a sysconf stripped of the stock server settings) | validated 1.3.2 (2026-11-13; builds, installs, `pkg test` passes and the game plays in both the tty and curses interfaces; unsigned memcmp/strcmp via pkg_cmp_shim) | builds, installs and `pkg test hackem` passes (2026-11-19); built at -O1 with -fno-inline-functions-called-once -fno-jump-tables, because the 68k assembler cannot encode 16-bit jump table offsets in big functions; unsigned memcmp/strcmp via pkg_cmp_shim; gameplay to be confirmed |
 | unnethack | validated 6.0.17 (2026-11-01; x86: builds, installs, `pkg test` passes and the game runs; GitHub master commit 0eafa32; tty and curses interfaces, terminfo through the ncurses package; installed as `unnethack` in /usr/local/share/unnethack; fcntl locking is off because it fails here, so files are locked with link()) | validated 6.0.17 (2026-11-12; builds, installs, `pkg test` passes and the game plays in both the tty and curses interfaces; unsigned memcmp/strcmp via pkg_cmp_shim) | builds, installs and `pkg test unnethack` passes (2026-11-19); built at -O1 with -fno-inline-functions-called-once -fno-jump-tables, because the 68k assembler cannot encode 16-bit jump table offsets in big functions; unsigned memcmp/strcmp via pkg_cmp_shim; gameplay to be confirmed |
 | splicehack | validated 1.2.0 (2026-11-05; x86: builds, installs, `pkg test` passes and the game plays in both the tty and curses interfaces; NetHack 3.7-based, last upstream commit 2022-09-19, from NullCGT/SpliceHack commit 8d70ade; builds the staged Lua 5.4.8 with the nethack5 package's OPENSTEP patch; installed as `splicehack` in /usr/local/lib/splicehackdir with a sysconf stripped of the stock server settings) | validated 1.2.0 (2026-11-11; builds, installs, `pkg test` passes and the game runs in both the tty and curses interfaces; unsigned memcmp/strcmp via pkg_cmp_shim) | builds, installs and `pkg test splicehack` passes (2026-11-19); built at -O1 with -fno-inline-functions-called-once -fno-jump-tables, because the 68k assembler cannot encode 16-bit jump table offsets in big functions; unsigned memcmp/strcmp via pkg_cmp_shim; gameplay to be confirmed |
-| netsurf-buildsystem | validated | validated 1.10 (rebootstrap, 2026-10-08) | — |
+| netsurf-buildsystem | validated | validated 1.10 (rebootstrap, 2026-10-08) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | netsurf-openstep | validated 3.12-dev.20261002 (2026-10-22; builds from turbolent/netsurf-openstep at 5fd3476, installs NetSurf.app into /usr/local/Apps, test passes; connects to slashdot.org over TLS) | n/a (i386 only) | n/a (i386 only) |
 | neXtaw | validated | validated (2026-10-10) | validated (2026-10-26; builds, installs and `pkg test` passes) |
-| nsgenbind | validated | validated 0.9 (2026-10-09; needed `-include stdlib.h -DYYMALLOC=malloc -DYYFREE=free`: the bison skeleton's own malloc prototype clashed with the system's) | — |
+| nsgenbind | validated | validated 0.9 (2026-10-09; needed `-include stdlib.h -DYYMALLOC=malloc -DYYFREE=free`: the bison skeleton's own malloc prototype clashed with the system's) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | ntp | validated (build, install, test; ntpdate and ntpd run against a server); on a fresh host configure's `setrlimit` check failed (prototype clash with `<sys/resource.h>`), so `ntp/build` supplies a no-op `ntp_rlimit()` (x86 rebuilt with it); `rc.ntp` boot script tested on Linux only; 2026-10-10: ntpdate stepped the clock again on x86 after `ntp/build` told configure that `settimeofday` and `adjtime` exist (their link tests are defeated by the forced header; without them ntpdate failed with "step-systime: error 0"); `pkg test ntp` now checks for a linked clock-setting call and queries public servers (needs the internet; `PKG_TEST_NTP_OFFLINE=1` skips) | validated (2026-10-10; builds without `<memory.h>`/NetInfo, `sigsetjmp` mapped onto `setjmp`; test hooks pass and ntpdate sets the clock) | validated 4.2.8p18 (2026-11-15; builds, installs and `pkg test ntp` passes; NetInfo left out as on SPARC, and the mode 7 layout check skipped: the 68k pads the ntpdc request structures differently, so ntpdc will not interoperate with a ntpd on another kind of machine, ntpq is unaffected) |
 | openmail | — (new 2026-10-16: the session code is tested against Dovecot on Linux; the AppKit windows are checked against the 4.2 headers but have not been built or run on OPENSTEP) | — | — |
 | openssh | validated (10.6p1: sshd, ssh login by password and key, scp); `rc.sshd` boot script tested on Linux only | validated 10.6p1 (2026-10-09; builds and passes its tests, against the rebuilt libcrypto; needed `PICFLAG=` since the SPARC assembler cannot relocate the position-independent code that openbsd-compat is otherwise compiled as) | validated (2026-10-22; built with gcc42, tests pass) |
