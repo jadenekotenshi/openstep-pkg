@@ -64,7 +64,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | darkhttpd | validated 1.13 (2026-10-25; builds, installs and tests; the test serves a directory and fetches from it) | validated 1.13 (2026-10-25; builds, installs, tests; the system printf misread %llu/%zu, so output goes through the snprintf shim) | validated (2026-11-17; builds, installs and `pkg test darkhttpd` passes) |
 | dash | validated 0.5.12 on x86 (2026-10-25; builds, installs, tests, and an interactive session with job control works; private stdint/inttypes, <dirent.h> and <sys/wait.h>, a sigaction-on-sigvec shim and waitpid/setpgid/getpgrp/tcgetpgrp/getcwd/strtoll/strsignal/vsnprintf shims) | validated 0.5.12 (2026-10-25; builds, installs and tests) | validated (2026-11-17; builds, installs and `pkg test dash` passes) |
 | diffutils | validated | validated 2.8.1 (2026-10-09) | validated (2026-11-17; builds, installs and `pkg test diffutils` passes; unsigned memcmp/strcmp via pkg_cmp_shim) |
-| duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | — |
+| duktape | validated | validated (2026-10-10; installed archive needs `ranlib`) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | emacs | validated | validated (2026-10-10; needed the pdumper alignment fixes for the 64-bit wide-int Lisp_Object, and a SPARC `netinet/in.h` big-endian branch) | — |
 | expat | validated | validated 2.9.0 (rebootstrap, 2026-10-08) | validated (2026-10-20; built with gcc42, tests pass) |
 | ffmpeg | validated (reinstalled on messer 2026-10-10, after curl stopped using zstd) | validated (2026-10-10) | — |
@@ -129,7 +129,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | openmail | — (new 2026-10-16: the session code is tested against Dovecot on Linux; the AppKit windows are checked against the 4.2 headers but have not been built or run on OPENSTEP) | — | — |
 | openssh | validated (10.6p1: sshd, ssh login by password and key, scp); `rc.sshd` boot script tested on Linux only | validated 10.6p1 (2026-10-09; builds and passes its tests, against the rebuilt libcrypto; needed `PICFLAG=` since the SPARC assembler cannot relocate the position-independent code that openbsd-compat is otherwise compiled as) | validated (2026-10-22; built with gcc42, tests pass) |
 | openssl | validated | validated 1.1.1w (rebuilt 2026-10-09 with the unsigned memcmp via pkg_cmp_named, which fixed OID lookups by DER bytes: SHA1, AES, SHA-2, secp384r1 and others had failed; the broadened `pkg test` passes: OIDs, digests, EC keys, signatures, chains, AES). The original failure is fixed: a secp384r1 key now round-trips through `openssl ec -pubout`. curl and openssh rebuilt against it link and pass their tests. Still to check on SPARC: `oidtest` recompiled (an old binary carries the old static library) | validated (2026-10-19; m68k-only workarounds) |
-| p7zip | validated | validated (2026-10-10) | — |
+| p7zip | validated | validated (2026-10-10) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | pantomime | validated 1.4.0 (2026-10-16; build, install and the 46 offline checks pass; `pmail` has connected to a local server; the full IMAP/POP3/SMTP flows are tested against Dovecot on Linux) | validated 1.4.0 (2026-10-16; build, install and the offline checks pass; `pmail` connected to a local server) | — |
 | patch | validated | validated 2.6.1 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
 | pdksh | validated | validated 5.2.14 (rebootstrap, 2026-10-08) | validated (2026-10-19; built, installed and tested as a dependency of gcc42) |
@@ -137,7 +137,7 @@ SPARC `test world` of 2026-10-14 covers every row.
 | pkgconf | validated on x86 (3.0.7: build, install, test; replaces pkg-config 0.29) | validated 3.0.7 (rebootstrap, 2026-10-08) | validated (2026-11-17; builds, installs and `pkg test pkgconf` passes) |
 | python311 | validated | validated 3.11.17 (2026-10-13; needs a correct `ldexp()` on SPARC: the libm one returns 0 for subnormal results) | validated 3.11.17 (2026-10-31; builds, installs and `pkg test python311` passes; the 68k FPU flushes subnormal operands to zero, so `frexp()` is replaced by an integer-shift version in the OPENSTEP patch) |
 | quake2 | validated (content-free dedicated-server startup test; no game data) | validated (2026-10-10; content-free dedicated-server startup test) | validated (2026-10-26; builds, installs and `pkg test` passes) |
-| quickjs | validated | validated 2025-09-13-2 (2026-10-13; SPARC needs memcpy accessors and an 8-byte aligned constant pool) | — |
+| quickjs | validated | validated 2025-09-13-2 (2026-10-13; SPARC needs memcpy accessors and an 8-byte aligned constant pool) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | roboclient | validated (1.1 with `rc.dhcp` installs and tests clean on x86) | validated 1.1 (2026-10-09) | — |
 | rsync | validated | validated (2026-10-10) | validated (2026-11-16; builds, installs and `pkg test rsync` passes) |
 | sdl12 | validated | validated (2026-10-10; per-arch cc flags instead of a hardcoded -m486) | validated (2026-11-18; builds, installs and `pkg test sdl12` passes; the Linux-syntax 68k mixer assembly in SDL_mixer_m68k.c is compiled out, since this assembler rejects it, so mixing uses the C code) |
@@ -151,9 +151,9 @@ SPARC `test world` of 2026-10-14 covers every row.
 | top | validated | validated 3.6.1 (2026-10-09; needed work: the SPARC kernel refuses the `utask` read through /dev/kmem that holds the command name, so reads are non-fatal and names come from one `ps -axc` snapshot per refresh; the process list matches the x86 one; the earlier SPARC result was only an install) | validated (2026-11-14; builds, installs and `pkg test top` passes) |
 | unzip | validated | validated 6.0 (rebootstrap, 2026-10-08) | validated (2026-11-17; builds, installs and `pkg test unzip` passes) |
 | utf8proc | validated | validated (2026-10-10) | validated (2026-11-17; builds, installs and `pkg test utf8proc` passes) |
-| vim | validated | validated 9.2.1091 (rebuilt 2026-10-09) | — |
+| vim | validated | validated 9.2.1091 (rebuilt 2026-10-09) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | vlc | 0.9.10 validated (runs as root) | validated (2026-10-10; the i386-only flags and Mach-O subtype fix are skipped, the audio test expects host byte order) | — |
-| wget | 1.25.0 validated on x86 (HTTPS via OpenSSL) | 1.25.0 validated (2026-10-10) | — |
+| wget | 1.25.0 validated on x86 (HTTPS via OpenSSL) | 1.25.0 validated (2026-10-10) | validated (2026-10-27; builds, installs and `pkg test` passes) |
 | wget-bootstrap | 1.19.5 validated | validated 1.19.5 (needs the localtime and unsigned-compare fixes; rebootstrap, 2026-10-08) | validated (2026-10-19; m68k-only workarounds) |
 | windowmaker | validated 0.80.0 (2026-10-24; builds, installs, test passes, runs under CubXWindow; Dock and Clip off by default) | validated 0.80.0 (2026-10-24; builds, installs, tests and runs under CubXWindow) | validated (2026-10-26; builds, installs and `pkg test` passes) |
 | xxhash | validated (manual build, after replacing `ln -sf`; rebuilt on a fresh host) | validated 0.8.4 (`XXH_FORCE_MEMORY_ACCESS=0`: the default packed-union reads bus-error with gcc 4.2; compiling `xxhash.c` is very slow; rebootstrap, 2026-10-08) | validated 0.8.4 (2026-11-15; builds, installs and `pkg test xxhash` passes; built with `XXH_FORCE_MEMORY_ACCESS=0`, as on SPARC) |
